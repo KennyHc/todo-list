@@ -86,6 +86,96 @@ describe('task store history', () => {
   });
 });
 
+describe('undo', () => {
+  it('restores a deleted subtree and the history', () => {
+    const p = get().add({ title: 'P' });
+    const c = get().add({ title: 'C', parentId: p });
+    const other = get().add({ title: 'O' });
+    get().toggle(other);
+    const before = { tasks: get().tasks, rootIds: get().rootIds, history: get().history };
+    get().remove(p);
+    expect(get().undo?.label).toBe('Deleted \u201cP\u201d and 1 subtask');
+    expect(get().tasks[c]).toBeUndefined();
+    get().undoLast();
+    expect(get().tasks).toBe(before.tasks);
+    expect(get().rootIds).toBe(before.rootIds);
+    expect(get().history).toBe(before.history);
+    expect(get().undo).toBeNull();
+  });
+
+  it('undoes a cascade completion, including the history entries', () => {
+    const p = get().add({ title: 'P' });
+    const c1 = get().add({ title: 'C1', parentId: p });
+    const c2 = get().add({ title: 'C2', parentId: p });
+    get().toggle(c1);
+    get().toggle(c2);
+    expect(get().undo?.label).toBe('Completed 2 tasks');
+    expect(get().tasks[p].done).toBe(true);
+    expect(get().history).toHaveLength(3);
+    get().undoLast();
+    expect(get().tasks[p].done).toBe(false);
+    expect(get().tasks[c2].done).toBe(false);
+    expect(get().tasks[c1].done).toBe(true);
+    expect(get().history.map((e) => e.title)).toEqual(['C1']);
+    expect(get().lastToggle).toBeNull();
+  });
+
+  it('labels single completions and reopens', () => {
+    const a = get().add({ title: 'A' });
+    get().toggle(a);
+    expect(get().undo?.label).toBe('Completed \u201cA\u201d');
+    get().toggle(a);
+    expect(get().undo?.label).toBe('Reopened \u201cA\u201d');
+  });
+
+  it('undoes clearCompleted', () => {
+    const a = get().add({ title: 'A' });
+    get().add({ title: 'B' });
+    get().toggle(a);
+    get().clearCompleted();
+    expect(get().undo?.label).toBe('Cleared 1 completed');
+    expect(get().tasks[a]).toBeUndefined();
+    get().undoLast();
+    expect(get().tasks[a].done).toBe(true);
+    expect(get().rootIds).toContain(a);
+  });
+
+  it('does not record an undo for a no-op clearCompleted', () => {
+    get().add({ title: 'A' });
+    get().clearCompleted();
+    expect(get().undo).toBeNull();
+  });
+
+  it('only undoes the latest action, and non-undoable actions keep the entry', () => {
+    const a = get().add({ title: 'A' });
+    const b = get().add({ title: 'B' });
+    get().remove(a);
+    get().remove(b);
+    const entry = get().undo;
+    get().add({ title: 'C' });
+    get().update(b, {});
+    expect(get().undo).toBe(entry);
+    get().undoLast();
+    expect(get().tasks[b]).toBeDefined();
+    expect(get().tasks[a]).toBeUndefined();
+    get().undoLast();
+    expect(get().tasks[a]).toBeUndefined();
+  });
+
+  it('undoes history clearing and replaceAll', () => {
+    const a = get().add({ title: 'A' });
+    get().toggle(a);
+    get().clearHistory();
+    expect(get().undo?.label).toBe('Cleared history (1 entry)');
+    get().undoLast();
+    expect(get().history).toHaveLength(1);
+    get().replaceAll({ tasks: {}, rootIds: [], history: [] }, 'Imported backup');
+    expect(get().rootIds).toEqual([]);
+    get().undoLast();
+    expect(get().tasks[a]).toBeDefined();
+  });
+});
+
 describe('ui store', () => {
   it('sets view and tag filter', () => {
     useUIStore.getState().setView('deadline');

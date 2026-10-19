@@ -7,6 +7,7 @@ import { ProgressRing } from './components/ProgressRing';
 import { TaskInput } from './components/TaskInput';
 import { TaskList } from './components/TaskList';
 import { ThemeToggle } from './components/ThemeToggle';
+import { UndoToast } from './components/UndoToast';
 import { ViewToolbar } from './components/ViewToolbar';
 import { useUIStore } from './store/ui';
 import { useTaskStore, useTotals } from './store/tasks';
@@ -75,6 +76,7 @@ function App() {
           </>
         )}
       </main>
+      <UndoToast />
     </MotionConfig>
   );
 }

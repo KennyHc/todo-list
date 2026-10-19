@@ -74,6 +74,26 @@ describe('App', () => {
     expect(Object.keys(useTaskStore.getState().tasks)).toHaveLength(0);
   });
 
+  it('shows an undo toast after deleting a leaf, and Undo brings it back', async () => {
+    render(<App />);
+    addViaInput('Buy milk');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete task' }));
+    const toast = await screen.findByRole('status');
+    expect(within(toast).getByText('Deleted \u201cBuy milk\u201d')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Buy milk')).not.toBeInTheDocument());
+    fireEvent.click(within(toast).getByRole('button', { name: 'Undo' }));
+    expect(await screen.findByText('Buy milk')).toBeInTheDocument();
+    expect(Object.keys(useTaskStore.getState().tasks)).toHaveLength(1);
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+  });
+
+  it('shows an undo toast after checking a task', () => {
+    render(<App />);
+    addViaInput('Write docs');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Write docs' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Completed \u201cWrite docs\u201d');
+  });
+
   it('asks before deleting a parent and keeps it on Cancel', async () => {
     render(<App />);
     act(() => {
