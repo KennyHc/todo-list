@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { useMemo } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
+import { appendAiTasks, type AiImportTask } from '../lib/ai';
 import { toggleDelay } from '../lib/cascade';
 import { applyHistory, diffCompletions, type HistoryEntry } from '../lib/history';
 import {
@@ -65,6 +66,10 @@ type TaskActions = {
   hydrate: (partial: Partial<PersistedTasks>) => void;
   /** Replaces tasks, rootIds and history (e.g. a backup import) and records an undo. */
   replaceAll: (data: PersistedTasks, label: string) => void;
+  /** Appends imported (AI) tasks at the root, with an undo. Returns the new root ids. */
+  appendTasks: (tasks: AiImportTask[], label: string) => string[];
+  /** Replaces the whole list with imported (AI) tasks, keeping the history, with an undo. */
+  replaceWithTasks: (tasks: AiImportTask[], label: string) => string[];
   /** Restores the state from before the latest undoable action. */
   undoLast: () => void;
   dismissUndo: () => void;
@@ -241,6 +246,30 @@ export const createTaskStore = () =>
         lastToggle: null,
         undo: undoEntry(get(), label),
       }),
+    appendTasks: (tasks, label) => {
+      const state = get();
+      const { tree, ids, count } = appendAiTasks(treeOf(state), tasks);
+      if (count === 0) return [];
+      set({
+        tasks: tree.tasks,
+        rootIds: tree.rootIds,
+        lastToggle: null,
+        undo: undoEntry(state, label),
+      });
+      return ids;
+    },
+    replaceWithTasks: (tasks, label) => {
+      const state = get();
+      const { tree, ids, count } = appendAiTasks(emptyTree(), tasks);
+      if (count === 0) return [];
+      set({
+        tasks: tree.tasks,
+        rootIds: tree.rootIds,
+        lastToggle: null,
+        undo: undoEntry(state, label),
+      });
+      return ids;
+    },
     undoLast: () => {
       const entry = get().undo;
       if (!entry) return;

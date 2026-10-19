@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { taskStorage } from './storage';
 
 export type View = 'tree' | 'deadline' | 'history';
+export type AiDialog = 'copy' | 'import' | null;
 
 type UIState = {
   view: View;
@@ -14,6 +15,8 @@ type UIState = {
   filterOpen: boolean;
   paletteOpen: boolean;
   sheetOpen: boolean;
+  /** Which AI copy/paste dialog is open. Not persisted. */
+  aiDialog: AiDialog;
   /** A row asked (by hotkey or palette) to run its own delete flow. Not persisted. */
   deleteRequestId: string | null;
   /** Latest "reveal" pulse; `n` changes on every pulse so the same row can flash again. */
@@ -24,6 +27,7 @@ type UIState = {
   setFilterOpen: (open: boolean) => void;
   setPaletteOpen: (open: boolean) => void;
   setSheetOpen: (open: boolean) => void;
+  setAiDialog: (dialog: AiDialog) => void;
   requestDelete: (id: string) => void;
   clearDeleteRequest: () => void;
   flashRow: (id: string) => void;
@@ -38,6 +42,7 @@ export const useUIStore = create<UIState>()(
       filterOpen: false,
       paletteOpen: false,
       sheetOpen: false,
+      aiDialog: null,
       deleteRequestId: null,
       revealFlash: null,
       setView: (view) => set({ view }),
@@ -46,6 +51,7 @@ export const useUIStore = create<UIState>()(
       setFilterOpen: (filterOpen) => set({ filterOpen }),
       setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
       setSheetOpen: (sheetOpen) => set({ sheetOpen }),
+      setAiDialog: (aiDialog) => set({ aiDialog }),
       requestDelete: (deleteRequestId) => set({ deleteRequestId }),
       clearDeleteRequest: () => set({ deleteRequestId: null }),
       flashRow: (id) => set((s) => ({ revealFlash: { id, n: (s.revealFlash?.n ?? 0) + 1 } })),

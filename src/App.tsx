@@ -1,6 +1,8 @@
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { AnimatedNumber } from './components/AnimatedNumber';
 import { DeadlineList } from './components/DeadlineList';
+import { CopyForAiDialog } from './components/CopyForAiDialog';
+import { ImportFromAiDialog } from './components/ImportFromAiDialog';
 import { CommandPalette } from './components/CommandPalette';
 import { EmptyState } from './components/EmptyState';
 import { MigrationToast } from './components/MigrationToast';
@@ -89,6 +91,8 @@ function App() {
       <MigrationToast />
       <CommandPalette />
       <ShortcutsSheet />
+      <CopyForAiDialog />
+      <ImportFromAiDialog />
     </MotionConfig>
   );
 }

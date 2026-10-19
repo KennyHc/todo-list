@@ -22,9 +22,11 @@ import {
   Moon,
   Plus,
   Search,
+  Sparkles,
   Sun,
   Tag,
   Undo2,
+  WandSparkles,
   type LucideIcon,
 } from 'lucide-react';
 import { exportBackup } from '../lib/backup';
@@ -164,6 +166,20 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
         run: onAskClear,
       });
     }
+    list.push(
+      {
+        id: 'ai-copy',
+        label: 'Copy for AI',
+        Icon: Sparkles,
+        run: () => ui().setAiDialog('copy'),
+      },
+      {
+        id: 'ai-import',
+        label: 'Import from AI\u2026',
+        Icon: WandSparkles,
+        run: () => ui().setAiDialog('import'),
+      },
+    );
     list.push({ id: 'export', label: 'Export backup', Icon: Download, run: () => exportBackup() });
     if (undo) {
       list.push({

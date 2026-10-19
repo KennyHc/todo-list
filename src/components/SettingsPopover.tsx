@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
-import { Download, LogOut, Upload } from 'lucide-react';
+import { Download, LogOut, Sparkles, Upload, WandSparkles } from 'lucide-react';
 import { useTaskStore, type PersistedTasks } from '../store/tasks';
 import { exportBackup, parseBackup, formatBackupDescription } from '../lib/backup';
 import { useAuthStore } from '../store/auth';
+import { useUIStore } from '../store/ui';
 import { useSyncStore, type SyncStatus } from '../sync/status';
 import { Popover } from './Popover';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -49,6 +50,11 @@ export function SettingsPopover() {
   const signOut = useAuthStore((s) => s.signOut);
   const syncStatus = useSyncStore((s) => s.syncStatus);
   const [photoFailed, setPhotoFailed] = useState(false);
+
+  const openAi = (dialog: 'copy' | 'import') => {
+    setPopoverOpen(false);
+    useUIStore.getState().setAiDialog(dialog);
+  };
 
   const handleExport = () => {
     if (exportBackup()) setPopoverOpen(false);
@@ -176,6 +182,29 @@ export function SettingsPopover() {
               <div className={styles.divider} role="separator" />
             </>
           )}
+          <div className={styles.section}>AI</div>
+
+          <button
+            type="button"
+            role="menuitem"
+            className={styles.item}
+            onClick={() => openAi('copy')}
+          >
+            <Sparkles size={15} />
+            <span>Copy for AI</span>
+          </button>
+
+          <button
+            type="button"
+            role="menuitem"
+            className={styles.item}
+            onClick={() => openAi('import')}
+          >
+            <WandSparkles size={15} />
+            <span>Import from AI…</span>
+          </button>
+
+          <div className={styles.divider} role="separator" />
           <div className={styles.section}>Data</div>
 
           <button type="button" role="menuitem" className={styles.item} onClick={handleExport}>

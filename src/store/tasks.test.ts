@@ -302,3 +302,50 @@ describe('hydrate', () => {
     expect(get().undo).not.toBeNull();
   });
 });
+
+describe('AI import actions', () => {
+  const imported = [
+    {
+      title: 'Plan',
+      difficulty: 1 as const,
+      tags: [],
+      subtasks: [
+        { title: 'Step 1', difficulty: 2 as const, tags: [], subtasks: [] },
+        { title: 'Step 2', difficulty: 3 as const, tags: [], subtasks: [] },
+      ],
+    },
+  ];
+
+  it('appendTasks adds at the root, records an undo with the label, and undo restores', () => {
+    const existing = get().add({ title: 'Existing' });
+    const ids = get().appendTasks(imported, 'Added 3 tasks from AI');
+    expect(ids).toHaveLength(1);
+    expect(get().rootIds).toEqual([existing, ids[0]]);
+    expect(get().tasks[ids[0]].childIds).toHaveLength(2);
+    expect(get().undo?.label).toBe('Added 3 tasks from AI');
+    get().undoLast();
+    expect(get().rootIds).toEqual([existing]);
+    expect(Object.keys(get().tasks)).toEqual([existing]);
+  });
+
+  it('appendTasks ignores an empty import', () => {
+    expect(get().appendTasks([], 'nothing')).toEqual([]);
+    expect(get().undo).toBeNull();
+  });
+
+  it('replaceWithTasks starts from an empty tree, keeps the history, and undoes', () => {
+    const a = get().add({ title: 'Old' });
+    get().toggle(a);
+    const history = get().history;
+    expect(history).toHaveLength(1);
+    const ids = get().replaceWithTasks(imported, 'Replaced list');
+    expect(get().rootIds).toEqual(ids);
+    expect(get().tasks[a]).toBeUndefined();
+    expect(Object.keys(get().tasks)).toHaveLength(3);
+    expect(get().history).toBe(history);
+    expect(get().undo?.label).toBe('Replaced list');
+    get().undoLast();
+    expect(get().tasks[a]).toBeDefined();
+    expect(get().rootIds).toEqual([a]);
+  });
+});
