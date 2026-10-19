@@ -177,11 +177,44 @@
 
 @media (max-width: 480px) {
   .row {
+    flex-wrap: wrap;
     gap: 4px;
     padding-right: 4px;
+    align-items: flex-start;
   }
 
   .iconBtn {
     width: 24px;
+    height: 24px;
+    padding: 10px;
+  }
+
+  .title {
+    flex: 1 1 auto;
+    order: 2;
+  }
+
+  .meta {
+    flex-basis: 100%;
+    order: 3;
+    margin-left: 48px;
+    margin-top: 4px;
+  }
+
+  .actions {
+    order: 4;
+  }
+
+  .chevron,
+  .chevronSpacer {
+    order: 0;
+  }
+
+  .row > :nth-child(2) {
+    order: 1;
+  }
+
+  .children {
+    margin-left: 12px;
   }
 }

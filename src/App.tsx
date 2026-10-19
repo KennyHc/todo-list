@@ -24,7 +24,23 @@ function App() {
         </header>
         <TaskInput />
         {isEmpty ? (
-          <p className={styles.empty}>Nothing here yet. Add your first task above.</p>
+          <div className={styles.emptyState}>
+            <div className={styles.emptyIcon}>
+              <svg viewBox="0 0 24 24" width="32" height="32" fill="none">
+                <path
+                  d="M 5 13 L 9 17 L 19 7"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <p className={styles.emptyTitle}>Nothing here yet</p>
+            <p className={styles.emptyHint}>
+              Add a task above — big ones can be broken into subtasks.
+            </p>
+          </div>
         ) : (
           <TaskList />
         )}
