@@ -23,6 +23,7 @@ import { useAuthStore } from './store/auth';
 import { useUIStore } from './store/ui';
 import { useTaskStore, useTotals } from './store/tasks';
 import styles from './App.module.css';
+import { useIntro } from './hooks/useIntro';
 
 const dateFormat = new Intl.DateTimeFormat(undefined, {
   weekday: 'long',
@@ -38,10 +39,11 @@ function App() {
   const { openDifficulty, done, total } = useTotals();
   useHotkeys();
   usePasteImport();
+  const intro = useIntro();
 
   return (
     <MotionConfig reducedMotion="user">
-      <main className="app">
+      <main className={intro ? 'app intro' : 'app'}>
         <header className={styles.header}>
           <div className={styles.heading}>
             <h1 className={styles.title}>Tasks</h1>

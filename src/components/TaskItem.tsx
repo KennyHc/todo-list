@@ -228,6 +228,23 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
   const hiddenTags = task.tags.slice(tagLimit);
   const edit = () => useTaskStore.getState().setEditingId(id);
 
+  const chevron = (
+    <motion.button
+      type="button"
+      className={`${styles.iconBtn} ${styles.chevron}`}
+      aria-label={task.collapsed ? 'Expand' : 'Collapse'}
+      aria-expanded={!task.collapsed}
+      onClick={() => store.update(id, { collapsed: !task.collapsed })}
+      initial={false}
+      animate={{ rotate: task.collapsed ? 0 : 90 }}
+      whileHover={{ scale: 1.08 }}
+      whileTap={{ scale: 0.9 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 26 }}
+    >
+      <ChevronRight size={15} strokeWidth={1.75} aria-hidden="true" />
+    </motion.button>
+  );
+
   return (
     <motion.li
       className={styles.item}
@@ -323,24 +340,9 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
                   <GripVertical size={14} strokeWidth={1.75} aria-hidden="true" />
                 </button>
               )}
-              {flat ? null : leaf ? (
-                <span className={styles.chevronSpacer} />
-              ) : (
-                <motion.button
-                  type="button"
-                  className={`${styles.iconBtn} ${styles.chevron}`}
-                  aria-label={task.collapsed ? 'Expand' : 'Collapse'}
-                  aria-expanded={!task.collapsed}
-                  onClick={() => store.update(id, { collapsed: !task.collapsed })}
-                  initial={false}
-                  animate={{ rotate: task.collapsed ? 0 : 90 }}
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.9 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 26 }}
-                >
-                  <ChevronRight size={15} strokeWidth={1.75} aria-hidden="true" />
-                </motion.button>
-              )}
+              {/* Phones put the disclosure chevron on the trailing side (iOS-style), so the checkbox
+                  sits on the content's leading edge instead of after an empty chevron column. */}
+              {flat || phone ? null : leaf ? <span className={styles.chevronSpacer} /> : chevron}
               <Checkbox
                 checked={task.done}
                 color={task.color}
@@ -410,6 +412,7 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
                     </span>
                   </span>
                 )}
+                {phone && !flat && !leaf && chevron}
               </div>
               <div className={styles.actions}>
                 <TaskMenu
