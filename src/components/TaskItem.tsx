@@ -10,6 +10,7 @@ import {
 } from 'framer-motion';
 import { ChevronRight, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
+import { useIsTouch } from '../hooks/useIsTouch';
 import { getAncestors, getDescendants } from '../lib/tree';
 import { isContextOnly, neighborAfterRemoval, taskPath, visibleOrder } from '../lib/views';
 import {
@@ -31,6 +32,7 @@ import { DuePill } from './DuePill';
 import { TagChip } from './TagChip';
 import { TaskMenu } from './TaskMenu';
 import { StrikeText } from './StrikeText';
+import { SwipeRow } from './SwipeRow';
 import styles from './TaskItem.module.css';
 import { TitleEditor } from './TitleEditor';
 
@@ -85,6 +87,8 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
   const delay = useToggleDelay(id);
   const reduced = useReducedMotion();
   const dragging = useDragStore((s) => s.activeId === id);
+  const anyDragging = useDragStore((s) => s.activeId !== null);
+  const touch = useIsTouch();
   const hidden = useDragStore((s) => s.hiddenIds.has(id));
   const layoutOff = useDragStore((s) => s.layoutOff);
   const tagFilter = useUIStore((s) => s.tagFilter);
@@ -137,42 +141,52 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
   }, [done_, id, delay, reduced, pulse, flash]);
 
   /** Shake the row, then remove it so the list's exit animation runs. */
-  const runDelete = useCallback(async () => {
-    if (deleting.current) return;
-    deleting.current = true;
-    try {
-      if (!reduced) {
-        await Promise.all([
-          pulse.start({
-            x: SHAKE_X,
-            transition: { duration: SHAKE_SECONDS, ease: 'easeInOut' },
-          }),
-          tint.start({
-            opacity: [0, 1, 1, 1, 1, 1, 1],
-            transition: { duration: SHAKE_SECONDS, ease: 'easeOut' },
-          }),
-        ]);
+  const runDelete = useCallback(
+    async (shake = true) => {
+      if (deleting.current) return;
+      deleting.current = true;
+      try {
+        if (shake && !reduced) {
+          await Promise.all([
+            pulse.start({
+              x: SHAKE_X,
+              transition: { duration: SHAKE_SECONDS, ease: 'easeInOut' },
+            }),
+            tint.start({
+              opacity: [0, 1, 1, 1, 1, 1, 1],
+              transition: { duration: SHAKE_SECONDS, ease: 'easeOut' },
+            }),
+          ]);
+        }
+        // Keyboard focus moves on to the neighbouring row, so j/k keep working after a delete.
+        const ui = useUIStore.getState();
+        if (ui.focusedId === id) {
+          const tasks = useTaskStore.getState();
+          const order = visibleOrder(tasks, { view: ui.view, tag: ui.tagFilter });
+          ui.setFocusedId(
+            neighborAfterRemoval(order, id, new Set([id, ...getDescendants(tasks, id)])),
+          );
+        }
+        useTaskStore.getState().remove(id);
+      } finally {
+        deleting.current = false;
       }
-      // Keyboard focus moves on to the neighbouring row, so j/k keep working after a delete.
-      const ui = useUIStore.getState();
-      if (ui.focusedId === id) {
-        const tasks = useTaskStore.getState();
-        const order = visibleOrder(tasks, { view: ui.view, tag: ui.tagFilter });
-        ui.setFocusedId(
-          neighborAfterRemoval(order, id, new Set([id, ...getDescendants(tasks, id)])),
-        );
-      }
-      useTaskStore.getState().remove(id);
-    } finally {
-      deleting.current = false;
-    }
-  }, [id, reduced, pulse, tint]);
+    },
+    [id, reduced, pulse, tint],
+  );
 
   const requestDelete = useCallback(() => {
     if (deleting.current) return;
     const count = getDescendants(useTaskStore.getState(), id).length;
     if (count > 0) setConfirm({ open: true, count });
     else void runDelete();
+  }, [id, runDelete]);
+
+  /** Swipe-to-delete: the gesture is the confirmation for a leaf, so no shake; parents still ask. */
+  const swipeDelete = useCallback(() => {
+    const count = getDescendants(useTaskStore.getState(), id).length;
+    if (count > 0) setConfirm({ open: true, count });
+    else void runDelete(false);
   }, [id, runDelete]);
 
   // The Delete hotkey asks through the store, so it takes the same path as the delete button.
@@ -239,160 +253,176 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
           />
         ))}
         <div className={styles.stack}>
-          <motion.div
-            ref={rowRef}
-            className={`${styles.row} ${task.done ? styles.rowDone : ''} ${editing ? styles.rowEditing : ''} ${focused ? styles.rowFocused : ''}`}
-            data-dim={dimmed || undefined}
-            data-focused={focused || undefined}
-            animate={pulse}
-            onClick={(e) => {
-              // A click on the row itself (not a button, input or link inside it) focuses it.
-              if (
-                (e.target as Element).closest('button, input, a, [role="checkbox"], [role="radio"]')
-              ) {
-                return;
-              }
-              useUIStore.getState().setFocusedId(id);
-            }}
+          <SwipeRow
+            enabled={touch && !editing && !anyDragging && !dragging}
+            color={task.color}
+            done={task.done}
+            deleteKind={leaf ? 'slide' : 'confirm'}
+            onComplete={() => useTaskStore.getState().toggle(id)}
+            onDelete={swipeDelete}
           >
-            {revealPulse > 0 && (
-              // Keyed on the pulse so a repeat reveal replays the CSS animation.
-              <span
-                key={revealPulse}
-                className={styles.reveal}
-                aria-hidden="true"
-                onAnimationEnd={() =>
-                  useUIStore.setState((s) =>
-                    s.revealFlash?.n === revealPulse ? { revealFlash: null } : s,
+            <motion.div
+              ref={rowRef}
+              className={`${styles.row} ${task.done ? styles.rowDone : ''} ${editing ? styles.rowEditing : ''} ${focused ? styles.rowFocused : ''}`}
+              data-dim={dimmed || undefined}
+              data-focused={focused || undefined}
+              animate={pulse}
+              onClick={(e) => {
+                // A click on the row itself (not a button, input or link inside it) focuses it.
+                if (
+                  (e.target as Element).closest(
+                    'button, input, a, [role="checkbox"], [role="radio"]',
                   )
+                ) {
+                  return;
                 }
+                useUIStore.getState().setFocusedId(id);
+              }}
+            >
+              {revealPulse > 0 && (
+                // Keyed on the pulse so a repeat reveal replays the CSS animation.
+                <span
+                  key={revealPulse}
+                  className={styles.reveal}
+                  aria-hidden="true"
+                  onAnimationEnd={() =>
+                    useUIStore.setState((s) =>
+                      s.revealFlash?.n === revealPulse ? { revealFlash: null } : s,
+                    )
+                  }
+                />
+              )}
+              <motion.span
+                className={styles.flash}
+                style={{ background: task.color }}
+                initial={{ opacity: 0 }}
+                animate={flash}
+                aria-hidden="true"
               />
-            )}
-            <motion.span
-              className={styles.flash}
-              style={{ background: task.color }}
-              initial={{ opacity: 0 }}
-              animate={flash}
-              aria-hidden="true"
-            />
-            <motion.span
-              className={styles.tint}
-              initial={{ opacity: 0 }}
-              animate={tint}
-              aria-hidden="true"
-            />
-            {drag?.enabled && (
-              <button
-                type="button"
-                ref={drag.setActivatorNodeRef}
-                className={styles.grip}
-                aria-label={`Reorder ${task.title}`}
-                {...drag.attributes}
-                {...drag.listeners}
-              >
-                <GripVertical size={14} strokeWidth={1.75} aria-hidden="true" />
-              </button>
-            )}
-            {flat ? null : leaf ? (
-              <span className={styles.chevronSpacer} />
-            ) : (
-              <motion.button
-                type="button"
-                className={`${styles.iconBtn} ${styles.chevron}`}
-                aria-label={task.collapsed ? 'Expand' : 'Collapse'}
-                aria-expanded={!task.collapsed}
-                onClick={() => store.update(id, { collapsed: !task.collapsed })}
-                initial={false}
-                animate={{ rotate: task.collapsed ? 0 : 90 }}
-                whileHover={{ scale: 1.08 }}
-                whileTap={{ scale: 0.9 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 26 }}
-              >
-                <ChevronRight size={15} strokeWidth={1.75} aria-hidden="true" />
-              </motion.button>
-            )}
-            <Checkbox
-              checked={task.done}
-              color={task.color}
-              label={`Done: ${task.title}`}
-              delay={delay}
-              onToggle={() => store.toggle(id)}
-            />
-            <div className={styles.title}>
-              <div
-                className={styles.titleLine}
-                // Blank space after the title edits it, like the title itself.
-                onClick={(e) => {
-                  if (!editing && e.target === e.currentTarget) edit();
-                }}
-              >
-                {editing ? (
-                  <TitleEditor id={id} initial={task.title} parentId={task.parentId} />
+              <motion.span
+                className={styles.tint}
+                initial={{ opacity: 0 }}
+                animate={tint}
+                aria-hidden="true"
+              />
+              {drag?.enabled && (
+                <button
+                  type="button"
+                  ref={drag.setActivatorNodeRef}
+                  className={styles.grip}
+                  aria-label={`Reorder ${task.title}`}
+                  {...drag.attributes}
+                  {...drag.listeners}
+                >
+                  <GripVertical size={14} strokeWidth={1.75} aria-hidden="true" />
+                </button>
+              )}
+              {flat ? null : leaf ? (
+                <span className={styles.chevronSpacer} />
+              ) : (
+                <motion.button
+                  type="button"
+                  className={`${styles.iconBtn} ${styles.chevron}`}
+                  aria-label={task.collapsed ? 'Expand' : 'Collapse'}
+                  aria-expanded={!task.collapsed}
+                  onClick={() => store.update(id, { collapsed: !task.collapsed })}
+                  initial={false}
+                  animate={{ rotate: task.collapsed ? 0 : 90 }}
+                  whileHover={{ scale: 1.08 }}
+                  whileTap={{ scale: 0.9 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 26 }}
+                >
+                  <ChevronRight size={15} strokeWidth={1.75} aria-hidden="true" />
+                </motion.button>
+              )}
+              <Checkbox
+                checked={task.done}
+                color={task.color}
+                label={`Done: ${task.title}`}
+                delay={delay}
+                onToggle={() => store.toggle(id)}
+              />
+              <div className={styles.title}>
+                <div
+                  className={styles.titleLine}
+                  // Blank space after the title edits it, like the title itself.
+                  onClick={(e) => {
+                    if (!editing && e.target === e.currentTarget) edit();
+                  }}
+                >
+                  {editing ? (
+                    <TitleEditor id={id} initial={task.title} parentId={task.parentId} />
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className={styles.titleBtn}
+                        data-swipe-through
+                        onClick={edit}
+                      >
+                        <StrikeText done={task.done} delay={delay}>
+                          {task.title}
+                        </StrikeText>
+                      </button>
+                      {(task.tags.length > 0 || task.dueDate !== null) && (
+                        <span className={styles.tail}>
+                          {shownTags.map((tag) => (
+                            <TagChip key={tag} tag={tag} onClick={() => setTagFilter(tag)} />
+                          ))}
+                          {hiddenTags.length > 0 && (
+                            <span className={styles.more} title={hiddenTags.join(', ')}>
+                              +{hiddenTags.length}
+                            </span>
+                          )}
+                          {task.dueDate !== null && (
+                            <DuePill dueDate={task.dueDate} done={task.done} />
+                          )}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+                {flat && path.length > 0 && <div className={styles.crumb}>{path.join(' › ')}</div>}
+              </div>
+              <div className={styles.meta}>
+                {leaf ? (
+                  <DifficultyPicker
+                    value={task.difficulty}
+                    color={task.color}
+                    onChange={(difficulty) => store.update(id, { difficulty })}
+                  />
                 ) : (
-                  <>
-                    <button type="button" className={styles.titleBtn} onClick={edit}>
-                      <StrikeText done={task.done} delay={delay}>
-                        {task.title}
-                      </StrikeText>
-                    </button>
-                    {(task.tags.length > 0 || task.dueDate !== null) && (
-                      <span className={styles.tail}>
-                        {shownTags.map((tag) => (
-                          <TagChip key={tag} tag={tag} onClick={() => setTagFilter(tag)} />
-                        ))}
-                        {hiddenTags.length > 0 && (
-                          <span className={styles.more} title={hiddenTags.join(', ')}>
-                            +{hiddenTags.length}
-                          </span>
-                        )}
-                        {task.dueDate !== null && (
-                          <DuePill dueDate={task.dueDate} done={task.done} />
-                        )}
-                      </span>
-                    )}
-                  </>
+                  <span className={styles.summary}>
+                    <span className={styles.badge}>Σ {sum}</span>
+                    <span className={styles.progress}>
+                      {done}/{total}
+                    </span>
+                  </span>
                 )}
               </div>
-              {flat && path.length > 0 && <div className={styles.crumb}>{path.join(' › ')}</div>}
-            </div>
-            <div className={styles.meta}>
-              {leaf ? (
-                <DifficultyPicker
-                  value={task.difficulty}
-                  color={task.color}
-                  onChange={(difficulty) => store.update(id, { difficulty })}
-                />
-              ) : (
-                <span className={styles.summary}>
-                  <span className={styles.badge}>Σ {sum}</span>
-                  <span className={styles.progress}>
-                    {done}/{total}
-                  </span>
-                </span>
-              )}
-            </div>
-            <div className={styles.actions}>
-              <TaskMenu id={id} buttonClassName={styles.iconBtn} motionProps={iconMotion} />
-              <motion.button
-                {...iconMotion}
-                type="button"
-                className={styles.iconBtn}
-                aria-label="Add subtask"
-                onClick={addChild}
-              >
-                <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
-              </motion.button>
-              <motion.button
-                {...iconMotion}
-                type="button"
-                className={`${styles.iconBtn} ${styles.deleteBtn}`}
-                aria-label="Delete task"
-                onClick={requestDelete}
-              >
-                <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
-              </motion.button>
-            </div>
-          </motion.div>
+              <div className={styles.actions}>
+                <TaskMenu id={id} buttonClassName={styles.iconBtn} motionProps={iconMotion} />
+                <motion.button
+                  {...iconMotion}
+                  type="button"
+                  className={styles.iconBtn}
+                  aria-label="Add subtask"
+                  onClick={addChild}
+                >
+                  <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
+                </motion.button>
+                <motion.button
+                  {...iconMotion}
+                  type="button"
+                  className={`${styles.iconBtn} ${styles.deleteBtn}`}
+                  aria-label="Delete task"
+                  onClick={requestDelete}
+                >
+                  <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
+                </motion.button>
+              </div>
+            </motion.div>
+          </SwipeRow>
 
           <AnimatePresence initial={false}>
             {leaf && !task.done && task.difficulty === MAX_DIFFICULTY && (

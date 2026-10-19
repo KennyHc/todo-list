@@ -1,0 +1,77 @@
+.swipe {
+  position: relative;
+  border-radius: var(--r-md);
+}
+
+/* Clip the sliding content to the row, but only mid-swipe so focus rings aren't cut. */
+.swipe[data-swiping] {
+  overflow: clip;
+}
+
+.surface {
+  position: relative;
+  border-radius: var(--r-md);
+}
+
+/* Vertical pans stay with the browser; horizontal ones are ours. */
+.swipe[data-enabled] .surface {
+  touch-action: pan-y;
+}
+
+.swipe[data-swiping] .surface {
+  /* Opaque, so the action layers behind don't show through the row. */
+  background: var(--surface);
+  will-change: transform;
+  user-select: none;
+}
+
+/* The row's own hover tint is off mid-swipe (it would out-specify a plain override). */
+.swipe[data-swiping] .surface > * {
+  background: transparent !important;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  border-radius: var(--r-md);
+  pointer-events: none;
+  transition: background-color 140ms var(--ease-out);
+}
+
+.complete {
+  justify-content: flex-start;
+  padding-left: 18px;
+  background: color-mix(in srgb, var(--swipe-color) 30%, transparent);
+  color: var(--text);
+}
+
+.complete[data-armed] {
+  background: color-mix(in srgb, var(--swipe-color) 55%, transparent);
+}
+
+.remove {
+  justify-content: flex-end;
+  padding-right: 18px;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.remove[data-armed] {
+  background: var(--danger);
+  color: #fff;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 550;
+  letter-spacing: 0.01em;
+}
+
+.pop {
+  display: inline-flex;
+}
