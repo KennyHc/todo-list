@@ -3,6 +3,7 @@ import type { Difficulty, TaskTree } from '../types';
 import { DEFAULT_COLOR } from './colors';
 import {
   addTask,
+  clearCompleted,
   deleteTask,
   effectiveDifficulty,
   emptyTree,
@@ -535,5 +536,75 @@ describe('structural sharing', () => {
     expect(tree.tasks[s.b]).not.toBe(s.tree.tasks[s.b]);
     for (const id of [s.r, s.a, s.a1, s.a2, s.b1]) expect(tree.tasks[id]).toBe(s.tree.tasks[id]);
     expect(tree.rootIds).toBe(s.tree.rootIds);
+  });
+});
+
+describe('tags and dueDate', () => {
+  it('addTask defaults and normalizes', () => {
+    const { tree, id } = addTask(emptyTree(), { title: 'x', tags: [' #Home ', 'home', '', 'B'] });
+    expect(tree.tasks[id].tags).toEqual(['home', 'b']);
+    expect(tree.tasks[id].dueDate).toBeNull();
+    const plain = add(emptyTree(), 'y');
+    expect(plain.tree.tasks[plain.id].tags).toEqual([]);
+    const dated = addTask(emptyTree(), { title: 'z', dueDate: '2026-01-02' });
+    expect(dated.tree.tasks[dated.id].dueDate).toBe('2026-01-02');
+  });
+
+  it('updateTask normalizes tags and sets/clears dueDate', () => {
+    const { tree, id } = add(emptyTree(), 'x');
+    const tagged = updateTask(tree, id, { tags: ['#Work', 'work', 'Home'] });
+    expect(tagged.tasks[id].tags).toEqual(['work', 'home']);
+    const dated = updateTask(tagged, id, { dueDate: '2026-05-01' });
+    expect(dated.tasks[id].dueDate).toBe('2026-05-01');
+    expect(updateTask(dated, id, { dueDate: null }).tasks[id].dueDate).toBeNull();
+  });
+
+  it('treats arrays by value in no-op detection', () => {
+    const { tree, id } = addTask(emptyTree(), { title: 'x', tags: ['a', 'b'] });
+    expect(updateTask(tree, id, { tags: ['a', 'b'] })).toBe(tree);
+    expect(updateTask(tree, id, { tags: ['#A', 'b'] })).toBe(tree);
+    expect(updateTask(tree, id, { dueDate: null })).toBe(tree);
+    const reordered = updateTask(tree, id, { tags: ['b', 'a'] });
+    expect(reordered).not.toBe(tree);
+    expect(reordered.tasks[id].tags).toEqual(['b', 'a']);
+  });
+});
+
+describe('clearCompleted', () => {
+  it('returns the same tree when nothing is done', () => {
+    const s = sample();
+    expect(clearCompleted(s.tree)).toBe(s.tree);
+  });
+
+  it('removes done tasks with their subtree and keeps the rest by identity', () => {
+    const s = sample();
+    const tree = toggleDone(s.tree, s.b);
+    const cleared = clearCompleted(tree);
+    expect(Object.keys(cleared.tasks).sort()).toEqual([s.a, s.c].sort());
+    expect(cleared.tasks[s.a].childIds).toEqual([s.c]);
+    expect(cleared.tasks[s.a].done).toBe(false);
+    expect(cleared.tasks[s.c]).toBe(tree.tasks[s.c]);
+  });
+
+  it('removes a fully done root and clears root ids', () => {
+    const s = sample();
+    const cleared = clearCompleted(toggleDone(s.tree, s.a));
+    expect(cleared).toEqual(emptyTree());
+  });
+
+  it('removes done root-level leaves', () => {
+    const a = add(emptyTree(), 'a');
+    const b = add(a.tree, 'b');
+    const cleared = clearCompleted(toggleDone(b.tree, a.id));
+    expect(cleared.rootIds).toEqual([b.id]);
+  });
+
+  it('leaves an undone parent with zero children undone', () => {
+    const p = add(emptyTree(), 'p');
+    const c = add(p.tree, 'c', { parentId: p.id });
+    const d = add(c.tree, 'd', { parentId: p.id });
+    const partial = clearCompleted(toggleDone(d.tree, c.id));
+    expect(partial.tasks[p.id].childIds).toEqual([d.id]);
+    expect(partial.tasks[p.id].done).toBe(false);
   });
 });

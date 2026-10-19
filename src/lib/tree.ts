@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
 import type { Difficulty, Task, TaskTree } from '../types';
 import { DEFAULT_COLOR } from './colors';
+import { normalizeTags } from './tags';
 
 type Tasks = Record<string, Task>;
 
@@ -10,9 +11,13 @@ export type NewTask = {
   afterId?: string;
   difficulty?: Difficulty;
   color?: string;
+  tags?: string[];
+  dueDate?: string | null;
 };
 
-export type TaskPatch = Partial<Pick<Task, 'title' | 'difficulty' | 'color' | 'collapsed'>>;
+export type TaskPatch = Partial<
+  Pick<Task, 'title' | 'difficulty' | 'color' | 'collapsed' | 'tags' | 'dueDate'>
+>;
 
 export const emptyTree = (): TaskTree => ({ tasks: {}, rootIds: [] });
 
@@ -159,7 +164,7 @@ function detach(draft: Draft, task: Task): void {
 
 export function addTask(
   tree: TaskTree,
-  { title, parentId = null, afterId, difficulty = 1, color }: NewTask,
+  { title, parentId = null, afterId, difficulty = 1, color, tags, dueDate = null }: NewTask,
   now = Date.now(),
 ): { tree: TaskTree; id: string } {
   if (parentId !== null && !tree.tasks[parentId]) return { tree, id: '' };
@@ -173,6 +178,8 @@ export function addTask(
     color: color ?? (parentId === null ? undefined : tree.tasks[parentId].color) ?? DEFAULT_COLOR,
     done: false,
     collapsed: false,
+    tags: normalizeTags(tags ?? []),
+    dueDate,
     parentId,
     childIds: [],
     createdAt: now,
@@ -187,11 +194,18 @@ export function addTask(
   return { tree: draft.finish(), id };
 }
 
-export function updateTask(tree: TaskTree, id: string, patch: TaskPatch): TaskTree {
+const sameValue = (a: unknown, b: unknown): boolean =>
+  Array.isArray(a) && Array.isArray(b)
+    ? a.length === b.length && a.every((item, i) => item === b[i])
+    : a === b;
+
+export function updateTask(tree: TaskTree, id: string, rawPatch: TaskPatch): TaskTree {
   const task = tree.tasks[id];
   if (!task) return tree;
+  const patch: TaskPatch =
+    rawPatch.tags === undefined ? rawPatch : { ...rawPatch, tags: normalizeTags(rawPatch.tags) };
   const changed = (Object.keys(patch) as (keyof TaskPatch)[]).some(
-    (key) => patch[key] !== undefined && patch[key] !== task[key],
+    (key) => patch[key] !== undefined && !sameValue(patch[key], task[key]),
   );
   if (!changed) return tree;
 
@@ -265,5 +279,23 @@ export function outdentTask(tree: TaskTree, id: string, now = Date.now()): TaskT
 
   // The old parent lost a child; the grandparent gained one (possibly an undone one).
   reevaluateFrom(draft, oldParentId, now);
+  return draft.finish();
+}
+
+/** Removes every done task with its subtree. Returns the same tree if nothing is done. */
+export function clearCompleted(tree: TaskTree): TaskTree {
+  // A done parent's subtree is entirely done, so only the topmost done tasks need removing.
+  const topmost = Object.values(tree.tasks).filter(
+    (task) => task.done && (task.parentId === null || !tree.tasks[task.parentId]?.done),
+  );
+  if (topmost.length === 0) return tree;
+
+  const draft = createDraft(tree);
+  for (const task of topmost) {
+    for (const removedId of [task.id, ...getDescendants(tree, task.id)]) {
+      delete draft.tasks[removedId];
+    }
+    detach(draft, task);
+  }
   return draft.finish();
 }

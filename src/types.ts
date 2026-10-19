@@ -12,6 +12,10 @@ export type Task = {
   color: string;
   done: boolean;
   collapsed: boolean;
+  /** Normalized (see lib/tags): lowercase, no '#', deduped. */
+  tags: string[];
+  /** Local calendar date, 'YYYY-MM-DD'. */
+  dueDate: string | null;
   parentId: string | null;
   childIds: string[];
   createdAt: number;

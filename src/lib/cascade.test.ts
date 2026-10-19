@@ -9,6 +9,8 @@ const task = (id: string, parentId: string | null, childIds: string[] = []): Tas
   color: '#000000',
   done: false,
   collapsed: false,
+  tags: [],
+  dueDate: null,
   parentId,
   childIds,
   createdAt: 0,
