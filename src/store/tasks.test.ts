@@ -140,6 +140,22 @@ describe('undo', () => {
     expect(get().rootIds).toContain(a);
   });
 
+  it('records and undoes a move, and ignores no-op moves', () => {
+    const a = get().add({ title: 'A' });
+    const b = get().add({ title: 'B' });
+    const before = { tasks: get().tasks, rootIds: get().rootIds };
+    get().move(a, { parentId: a, index: 0 });
+    get().move(a, { parentId: null, index: 0 });
+    expect(get().undo).toBeNull();
+    get().move(a, { parentId: b, index: 0 });
+    expect(get().undo?.label).toBe('Moved \u201cA\u201d');
+    expect(get().tasks[b].childIds).toEqual([a]);
+    expect(get().lastToggle).toBeNull();
+    get().undoLast();
+    expect(get().tasks).toBe(before.tasks);
+    expect(get().rootIds).toBe(before.rootIds);
+  });
+
   it('does not record an undo for a no-op clearCompleted', () => {
     get().add({ title: 'A' });
     get().clearCompleted();

@@ -277,22 +277,94 @@
   }
 }
 
-.children {
-  position: relative;
-  margin: 0 0 0 var(--indent);
-  padding: 0;
+/* Tree rows are flat: nesting is drawn with an indent and per-level guide lines. */
+.item[data-hidden] {
+  display: none;
 }
 
-/* Hairline guide under the parent's checkbox centre. */
-.children::before {
-  content: '';
+/* The node the sortable moves and measures; the li itself stays put for the layout animation. */
+.wrap {
+  position: relative;
+}
+
+.wrap[data-dragging] {
+  opacity: 0.35;
+}
+
+.stack {
+  margin-left: calc(var(--depth, 0) * var(--indent));
+}
+
+/* Hairline guide under an ancestor's checkbox centre, one per nesting level. */
+.guide {
   position: absolute;
-  top: -8px;
-  bottom: 14px;
-  left: calc(var(--guide-x) - var(--indent));
+  top: 0;
+  bottom: 0;
+  left: calc(var(--guide-x) + var(--level) * var(--indent));
   width: 1px;
   background: var(--border);
   pointer-events: none;
+}
+
+.guideFirst {
+  top: -8px;
+}
+
+.guideLast {
+  bottom: 14px;
+}
+
+/* Drag handle in the left gutter, before the chevron. */
+.grip {
+  position: absolute;
+  top: 50%;
+  left: -6px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  cursor: grab;
+  opacity: 0;
+  transform: translateY(-50%);
+  touch-action: manipulation;
+  user-select: none;
+  transition:
+    opacity var(--t-fast),
+    color var(--t-fast);
+}
+
+.grip:active {
+  cursor: grabbing;
+}
+
+.grip:hover {
+  color: var(--text-2);
+}
+
+.row:hover .grip,
+.row:has(:focus-visible) .grip,
+.grip:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .grip {
+    opacity: 1;
+  }
+}
+
+/* A bigger touch target around the 14px icon. */
+.grip::after {
+  content: '';
+  position: absolute;
+  inset: -8px -6px;
 }
 
 @media (max-width: 480px) {

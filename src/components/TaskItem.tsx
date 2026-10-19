@@ -1,4 +1,6 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   AnimatePresence,
   motion,
@@ -6,20 +8,19 @@ import {
   useReducedMotion,
   type MotionProps,
 } from 'framer-motion';
-import { ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { ChevronRight, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
-import { useSettledOrder } from '../hooks/useSettledOrder';
 import { getAncestors, getDescendants } from '../lib/tree';
 import { isContextOnly, neighborAfterRemoval, taskPath, visibleOrder } from '../lib/views';
 import {
   useEffectiveDifficulty,
   useIsLeaf,
   useProgress,
-  useSortedChildIds,
   useTask,
   useTaskStore,
   useToggleDelay,
 } from '../store/tasks';
+import { useDragStore } from '../store/drag';
 import { useUIStore } from '../store/ui';
 import { MAX_DIFFICULTY } from '../types';
 import { BreakdownNudge } from './BreakdownNudge';
@@ -38,8 +39,19 @@ type Props = {
   depth: number;
   /** Deadline view: no chevron, no children, no indent; shows the ancestor path instead. */
   flat?: boolean;
-  /** Ids shown under a tag filter (`null` = everything). Hides filtered-out subtrees. */
-  visible?: Set<string> | null;
+  /** Tree view: one char per ancestor level ('f' first, 'l' last, 'b' both, 'n' neither). */
+  guides?: string;
+  /** Sortable bindings for the drag handle; absent where rows aren't draggable. */
+  drag?: RowDrag;
+};
+
+export type RowDrag = Pick<
+  ReturnType<typeof useSortable>,
+  'setNodeRef' | 'setActivatorNodeRef' | 'attributes' | 'listeners'
+> & {
+  /** Show the handle (tree view, no tag filter). */
+  enabled: boolean;
+  style: CSSProperties;
 };
 
 const NO_PATH: string[] = [];
@@ -61,10 +73,9 @@ const ENTER = {
   layout: { type: 'spring', stiffness: 380, damping: 34 },
 } as const;
 
-function TaskItemInner({ id, depth, flat = false, visible = null }: Props) {
+function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
   const liveTask = useTask(id);
   const liveLeaf = useIsLeaf(id);
-  const liveChildIds = useSortedChildIds(id);
   const liveSum = useEffectiveDifficulty(id);
   const liveProgress = useProgress(id);
   const editing = useTaskStore((s) => s.editingId === id);
@@ -73,6 +84,9 @@ function TaskItemInner({ id, depth, flat = false, visible = null }: Props) {
   const revealPulse = useUIStore((s) => (s.revealFlash?.id === id ? s.revealFlash.n : 0));
   const delay = useToggleDelay(id);
   const reduced = useReducedMotion();
+  const dragging = useDragStore((s) => s.activeId === id);
+  const hidden = useDragStore((s) => s.hiddenIds.has(id));
+  const layoutOff = useDragStore((s) => s.layoutOff);
   const tagFilter = useUIStore((s) => s.tagFilter);
   const setTagFilter = useUIStore((s) => s.setTagFilter);
   const dimmed = useTaskStore(
@@ -95,18 +109,13 @@ function TaskItemInner({ id, depth, flat = false, visible = null }: Props) {
   const view = {
     task: liveTask,
     leaf: liveLeaf,
-    childIds: liveChildIds,
     sum: liveSum,
     ...liveProgress,
   };
   const lastView = useRef(view);
   if (liveTask) lastView.current = view;
-  const { task, leaf, childIds, sum, done, total } = liveTask ? view : lastView.current;
+  const { task, leaf, sum, done, total } = liveTask ? view : lastView.current;
 
-  const settledChildIds = useSettledOrder(childIds);
-  const shownChildIds = visible
-    ? settledChildIds.filter((childId) => visible.has(childId))
-    : settledChildIds;
   const done_ = task?.done ?? false;
 
   // Auto-complete pulse: an ancestor of the toggled task that became done as a result.
@@ -206,182 +215,192 @@ function TaskItemInner({ id, depth, flat = false, visible = null }: Props) {
       className={styles.item}
       data-depth={depth}
       data-flat={flat || undefined}
+      data-row-id={id}
+      data-hidden={hidden || undefined}
       layout="position"
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -12, height: 0, overflow: 'hidden', transition: { duration: 0.2 } }}
-      transition={ENTER}
+      // While dragging, row moves are the sortable's job: layout animations would fight it.
+      transition={layoutOff ? { ...ENTER, layout: { duration: 0 } } : ENTER}
     >
-      <motion.div
-        ref={rowRef}
-        className={`${styles.row} ${task.done ? styles.rowDone : ''} ${editing ? styles.rowEditing : ''} ${focused ? styles.rowFocused : ''}`}
-        data-dim={dimmed || undefined}
-        data-focused={focused || undefined}
-        animate={pulse}
-        onClick={(e) => {
-          // A click on the row itself (not a button, input or link inside it) focuses it.
-          if (
-            (e.target as Element).closest('button, input, a, [role="checkbox"], [role="radio"]')
-          ) {
-            return;
-          }
-          useUIStore.getState().setFocusedId(id);
-        }}
+      <div
+        ref={drag?.setNodeRef}
+        className={styles.wrap}
+        style={{ ...drag?.style, '--depth': depth } as CSSProperties}
+        data-dragging={dragging || undefined}
       >
-        {revealPulse > 0 && (
-          // Keyed on the pulse so a repeat reveal replays the CSS animation.
+        {guides.split('').map((flag, level) => (
           <span
-            key={revealPulse}
-            className={styles.reveal}
+            key={level}
+            className={`${styles.guide} ${flag === 'f' || flag === 'b' ? styles.guideFirst : ''} ${flag === 'l' || flag === 'b' ? styles.guideLast : ''}`}
+            style={{ '--level': level } as CSSProperties}
             aria-hidden="true"
-            onAnimationEnd={() =>
-              useUIStore.setState((s) =>
-                s.revealFlash?.n === revealPulse ? { revealFlash: null } : s,
-              )
-            }
           />
-        )}
-        <motion.span
-          className={styles.flash}
-          style={{ background: task.color }}
-          initial={{ opacity: 0 }}
-          animate={flash}
-          aria-hidden="true"
-        />
-        <motion.span
-          className={styles.tint}
-          initial={{ opacity: 0 }}
-          animate={tint}
-          aria-hidden="true"
-        />
-        {flat ? null : leaf ? (
-          <span className={styles.chevronSpacer} />
-        ) : (
-          <motion.button
-            type="button"
-            className={`${styles.iconBtn} ${styles.chevron}`}
-            aria-label={task.collapsed ? 'Expand' : 'Collapse'}
-            aria-expanded={!task.collapsed}
-            onClick={() => store.update(id, { collapsed: !task.collapsed })}
-            initial={false}
-            animate={{ rotate: task.collapsed ? 0 : 90 }}
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.9 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 26 }}
-          >
-            <ChevronRight size={15} strokeWidth={1.75} aria-hidden="true" />
-          </motion.button>
-        )}
-        <Checkbox
-          checked={task.done}
-          color={task.color}
-          label={`Done: ${task.title}`}
-          delay={delay}
-          onToggle={() => store.toggle(id)}
-        />
-        <div className={styles.title}>
-          <div
-            className={styles.titleLine}
-            // Blank space after the title edits it, like the title itself.
+        ))}
+        <div className={styles.stack}>
+          <motion.div
+            ref={rowRef}
+            className={`${styles.row} ${task.done ? styles.rowDone : ''} ${editing ? styles.rowEditing : ''} ${focused ? styles.rowFocused : ''}`}
+            data-dim={dimmed || undefined}
+            data-focused={focused || undefined}
+            animate={pulse}
             onClick={(e) => {
-              if (!editing && e.target === e.currentTarget) edit();
+              // A click on the row itself (not a button, input or link inside it) focuses it.
+              if (
+                (e.target as Element).closest('button, input, a, [role="checkbox"], [role="radio"]')
+              ) {
+                return;
+              }
+              useUIStore.getState().setFocusedId(id);
             }}
           >
-            {editing ? (
-              <TitleEditor id={id} initial={task.title} parentId={task.parentId} />
+            {revealPulse > 0 && (
+              // Keyed on the pulse so a repeat reveal replays the CSS animation.
+              <span
+                key={revealPulse}
+                className={styles.reveal}
+                aria-hidden="true"
+                onAnimationEnd={() =>
+                  useUIStore.setState((s) =>
+                    s.revealFlash?.n === revealPulse ? { revealFlash: null } : s,
+                  )
+                }
+              />
+            )}
+            <motion.span
+              className={styles.flash}
+              style={{ background: task.color }}
+              initial={{ opacity: 0 }}
+              animate={flash}
+              aria-hidden="true"
+            />
+            <motion.span
+              className={styles.tint}
+              initial={{ opacity: 0 }}
+              animate={tint}
+              aria-hidden="true"
+            />
+            {drag?.enabled && (
+              <button
+                type="button"
+                ref={drag.setActivatorNodeRef}
+                className={styles.grip}
+                aria-label={`Reorder ${task.title}`}
+                {...drag.attributes}
+                {...drag.listeners}
+              >
+                <GripVertical size={14} strokeWidth={1.75} aria-hidden="true" />
+              </button>
+            )}
+            {flat ? null : leaf ? (
+              <span className={styles.chevronSpacer} />
             ) : (
-              <>
-                <button type="button" className={styles.titleBtn} onClick={edit}>
-                  <StrikeText done={task.done} delay={delay}>
-                    {task.title}
-                  </StrikeText>
-                </button>
-                {(task.tags.length > 0 || task.dueDate !== null) && (
-                  <span className={styles.tail}>
-                    {shownTags.map((tag) => (
-                      <TagChip key={tag} tag={tag} onClick={() => setTagFilter(tag)} />
-                    ))}
-                    {hiddenTags.length > 0 && (
-                      <span className={styles.more} title={hiddenTags.join(', ')}>
-                        +{hiddenTags.length}
+              <motion.button
+                type="button"
+                className={`${styles.iconBtn} ${styles.chevron}`}
+                aria-label={task.collapsed ? 'Expand' : 'Collapse'}
+                aria-expanded={!task.collapsed}
+                onClick={() => store.update(id, { collapsed: !task.collapsed })}
+                initial={false}
+                animate={{ rotate: task.collapsed ? 0 : 90 }}
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.9 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 26 }}
+              >
+                <ChevronRight size={15} strokeWidth={1.75} aria-hidden="true" />
+              </motion.button>
+            )}
+            <Checkbox
+              checked={task.done}
+              color={task.color}
+              label={`Done: ${task.title}`}
+              delay={delay}
+              onToggle={() => store.toggle(id)}
+            />
+            <div className={styles.title}>
+              <div
+                className={styles.titleLine}
+                // Blank space after the title edits it, like the title itself.
+                onClick={(e) => {
+                  if (!editing && e.target === e.currentTarget) edit();
+                }}
+              >
+                {editing ? (
+                  <TitleEditor id={id} initial={task.title} parentId={task.parentId} />
+                ) : (
+                  <>
+                    <button type="button" className={styles.titleBtn} onClick={edit}>
+                      <StrikeText done={task.done} delay={delay}>
+                        {task.title}
+                      </StrikeText>
+                    </button>
+                    {(task.tags.length > 0 || task.dueDate !== null) && (
+                      <span className={styles.tail}>
+                        {shownTags.map((tag) => (
+                          <TagChip key={tag} tag={tag} onClick={() => setTagFilter(tag)} />
+                        ))}
+                        {hiddenTags.length > 0 && (
+                          <span className={styles.more} title={hiddenTags.join(', ')}>
+                            +{hiddenTags.length}
+                          </span>
+                        )}
+                        {task.dueDate !== null && (
+                          <DuePill dueDate={task.dueDate} done={task.done} />
+                        )}
                       </span>
                     )}
-                    {task.dueDate !== null && <DuePill dueDate={task.dueDate} done={task.done} />}
-                  </span>
+                  </>
                 )}
-              </>
+              </div>
+              {flat && path.length > 0 && <div className={styles.crumb}>{path.join(' › ')}</div>}
+            </div>
+            <div className={styles.meta}>
+              {leaf ? (
+                <DifficultyPicker
+                  value={task.difficulty}
+                  color={task.color}
+                  onChange={(difficulty) => store.update(id, { difficulty })}
+                />
+              ) : (
+                <span className={styles.summary}>
+                  <span className={styles.badge}>Σ {sum}</span>
+                  <span className={styles.progress}>
+                    {done}/{total}
+                  </span>
+                </span>
+              )}
+            </div>
+            <div className={styles.actions}>
+              <TaskMenu id={id} buttonClassName={styles.iconBtn} motionProps={iconMotion} />
+              <motion.button
+                {...iconMotion}
+                type="button"
+                className={styles.iconBtn}
+                aria-label="Add subtask"
+                onClick={addChild}
+              >
+                <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
+              </motion.button>
+              <motion.button
+                {...iconMotion}
+                type="button"
+                className={`${styles.iconBtn} ${styles.deleteBtn}`}
+                aria-label="Delete task"
+                onClick={requestDelete}
+              >
+                <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
+              </motion.button>
+            </div>
+          </motion.div>
+
+          <AnimatePresence initial={false}>
+            {leaf && !task.done && task.difficulty === MAX_DIFFICULTY && (
+              <BreakdownNudge key="nudge" flat={flat} onBreakdown={addChild} />
             )}
-          </div>
-          {flat && path.length > 0 && <div className={styles.crumb}>{path.join(' › ')}</div>}
+          </AnimatePresence>
         </div>
-        <div className={styles.meta}>
-          {leaf ? (
-            <DifficultyPicker
-              value={task.difficulty}
-              color={task.color}
-              onChange={(difficulty) => store.update(id, { difficulty })}
-            />
-          ) : (
-            <span className={styles.summary}>
-              <span className={styles.badge}>Σ {sum}</span>
-              <span className={styles.progress}>
-                {done}/{total}
-              </span>
-            </span>
-          )}
-        </div>
-        <div className={styles.actions}>
-          <TaskMenu id={id} buttonClassName={styles.iconBtn} motionProps={iconMotion} />
-          <motion.button
-            {...iconMotion}
-            type="button"
-            className={styles.iconBtn}
-            aria-label="Add subtask"
-            onClick={addChild}
-          >
-            <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
-          </motion.button>
-          <motion.button
-            {...iconMotion}
-            type="button"
-            className={`${styles.iconBtn} ${styles.deleteBtn}`}
-            aria-label="Delete task"
-            onClick={requestDelete}
-          >
-            <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
-          </motion.button>
-        </div>
-      </motion.div>
-
-      <AnimatePresence initial={false}>
-        {leaf && !task.done && task.difficulty === MAX_DIFFICULTY && (
-          <BreakdownNudge key="nudge" flat={flat} onBreakdown={addChild} />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence initial={false}>
-        {!flat && shownChildIds.length > 0 && !task.collapsed && (
-          <motion.ul
-            key="children"
-            className={styles.children}
-            initial={{ height: 0, opacity: 0, overflow: 'hidden' }}
-            animate={{
-              height: 'auto',
-              opacity: 1,
-              // Only clip while animating, so the colour popover can overflow at rest.
-              transitionEnd: { overflow: 'visible' },
-            }}
-            exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
-            transition={{ type: 'spring', stiffness: 400, damping: 40 }}
-          >
-            <AnimatePresence initial={false}>
-              {shownChildIds.map((childId) => (
-                <TaskItem key={childId} id={childId} depth={depth + 1} visible={visible} />
-              ))}
-            </AnimatePresence>
-          </motion.ul>
-        )}
-      </AnimatePresence>
+      </div>
       <ConfirmDialog
         open={confirm.open}
         title={`Delete "${task.title}"?`}
@@ -397,3 +416,40 @@ function TaskItemInner({ id, depth, flat = false, visible = null }: Props) {
 }
 
 export const TaskItem = memo(TaskItemInner);
+
+const SHIFT = { duration: 180, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' };
+
+type SortableProps = Omit<Props, 'drag' | 'flat'> & { dragEnabled: boolean };
+
+function SortableTaskItemInner({ dragEnabled, ...props }: SortableProps) {
+  const reduced = useReducedMotion();
+  // Descendants of the dragged row are hidden and take no part in the sort.
+  const hidden = useDragStore((s) => s.hiddenIds.has(props.id));
+  const sortable = useSortable({
+    id: props.id,
+    disabled: !dragEnabled || hidden,
+    // The drop animation and the row's own layout handle the landing.
+    animateLayoutChanges: () => false,
+    transition: reduced ? null : SHIFT,
+  });
+  return (
+    <TaskItemInner
+      {...props}
+      drag={{
+        enabled: dragEnabled,
+        setNodeRef: sortable.setNodeRef,
+        setActivatorNodeRef: sortable.setActivatorNodeRef,
+        attributes: sortable.attributes,
+        listeners: sortable.listeners,
+        // Translate only: the sort strategy's scale would stretch rows of different heights.
+        style: {
+          transform: CSS.Translate.toString(sortable.transform),
+          transition: sortable.transition,
+        },
+      }}
+    />
+  );
+}
+
+/** A tree row that can be reordered by its handle. */
+export const SortableTaskItem = memo(SortableTaskItemInner);

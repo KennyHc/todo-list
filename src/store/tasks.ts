@@ -16,11 +16,13 @@ import {
   getDescendants,
   indentTask,
   isLeaf,
+  moveTask,
   outdentTask,
   progress,
   sortedChildIds,
   toggleDone,
   updateTask,
+  type MoveTarget,
   type NewTask,
   type TaskPatch,
 } from '../lib/tree';
@@ -53,6 +55,8 @@ type TaskActions = {
   removeHistoryEntry: (id: string) => void;
   indent: (id: string) => void;
   outdent: (id: string) => void;
+  /** Moves a task (with its subtree) to `target` and records an undo. */
+  move: (id: string, target: MoveTarget) => void;
   setEditingId: (id: string | null) => void;
   /** Expands every collapsed ancestor of `id` in one update. Not undoable. */
   revealTask: (id: string) => void;
@@ -168,6 +172,20 @@ export const useTaskStore = create<TaskStore>()(
       },
       indent: (id) => set({ ...indentTask(treeOf(get()), id), lastToggle: null }),
       outdent: (id) => set({ ...outdentTask(treeOf(get()), id), lastToggle: null }),
+      move: (id, target) => {
+        const state = get();
+        const task = state.tasks[id];
+        if (!task) return;
+        const before = treeOf(state);
+        const after = moveTask(before, id, target);
+        if (after === before) return;
+        set({
+          tasks: after.tasks,
+          rootIds: after.rootIds,
+          lastToggle: null,
+          undo: undoEntry(state, `Moved \u201c${task.title}\u201d`),
+        });
+      },
       setEditingId: (editingId) => set({ editingId }),
       revealTask: (id) => {
         const state = get();

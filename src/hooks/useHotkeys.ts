@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
+import { siblingMoveTarget } from '../lib/dnd';
 import { isLeaf } from '../lib/tree';
-import { visibleOrder } from '../lib/views';
+import { visibleOrder, visibleTreeIds } from '../lib/views';
 import { useTaskStore } from '../store/tasks';
 import { useUIStore, type View } from '../store/ui';
 import type { Difficulty } from '../types';
@@ -17,6 +18,8 @@ export type HotkeyAction =
   | { type: 'delete' }
   | { type: 'difficulty'; value: Difficulty }
   | { type: 'collapse'; collapsed: boolean }
+  | { type: 'reorder'; step: 1 | -1 }
+  | { type: 'nest'; direction: 'in' | 'out' }
   | { type: 'help' };
 
 export type HotkeyEvent = {
@@ -55,6 +58,22 @@ export function matchHotkey(e: HotkeyEvent, ctx: HotkeyContext): HotkeyAction | 
   if (ctx.typing || ctx.modalOpen || e.metaKey || e.ctrlKey) return null;
 
   if (e.altKey) {
+    // Alt+arrows rearrange the focused row in the tree, even from a button inside it.
+    if (e.key.startsWith('Arrow')) {
+      if (e.shiftKey || !ctx.hasFocus || ctx.view !== 'tree') return null;
+      switch (e.key) {
+        case 'ArrowUp':
+          return { type: 'reorder', step: -1 };
+        case 'ArrowDown':
+          return { type: 'reorder', step: 1 };
+        case 'ArrowRight':
+          return { type: 'nest', direction: 'in' };
+        case 'ArrowLeft':
+          return { type: 'nest', direction: 'out' };
+        default:
+          return null;
+      }
+    }
     const digit = /^Digit([1-5])$/.exec(e.code ?? '');
     if (!digit || e.shiftKey || !ctx.hasFocus || ctx.view === 'history') return null;
     return { type: 'difficulty', value: Number(digit[1]) as Difficulty };
@@ -182,6 +201,31 @@ export function useHotkeys(): void {
             tasks.update(focusedId, { collapsed: action.collapsed });
           }
           break;
+        case 'reorder': {
+          if (!focusedId) break;
+          const target = siblingMoveTarget(
+            tasks,
+            focusedId,
+            action.step,
+            visibleTreeIds(tasks, ui.tagFilter),
+          );
+          if (target) tasks.move(focusedId, target);
+          break;
+        }
+        case 'nest': {
+          if (!focusedId) break;
+          if (action.direction === 'out') {
+            tasks.outdent(focusedId);
+            break;
+          }
+          tasks.indent(focusedId);
+          // Indenting under a collapsed row would hide the focused one; open it.
+          const parentId = useTaskStore.getState().tasks[focusedId]?.parentId;
+          if (parentId && useTaskStore.getState().tasks[parentId]?.collapsed) {
+            tasks.update(parentId, { collapsed: false });
+          }
+          break;
+        }
         case 'help':
           ui.setPaletteOpen(false);
           ui.setSheetOpen(true);

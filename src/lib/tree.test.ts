@@ -11,6 +11,7 @@ import {
   getDescendants,
   indentTask,
   isLeaf,
+  moveTask,
   outdentTask,
   progress,
   sortedChildIds,
@@ -606,5 +607,168 @@ describe('clearCompleted', () => {
     const partial = clearCompleted(toggleDone(d.tree, c.id));
     expect(partial.tasks[p.id].childIds).toEqual([d.id]);
     expect(partial.tasks[p.id].done).toBe(false);
+  });
+});
+
+describe('moveTask', () => {
+  /** Roots P, Q, R; P -> (p1, p2, p3). */
+  function flat() {
+    let tree = emptyTree();
+    const ids: Record<string, string> = {};
+    const put = (title: string, parentId: string | null = null) => {
+      const r = add(tree, title, { parentId });
+      tree = r.tree;
+      ids[title] = r.id;
+    };
+    put('P');
+    put('Q');
+    put('R');
+    put('p1', ids.P);
+    put('p2', ids.P);
+    put('p3', ids.P);
+    return { tree, ...ids } as { tree: TaskTree } & Record<string, string>;
+  }
+
+  it('reorders among siblings, down', () => {
+    const s = flat();
+    const tree = moveTask(s.tree, s.p1, { parentId: s.P, index: 2 });
+    expect(tree.tasks[s.P].childIds).toEqual([s.p2, s.p3, s.p1]);
+    expect(tree.tasks[s.p1].parentId).toBe(s.P);
+  });
+
+  it('reorders among siblings, up', () => {
+    const s = flat();
+    const tree = moveTask(s.tree, s.p3, { parentId: s.P, index: 0 });
+    expect(tree.tasks[s.P].childIds).toEqual([s.p3, s.p1, s.p2]);
+    const roots = moveTask(s.tree, s.R, { parentId: null, index: 1 });
+    expect(roots.rootIds).toEqual([s.P, s.R, s.Q]);
+  });
+
+  it('moves a nested task to the root at a given position', () => {
+    const s = flat();
+    const tree = moveTask(s.tree, s.p2, { parentId: null, index: 1 });
+    expect(tree.rootIds).toEqual([s.P, s.p2, s.Q, s.R]);
+    expect(tree.tasks[s.p2].parentId).toBeNull();
+    expect(tree.tasks[s.P].childIds).toEqual([s.p1, s.p3]);
+  });
+
+  it('moves a root task under another parent, subtree included', () => {
+    const s = flat();
+    const tree = moveTask(s.tree, s.P, { parentId: s.Q, index: 0 });
+    expect(tree.rootIds).toEqual([s.Q, s.R]);
+    expect(tree.tasks[s.Q].childIds).toEqual([s.P]);
+    expect(tree.tasks[s.P].parentId).toBe(s.Q);
+    expect(tree.tasks[s.P].childIds).toEqual([s.p1, s.p2, s.p3]);
+  });
+
+  it('nests under a leaf, which becomes a parent and is re-evaluated', () => {
+    const s = flat();
+    let tree = toggleDone(s.tree, s.R); // R is a done leaf
+    tree = moveTask(tree, s.Q, { parentId: s.R, index: 0 });
+    expect(isLeaf(tree, s.R)).toBe(false);
+    expect(tree.tasks[s.R].childIds).toEqual([s.Q]);
+    expect(done(tree, s.R)).toBe(false); // gained an undone child
+    // A done child under an open leaf completes it.
+    let t2 = toggleDone(s.tree, s.Q);
+    t2 = moveTask(t2, s.Q, { parentId: s.R, index: 0 });
+    expect(done(t2, s.R)).toBe(true);
+  });
+
+  it('refuses to move into its own subtree', () => {
+    const s = sample();
+    expect(moveTask(s.tree, s.a, { parentId: s.a, index: 0 })).toBe(s.tree);
+    expect(moveTask(s.tree, s.a, { parentId: s.b, index: 0 })).toBe(s.tree);
+    expect(moveTask(s.tree, s.a, { parentId: s.d, index: 0 })).toBe(s.tree);
+    expect(moveTask(s.tree, s.b, { parentId: s.e, index: 0 })).toBe(s.tree);
+  });
+
+  it('reopens a done parent that gains an undone child', () => {
+    const s = flat();
+    let tree = toggleDone(s.tree, s.P); // P and all its children done
+    expect(done(tree, s.P)).toBe(true);
+    tree = moveTask(tree, s.Q, { parentId: s.P, index: 1 });
+    expect(done(tree, s.P)).toBe(false);
+    expect(done(tree, s.p1)).toBe(true);
+  });
+
+  it('completes the old parent when its remaining children are all done', () => {
+    const s = flat();
+    let tree = toggleDone(s.tree, s.p1);
+    tree = toggleDone(tree, s.p2);
+    expect(done(tree, s.P)).toBe(false);
+    tree = moveTask(tree, s.p3, { parentId: null, index: 3 });
+    expect(done(tree, s.P)).toBe(true);
+    expect(tree.tasks[s.P].completedAt).toBeDefined();
+  });
+
+  it('re-evaluates when the new parent is a descendant of the old one', () => {
+    const s = sample();
+    // Complete D; B is open because of E. Move E to C: B is done, A has the open C and E.
+    let tree = toggleDone(s.tree, s.d);
+    tree = moveTask(tree, s.e, { parentId: s.c, index: 0 });
+    expect(done(tree, s.b)).toBe(true);
+    expect(done(tree, s.a)).toBe(false);
+    tree = toggleDone(tree, s.e);
+    expect(done(tree, s.c)).toBe(true);
+    expect(done(tree, s.a)).toBe(true);
+  });
+
+  it('clamps the index to the valid range', () => {
+    const s = flat();
+    expect(moveTask(s.tree, s.p1, { parentId: s.P, index: 99 }).tasks[s.P].childIds).toEqual([
+      s.p2,
+      s.p3,
+      s.p1,
+    ]);
+    expect(moveTask(s.tree, s.p3, { parentId: s.P, index: -5 }).tasks[s.P].childIds).toEqual([
+      s.p3,
+      s.p1,
+      s.p2,
+    ]);
+    expect(moveTask(s.tree, s.R, { parentId: s.P, index: 99 }).tasks[s.P].childIds).toEqual([
+      s.p1,
+      s.p2,
+      s.p3,
+      s.R,
+    ]);
+    expect(moveTask(s.tree, s.R, { parentId: s.Q, index: -1 }).tasks[s.Q].childIds).toEqual([s.R]);
+  });
+
+  it('returns the same tree for no-ops', () => {
+    const s = flat();
+    expect(moveTask(s.tree, s.p2, { parentId: s.P, index: 1 })).toBe(s.tree);
+    expect(moveTask(s.tree, s.p2, { parentId: s.P, index: 50 }).tasks[s.P].childIds).toEqual([
+      s.p1,
+      s.p3,
+      s.p2,
+    ]);
+    expect(moveTask(s.tree, s.Q, { parentId: null, index: 1 })).toBe(s.tree);
+    expect(moveTask(s.tree, 'nope', { parentId: null, index: 0 })).toBe(s.tree);
+    expect(moveTask(s.tree, s.Q, { parentId: 'nope', index: 0 })).toBe(s.tree);
+  });
+
+  it('keeps unrelated branches referentially equal', () => {
+    let tree = emptyTree();
+    const mk = (title: string, parentId: string | null = null) => {
+      const r = add(tree, title, { parentId });
+      tree = r.tree;
+      return r.id;
+    };
+    const x = mk('X');
+    const y = mk('Y');
+    const z = mk('Z');
+    const x1 = mk('x1', x);
+    const y1 = mk('y1', y);
+    const z1 = mk('z1', z);
+    const before = tree;
+    const after = moveTask(before, x1, { parentId: y, index: 1 });
+    expect(after.tasks[z]).toBe(before.tasks[z]);
+    expect(after.tasks[z1]).toBe(before.tasks[z1]);
+    expect(after.tasks[y1]).toBe(before.tasks[y1]);
+    expect(after.rootIds).toBe(before.rootIds);
+    for (const id of [x, y, x1]) expect(after.tasks[id]).not.toBe(before.tasks[id]);
+    // The input is never mutated.
+    expect(before.tasks[x].childIds).toEqual([x1]);
+    expect(before.tasks[y].childIds).toEqual([y1]);
   });
 });

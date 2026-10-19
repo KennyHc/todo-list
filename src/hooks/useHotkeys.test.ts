@@ -48,6 +48,24 @@ describe('matchHotkey', () => {
     ).toBeNull();
   });
 
+  it('maps Alt+arrows to reorder and nest in the tree only, for a focused row', () => {
+    const alt = { altKey: true };
+    expect(matchHotkey(ev('ArrowUp', alt), ctx())).toEqual({ type: 'reorder', step: -1 });
+    expect(matchHotkey(ev('ArrowDown', alt), ctx())).toEqual({ type: 'reorder', step: 1 });
+    expect(matchHotkey(ev('ArrowRight', alt), ctx())).toEqual({ type: 'nest', direction: 'in' });
+    expect(matchHotkey(ev('ArrowLeft', alt), ctx())).toEqual({ type: 'nest', direction: 'out' });
+    // Still works from a button inside the row, unlike the plain arrows.
+    expect(matchHotkey(ev('ArrowUp', alt), ctx({ interactive: true }))).toEqual({
+      type: 'reorder',
+      step: -1,
+    });
+    expect(matchHotkey(ev('ArrowUp', alt), ctx({ hasFocus: false }))).toBeNull();
+    expect(matchHotkey(ev('ArrowUp', alt), ctx({ view: 'deadline' }))).toBeNull();
+    expect(matchHotkey(ev('ArrowUp', alt), ctx({ typing: true }))).toBeNull();
+    expect(matchHotkey(ev('ArrowUp', { ...alt, metaKey: true }), ctx())).toBeNull();
+    expect(matchHotkey(ev('ArrowUp', { ...alt, shiftKey: true }), ctx())).toBeNull();
+  });
+
   it('opens the palette with Cmd+K or Ctrl+K, even while typing or over a dialog', () => {
     const typing = ctx({ typing: true, modalOpen: true });
     expect(matchHotkey(ev('k', { metaKey: true }), typing)).toEqual({ type: 'palette' });

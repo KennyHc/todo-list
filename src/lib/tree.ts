@@ -282,6 +282,54 @@ export function outdentTask(tree: TaskTree, id: string, now = Date.now()): TaskT
   return draft.finish();
 }
 
+export type MoveTarget = {
+  /** New parent, or null for the root list. */
+  parentId: string | null;
+  /** Position among the target parent's children once the task has been taken out. */
+  index: number;
+};
+
+/**
+ * Moves a task (with its subtree) to `target`. The index is clamped to the valid range. Returns
+ * the same tree when the task or parent is unknown, the parent is the task or one of its
+ * descendants, or the task would end up where it already is.
+ */
+export function moveTask(
+  tree: TaskTree,
+  id: string,
+  target: MoveTarget,
+  now = Date.now(),
+): TaskTree {
+  const task = tree.tasks[id];
+  if (!task) return tree;
+  const { parentId } = target;
+  if (parentId !== null) {
+    if (!tree.tasks[parentId]) return tree;
+    if (parentId === id || getAncestors(tree, parentId).includes(id)) return tree;
+  }
+
+  const sameParent = parentId === task.parentId;
+  const targetSiblings = parentId === null ? tree.rootIds : tree.tasks[parentId].childIds;
+  const remaining = targetSiblings.length - (sameParent ? 1 : 0);
+  const wanted = Number.isNaN(target.index) ? remaining : Math.trunc(target.index);
+  const index = Math.min(remaining, Math.max(0, wanted));
+  if (sameParent && index === siblingIds(tree, task).indexOf(id)) return tree;
+
+  const draft = createDraft(tree);
+  const oldParentId = task.parentId;
+  detach(draft, task);
+  draft.siblings(parentId).splice(index, 0, id);
+  if (!sameParent) draft.edit(id).parentId = parentId;
+
+  // Both ends changed their children: the old parent may now be complete, the new one may
+  // have gained open work (or, as a former leaf, a done child).
+  if (!sameParent) {
+    reevaluateFrom(draft, oldParentId, now);
+    reevaluateFrom(draft, parentId, now);
+  }
+  return draft.finish();
+}
+
 /** Removes every done task with its subtree. Returns the same tree if nothing is done. */
 export function clearCompleted(tree: TaskTree): TaskTree {
   // A done parent's subtree is entirely done, so only the topmost done tasks need removing.

@@ -21,6 +21,16 @@ beforeEach(() => {
   });
 });
 
+/** The undo toast. dnd-kit keeps its own (empty) role="status" announcer on the page. */
+const queryToast = () =>
+  screen.queryAllByRole('status').find((el) => within(el).queryByRole('button', { name: 'Undo' }));
+const findToast = () =>
+  waitFor(() => {
+    const toast = queryToast();
+    if (!toast) throw new Error('no undo toast');
+    return toast;
+  });
+
 function addViaInput(title: string) {
   const input = screen.getByLabelText('New task');
   fireEvent.change(input, { target: { value: title } });
@@ -87,20 +97,20 @@ describe('App', () => {
     render(<App />);
     addViaInput('Buy milk');
     fireEvent.click(screen.getByRole('button', { name: 'Delete task' }));
-    const toast = await screen.findByRole('status');
+    const toast = await findToast();
     expect(within(toast).getByText('Deleted \u201cBuy milk\u201d')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText('Buy milk')).not.toBeInTheDocument());
     fireEvent.click(within(toast).getByRole('button', { name: 'Undo' }));
     expect(await screen.findByText('Buy milk')).toBeInTheDocument();
     expect(Object.keys(useTaskStore.getState().tasks)).toHaveLength(1);
-    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+    await waitFor(() => expect(queryToast()).toBeUndefined());
   });
 
   it('shows an undo toast after checking a task', () => {
     render(<App />);
     addViaInput('Write docs');
     fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Write docs' }));
-    expect(screen.getByRole('status')).toHaveTextContent('Completed \u201cWrite docs\u201d');
+    expect(queryToast()).toHaveTextContent('Completed \u201cWrite docs\u201d');
   });
 
   it('asks before deleting a parent and keeps it on Cancel', async () => {
@@ -286,7 +296,7 @@ describe('App', () => {
     });
 
     // Undo toast should appear
-    const toast = await screen.findByRole('status');
+    const toast = await findToast();
     expect(within(toast).getByText('Restored backup (1 task)')).toBeInTheDocument();
   });
 });
@@ -438,6 +448,106 @@ describe('keyboard workflow', () => {
       fireEvent.keyDown(input, { key: 'Enter' });
       await waitFor(() => expect(useUIStore.getState().view).toBe('history'));
       expect(useUIStore.getState().paletteOpen).toBe(false);
+    });
+  });
+});
+
+describe('drag and drop', () => {
+  const grips = () => screen.queryAllByRole('button', { name: /^Reorder / });
+
+  function seed() {
+    const s = useTaskStore.getState();
+    const a = s.add({ title: 'Alpha', tags: ['x'] });
+    const b = s.add({ title: 'Bravo' });
+    return { a, b };
+  }
+
+  it('shows a drag handle on every tree row', () => {
+    seed();
+    render(<App />);
+    expect(grips().map((g) => g.getAttribute('aria-label'))).toEqual([
+      'Reorder Alpha',
+      'Reorder Bravo',
+    ]);
+  });
+
+  it('hides the handles while a tag filter is active', () => {
+    seed();
+    useUIStore.setState({ tagFilter: 'x' });
+    render(<App />);
+    expect(screen.getByText('Alpha')).toBeInTheDocument();
+    expect(grips()).toHaveLength(0);
+  });
+
+  it('has no handles in the deadline view', () => {
+    seed();
+    useUIStore.setState({ view: 'deadline' });
+    render(<App />);
+    expect(screen.getByText('Alpha')).toBeInTheDocument();
+    expect(grips()).toHaveLength(0);
+  });
+
+  describe('Alt+arrow shortcuts', () => {
+    const press = (key: string) =>
+      act(() => {
+        fireEvent.keyDown(document.body, { key, altKey: true });
+      });
+    const roots = () => useTaskStore.getState().rootIds;
+    const parentOf = (id: string) => useTaskStore.getState().tasks[id].parentId;
+
+    function three() {
+      const s = useTaskStore.getState();
+      const a = s.add({ title: 'Alpha' });
+      const b = s.add({ title: 'Bravo' });
+      const c = s.add({ title: 'Charlie' });
+      return { a, b, c };
+    }
+
+    it('Alt+ArrowUp and Alt+ArrowDown move the focused row among its siblings', () => {
+      const { a, b, c } = three();
+      render(<App />);
+      act(() => useUIStore.getState().setFocusedId(b));
+      press('ArrowUp');
+      expect(roots()).toEqual([b, a, c]);
+      press('ArrowUp'); // already first: nothing happens
+      expect(roots()).toEqual([b, a, c]);
+      press('ArrowDown');
+      press('ArrowDown');
+      expect(roots()).toEqual([a, c, b]);
+      expect(useTaskStore.getState().undo?.label).toBe('Moved “Bravo”');
+    });
+
+    it('Alt+ArrowRight indents under the previous sibling and Alt+ArrowLeft outdents', () => {
+      const { a, b, c } = three();
+      render(<App />);
+      act(() => useUIStore.getState().setFocusedId(b));
+      press('ArrowRight');
+      expect(parentOf(b)).toBe(a);
+      expect(roots()).toEqual([a, c]);
+      expect(useUIStore.getState().focusedId).toBe(b);
+      press('ArrowLeft');
+      expect(parentOf(b)).toBeNull();
+      expect(roots()).toEqual([a, b, c]);
+    });
+
+    it('opens a collapsed parent so the indented row stays visible', () => {
+      const { a, b } = three();
+      useTaskStore.getState().add({ title: 'Child', parentId: a });
+      useTaskStore.getState().update(a, { collapsed: true });
+      render(<App />);
+      act(() => useUIStore.getState().setFocusedId(b));
+      press('ArrowRight');
+      expect(useTaskStore.getState().tasks[a].collapsed).toBe(false);
+    });
+
+    it('does nothing without a focused row or outside the tree view', () => {
+      const { a, b } = three();
+      render(<App />);
+      press('ArrowUp');
+      expect(roots()[0]).toBe(a);
+      useUIStore.setState({ view: 'deadline', focusedId: b });
+      press('ArrowRight');
+      expect(parentOf(b)).toBeNull();
     });
   });
 });

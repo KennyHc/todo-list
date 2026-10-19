@@ -28,6 +28,20 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { label: 'Edit title', keys: [['e'], ['↵']] },
       { label: 'Delete', keys: [['⌫']] },
       { label: 'Set difficulty', keys: [['alt', '1–5']] },
+      {
+        label: 'Move up or down',
+        keys: [
+          ['alt', '↑'],
+          ['alt', '↓'],
+        ],
+      },
+      {
+        label: 'Indent or outdent',
+        keys: [
+          ['alt', '→'],
+          ['alt', '←'],
+        ],
+      },
     ],
   },
   {
