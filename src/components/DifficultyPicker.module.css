@@ -1,36 +1,75 @@
+/* A five-bar signal meter. Each bar is its own radio button; the group is padded to 28px tall. */
 .group {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-end;
   flex: none;
+  height: 28px;
+  padding: 7px 2px;
 }
 
-.dot {
-  position: relative;
-  width: 18px;
-  height: 28px;
-  padding: 0;
+.hit {
+  display: flex;
+  align-items: flex-end;
+  width: 5px;
+  height: 100%;
+  padding: 0 1px;
   border: 0;
   background: none;
   cursor: pointer;
 }
 
-.pip {
-  position: absolute;
-  top: 9px;
-  left: 4px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 1.5px solid var(--border);
-  background: transparent;
+.hit:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.bar {
+  display: block;
+  width: 3px;
+  border-radius: 1px;
+  background: var(--border-strong);
+  transform-origin: 50% 100%;
+  transition: background-color var(--t-fast);
+}
+
+.hit:nth-child(1) .bar {
+  height: 5px;
+}
+.hit:nth-child(2) .bar {
+  height: 7px;
+}
+.hit:nth-child(3) .bar {
+  height: 9px;
+}
+.hit:nth-child(4) .bar {
+  height: 11px;
+}
+.hit:nth-child(5) .bar {
+  height: 13px;
 }
 
 .filled {
-  background: var(--task-color);
-  border-color: color-mix(in srgb, var(--task-color) 70%, var(--text));
+  background: color-mix(in srgb, var(--task-color) 75%, var(--text));
 }
 
-.dot:focus-visible {
-  outline: 2px solid var(--accent-strong);
-  border-radius: 6px;
+/* Hover previews the value: bars up to the hovered one go to half fill. */
+.hit:hover .bar:not(.filled),
+.hit:has(~ .hit:hover) .bar:not(.filled) {
+  background: color-mix(in srgb, var(--task-color) 50%, transparent);
+}
+
+@media (hover: none), (max-width: 480px) {
+  .hit {
+    position: relative;
+    width: 10px;
+    padding: 0 3.5px;
+  }
+
+  /* Stretch the touch target to 44px without growing the row. */
+  .hit::after {
+    content: '';
+    position: absolute;
+    inset: -8px -1px;
+  }
 }

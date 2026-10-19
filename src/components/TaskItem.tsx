@@ -6,6 +6,7 @@ import {
   useReducedMotion,
   type MotionProps,
 } from 'framer-motion';
+import { ChevronRight, Plus, X } from 'lucide-react';
 import { useSettledOrder } from '../hooks/useSettledOrder';
 import { getAncestors } from '../lib/tree';
 import {
@@ -109,7 +110,10 @@ function TaskItemInner({ id, depth }: Props) {
       exit={{ opacity: 0, x: -12, height: 0, overflow: 'hidden', transition: { duration: 0.2 } }}
       transition={ENTER}
     >
-      <motion.div className={`${styles.row} ${task.done ? styles.rowDone : ''}`} animate={pulse}>
+      <motion.div
+        className={`${styles.row} ${task.done ? styles.rowDone : ''} ${editing ? styles.rowEditing : ''}`}
+        animate={pulse}
+      >
         <motion.span
           className={styles.flash}
           style={{ background: task.color }}
@@ -117,7 +121,6 @@ function TaskItemInner({ id, depth }: Props) {
           animate={flash}
           aria-hidden="true"
         />
-        <span className={styles.bar} style={{ background: task.color }} />
         {leaf ? (
           <span className={styles.chevronSpacer} />
         ) : (
@@ -133,7 +136,7 @@ function TaskItemInner({ id, depth }: Props) {
             whileTap={{ scale: 0.9 }}
             transition={{ type: 'spring', stiffness: 400, damping: 26 }}
           >
-            ›
+            <ChevronRight size={15} strokeWidth={1.75} aria-hidden="true" />
           </motion.button>
         )}
         <Checkbox
@@ -185,15 +188,20 @@ function TaskItemInner({ id, depth }: Props) {
               aria-expanded={pickerOpen}
               onClick={() => setPickerOpen((o) => !o)}
             >
-              <span className={styles.colorDot} style={{ background: task.color }} />
-            </motion.button>
-            {pickerOpen && (
-              <ColorPicker
-                value={task.color}
-                onChange={(color) => store.update(id, { color })}
-                onClose={closePicker}
+              <span
+                className={styles.colorDot}
+                style={{ background: task.color, ['--task-color' as string]: task.color }}
               />
-            )}
+            </motion.button>
+            <AnimatePresence>
+              {pickerOpen && (
+                <ColorPicker
+                  value={task.color}
+                  onChange={(color) => store.update(id, { color })}
+                  onClose={closePicker}
+                />
+              )}
+            </AnimatePresence>
           </div>
           <motion.button
             {...iconMotion}
@@ -202,16 +210,16 @@ function TaskItemInner({ id, depth }: Props) {
             aria-label="Add subtask"
             onClick={addChild}
           >
-            +
+            <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
           </motion.button>
           <motion.button
             {...iconMotion}
             type="button"
-            className={`${styles.iconBtn} ${styles.delete}`}
+            className={styles.iconBtn}
             aria-label="Delete task"
             onClick={() => store.remove(id)}
           >
-            ×
+            <X size={15} strokeWidth={1.75} aria-hidden="true" />
           </motion.button>
         </div>
       </motion.div>

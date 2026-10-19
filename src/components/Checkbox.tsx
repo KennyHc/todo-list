@@ -47,7 +47,7 @@ export function Checkbox({ checked, color, onToggle, label = 'Done', delay = 0 }
       )}
       <motion.span
         className={styles.box}
-        style={{ borderColor: color }}
+        style={{ ['--task-color' as string]: color }}
         initial={false}
         whileTap={{ scale: 0.85 }}
         animate={

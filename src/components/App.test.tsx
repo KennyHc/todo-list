@@ -17,10 +17,10 @@ function addViaInput(title: string) {
 describe('App', () => {
   it('shows the empty state, then a task added via the input', () => {
     render(<App />);
-    expect(screen.getByText(/nothing here yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/all clear/i)).toBeInTheDocument();
     addViaInput('Buy milk');
     expect(screen.getByText('Buy milk')).toBeInTheDocument();
-    expect(screen.queryByText(/nothing here yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/all clear/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText('New task')).toHaveValue('');
   });
 

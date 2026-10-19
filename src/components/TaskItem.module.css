@@ -1,4 +1,7 @@
 .item {
+  --indent: 22px;
+  /* Horizontal centre of a row's checkbox: padding 8 + chevron 20 + gap 8 + half the 18px box. */
+  --guide-x: 45px;
   list-style: none;
   min-width: 0;
 }
@@ -7,34 +10,37 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0 8px;
   min-width: 0;
-  padding: 10px 8px 10px 14px;
-  border-radius: var(--radius);
+  min-height: 40px;
+  padding: 0 6px 0 8px;
+  border-radius: var(--r-md);
   isolation: isolate;
+  transition: background-color var(--t-fast);
+}
+
+.row:hover,
+.row:has(:focus-visible) {
+  background: var(--surface-2);
+}
+
+.rowEditing,
+.rowEditing:hover {
+  background: var(--accent-soft);
+}
+
+/* Keep a row with an open colour popover above the rows that follow it. */
+.row:has([aria-haspopup][aria-expanded='true']) {
+  z-index: 20;
 }
 
 .flash {
   position: absolute;
   inset: 0;
   z-index: -1;
-  border-radius: var(--radius);
+  border-radius: var(--r-md);
   opacity: 0;
   pointer-events: none;
-}
-
-.row:hover,
-.row:focus-within {
-  background: var(--surface);
-}
-
-.bar {
-  position: absolute;
-  left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 4px;
-  border-radius: 2px;
 }
 
 .chevronSpacer {
@@ -43,6 +49,7 @@
 }
 
 .iconBtn {
+  position: relative;
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -51,36 +58,35 @@
   height: 28px;
   padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: none;
   color: var(--muted);
-  font: inherit;
-  font-size: 18px;
-  line-height: 1;
   cursor: pointer;
+  transition:
+    background-color var(--t-fast),
+    color var(--t-fast);
 }
 
 .iconBtn:hover {
-  background: var(--border);
-  color: var(--text);
+  background: var(--border-strong);
+  color: var(--text-2);
 }
 
-.iconBtn:focus-visible,
-.titleBtn:focus-visible,
-.titleInput:focus-visible {
-  outline: 2px solid var(--accent-strong);
+.titleBtn:focus-visible {
   outline-offset: 1px;
 }
 
 .chevron {
   width: 20px;
-  transition: none;
 }
 
 .title {
   flex: 1 1 0;
   min-width: 0;
-  font-size: 15px;
+  font-size: 14.5px;
+  font-weight: 450;
+  letter-spacing: -0.005em;
+  line-height: 20px;
 }
 
 .titleBtn {
@@ -95,18 +101,28 @@
   text-align: left;
   cursor: text;
   border-radius: 4px;
+  transition: color var(--t-theme);
 }
 
+/* Seamless inline editing: same type as the label, only the caret and row tint show. */
 .titleInput {
+  display: block;
   width: 100%;
   min-width: 0;
-  padding: 2px 6px;
-  margin: -2px -6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
+  height: 20px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--text);
   font: inherit;
+  letter-spacing: inherit;
+  caret-color: var(--accent);
+}
+
+.titleInput:focus-visible {
+  outline: none;
 }
 
 .meta {
@@ -119,27 +135,48 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
   color: var(--muted);
+  font-size: 12px;
+  transition: color var(--t-theme);
 }
 
 .badge {
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--surface);
+  padding: 2px 6px;
   border: 1px solid var(--border);
-  color: var(--text);
-  font-weight: 600;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 550;
+  line-height: 16px;
+  transition:
+    background-color var(--t-fast),
+    border-color var(--t-theme),
+    color var(--t-theme);
 }
 
 .row:hover .badge {
-  background: var(--bg);
+  background: var(--surface);
 }
 
 .actions {
   display: flex;
   flex: none;
   align-items: center;
+  opacity: 0;
+  transition: opacity var(--t-fast);
+}
+
+.row:hover .actions,
+.row:has(:focus-visible) .actions,
+.actions:has([aria-expanded='true']) {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .actions {
+    opacity: 1;
+  }
 }
 
 .pickerAnchor {
@@ -147,74 +184,70 @@
 }
 
 .colorDot {
-  width: 14px;
-  height: 14px;
+  display: block;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  border: 1.5px solid color-mix(in srgb, var(--text) 25%, transparent);
-}
-
-.delete {
-  opacity: 0;
-}
-
-.row:hover .delete,
-.row:focus-within .delete,
-.delete:focus-visible {
-  opacity: 1;
-}
-
-@media (hover: none) {
-  .delete {
-    opacity: 1;
-  }
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--task-color) 30%, transparent);
 }
 
 .children {
-  margin: 0 0 0 16px;
+  position: relative;
+  margin: 0 0 0 var(--indent);
   padding: 0;
-  border-left: 1px solid var(--border);
+}
+
+/* Hairline guide under the parent's checkbox centre. */
+.children::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  bottom: 14px;
+  left: calc(var(--guide-x) - var(--indent));
+  width: 1px;
+  background: var(--border);
+  pointer-events: none;
 }
 
 @media (max-width: 480px) {
+  .item {
+    --indent: 16px;
+  }
+
   .row {
     flex-wrap: wrap;
-    gap: 4px;
-    padding-right: 4px;
-    align-items: flex-start;
+    gap: 2px 8px;
+    min-height: 0;
+    padding: 6px 4px 6px 8px;
   }
 
-  .iconBtn {
-    width: 24px;
+  .chevron {
     height: 24px;
-    padding: 10px;
   }
 
+  /* Line 1: chevron + checkbox + title, which takes the rest of the width. */
   .title {
-    flex: 1 1 auto;
-    order: 2;
+    order: 1;
+    flex: 1 1 calc(100% - 54px);
   }
 
+  /* Line 2: meta on the left, a compact action cluster on the right. */
   .meta {
-    flex-basis: 100%;
-    order: 3;
-    margin-left: 48px;
-    margin-top: 4px;
+    order: 2;
+    flex: 1 1 0;
+    min-width: 0;
+    /* Line up under the title: chevron 20 + checkbox 18 + two 8px gaps. */
+    margin-left: 54px;
   }
 
   .actions {
-    order: 4;
+    order: 3;
   }
 
-  .chevron,
-  .chevronSpacer {
-    order: 0;
-  }
-
-  .row > :nth-child(2) {
-    order: 1;
-  }
-
-  .children {
-    margin-left: 12px;
+  /* 44px touch target around each 28px button. */
+  .iconBtn::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
   }
 }

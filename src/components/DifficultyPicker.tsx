@@ -31,13 +31,13 @@ export function DifficultyPicker({ value, color, onChange }: Props) {
             role="radio"
             aria-checked={level === value}
             aria-label={`Difficulty ${level}`}
-            className={styles.dot}
+            className={styles.hit}
             onClick={() => onChange(level)}
           >
             <motion.span
               // Remounting on each change replays the pop for newly filled dots only.
               key={popping ? `pop-${change.seq}` : 'still'}
-              className={`${styles.pip} ${level <= value ? styles.filled : ''}`}
+              className={`${styles.bar} ${level <= value ? styles.filled : ''}`}
               initial={popping ? { scale: 0.6 } : false}
               animate={{ scale: 1 }}
               transition={{

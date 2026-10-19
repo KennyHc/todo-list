@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, type ReactNode } from 'react';
+import { animate, motion, useMotionTemplate, useMotionValue } from 'framer-motion';
 import styles from './StrikeText.module.css';
 
 type Props = {
@@ -12,29 +12,39 @@ type Props = {
 const EASE = [0.65, 0, 0.35, 1] as const;
 
 export function StrikeText({ done, children, delay = 0 }: Props) {
+  // The strike is a background gradient on an inline element, so it follows every wrapped line.
+  // Its width (0–100%) is animated; the anchor side flips so it grows from the left on check
+  // and retracts toward the right on uncheck.
+  const pct = useMotionValue(done ? 100 : 0);
+  const backgroundSize = useMotionTemplate`${pct}% 1.5px`;
+
+  useEffect(() => {
+    const controls = animate(
+      pct,
+      done ? 100 : 0,
+      done
+        ? { duration: 0.32, ease: EASE, delay: delay + 0.08 }
+        : { duration: 0.2, ease: EASE, delay },
+    );
+    return () => controls.stop();
+  }, [done, delay, pct]);
+
   return (
     <span className={styles.wrap}>
-      <motion.span
-        className={styles.text}
-        initial={false}
-        animate={{ opacity: done ? 0.55 : 1 }}
-        transition={{ duration: 0.3, delay: done ? delay + 0.08 : delay }}
-      >
-        {children}
-      </motion.span>
-      <motion.span
-        className={styles.line}
-        aria-hidden="true"
-        initial={false}
-        // Grow from the left on check, retract toward the right on uncheck.
-        style={{ transformOrigin: done ? 'left center' : 'right center' }}
-        animate={{ scaleX: done ? 1 : 0 }}
-        transition={
-          done
-            ? { duration: 0.32, ease: EASE, delay: delay + 0.08 }
-            : { duration: 0.2, ease: EASE, delay }
-        }
-      />
+      <span className={styles.text}>
+        <motion.span
+          className={styles.strike}
+          style={{ backgroundSize, backgroundPosition: done ? '0% 58%' : '100% 58%' }}
+        >
+          <motion.span
+            initial={false}
+            animate={{ opacity: done ? 0.55 : 1 }}
+            transition={{ duration: 0.3, delay: done ? delay + 0.08 : delay }}
+          >
+            {children}
+          </motion.span>
+        </motion.span>
+      </span>
     </span>
   );
 }

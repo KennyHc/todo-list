@@ -13,15 +13,18 @@
   white-space: nowrap;
 }
 
-.line {
-  position: absolute;
-  left: 0;
-  top: 55%;
-  width: 100%;
-  height: 2px;
-  background: var(--muted);
-  border-radius: 1px;
-  transform: scaleX(0);
-  will-change: transform;
-  pointer-events: none;
+.strike {
+  background-image: linear-gradient(var(--muted), var(--muted));
+  background-repeat: no-repeat;
+}
+
+/* Titles may wrap to two lines on small screens. */
+@media (max-width: 480px), (hover: none) {
+  .text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }

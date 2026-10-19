@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { Sparkles } from 'lucide-react';
 import styles from './BreakdownNudge.module.css';
 
 type Props = { onBreakdown: () => void };
@@ -12,10 +13,13 @@ export function BreakdownNudge({ onBreakdown }: Props) {
       transition={{ type: 'spring', stiffness: 400, damping: 36 }}
       style={{ overflow: 'hidden' }}
     >
-      <div className={styles.card}>
-        <span>This looks big — break it down?</span>
+      <div className={styles.nudge}>
+        <span className={styles.message}>
+          <Sparkles className={styles.icon} size={13} strokeWidth={1.75} aria-hidden="true" />
+          <span>Large task — consider breaking it down</span>
+        </span>
         <button type="button" className={styles.button} onClick={onBreakdown}>
-          Add subtasks
+          Add subtasks →
         </button>
       </div>
     </motion.div>

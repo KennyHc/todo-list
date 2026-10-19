@@ -1,31 +1,54 @@
-.card {
+.nudge {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
-  margin: 2px 0 6px 52px;
-  padding: 8px 12px;
-  background: var(--surface);
-  border-radius: var(--radius);
-  color: var(--muted);
-  font-size: 13px;
+  gap: 2px 6px;
+  /* Align with the title: row padding 8 + chevron 20 + checkbox 18 + two 8px gaps. */
+  padding: 0 8px 6px 62px;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 20px;
+  transition: color var(--t-theme);
+}
+
+.message {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.icon {
+  flex: none;
+  margin-top: 3.5px;
+  color: var(--accent);
 }
 
 .button {
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg);
-  color: var(--text);
+  position: relative;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--accent-ink);
   font: inherit;
+  font-weight: 550;
   cursor: pointer;
 }
 
 .button:hover {
-  border-color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .button:focus-visible {
-  outline: 2px solid var(--accent-strong);
-  outline-offset: 2px;
+  outline-offset: 1px;
+}
+
+@media (max-width: 480px), (hover: none) {
+  .button::after {
+    content: '';
+    position: absolute;
+    inset: -12px -4px;
+  }
 }

@@ -1,5 +1,18 @@
 .list {
   margin: 16px 0 0;
-  padding: 0;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
   list-style: none;
+  transition:
+    background-color var(--t-theme),
+    border-color var(--t-theme);
+}
+
+@media (max-width: 480px) {
+  .list {
+    padding: 4px;
+  }
 }
