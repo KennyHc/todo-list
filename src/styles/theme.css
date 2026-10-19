@@ -1,0 +1,29 @@
+:root {
+  --bg: #FFFFFF;
+  --surface: #F7F9FC;
+  --text: #1F2A44;
+  --muted: #8A94A6;
+  --border: #E6EBF2;
+  --accent: #A9C6F5;
+  --accent-strong: #6F9BE8;
+  --radius: 12px;
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 32px 16px;
+}
