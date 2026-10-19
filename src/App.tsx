@@ -15,7 +15,6 @@ import { SettingsPopover } from './components/SettingsPopover';
 import { ShortcutsSheet } from './components/ShortcutsSheet';
 import { TaskInput } from './components/TaskInput';
 import { TaskList } from './components/TaskList';
-import { ThemeToggle } from './components/ThemeToggle';
 import { UndoToast } from './components/UndoToast';
 import { ViewToolbar } from './components/ViewToolbar';
 import { useHotkeys } from './hooks/useHotkeys';
@@ -61,7 +60,6 @@ function App() {
               </div>
             )}
             <SettingsPopover />
-            <ThemeToggle />
           </div>
         </header>
         <TaskInput autoFocus={freshSignIn} />

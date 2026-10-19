@@ -66,3 +66,24 @@
   opacity: 0;
   pointer-events: none;
 }
+
+@media (max-width: 480px) {
+  .hit {
+    margin: -12px;
+  }
+
+  .box,
+  .ring {
+    width: 20px;
+    height: 20px;
+  }
+
+  .ring {
+    margin: -10px 0 0 -10px;
+  }
+
+  .svg {
+    width: 18px;
+    height: 18px;
+  }
+}

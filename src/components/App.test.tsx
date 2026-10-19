@@ -179,14 +179,16 @@ describe('App', () => {
     expect(input).toHaveValue('Ship #work ');
   });
 
-  it('sets the difficulty by clicking a segment', () => {
+  it('sets the difficulty from the icon menu', () => {
     render(<App />);
     act(() => {
       useTaskStore.getState().add({ title: 'Task', difficulty: 1 });
     });
-    fireEvent.click(screen.getByRole('radio', { name: 'Difficulty 4 of 5, Hard' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Difficulty 1 of 5, Trivial/ }));
+    const menu = screen.getByRole('dialog', { name: 'Difficulty' });
+    fireEvent.click(within(menu).getByRole('radio', { name: 'Difficulty 4 of 5, Hard' }));
     expect(Object.values(useTaskStore.getState().tasks)[0].difficulty).toBe(4);
-    expect(screen.getByRole('radiogroup', { name: 'Difficulty 4 of 5, Hard' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Difficulty 4 of 5, Hard/ })).toBeInTheDocument();
   });
 
   it('lists tasks flat by deadline with a breadcrumb for subtasks', async () => {

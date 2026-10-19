@@ -145,6 +145,21 @@ input {
 
 @media (max-width: 480px) {
   .app {
-    padding-top: max(24px, env(safe-area-inset-top));
+    padding-top: calc(env(safe-area-inset-top, 0px) + 20px);
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(40px, env(safe-area-inset-bottom));
+    padding-left: max(12px, env(safe-area-inset-left));
+  }
+}
+
+/*
+ * iOS Safari zooms the whole page when focusing a text field under 16px. On touch devices every
+ * text entry is at least 16px so tapping the composer or a title never jolts the layout.
+ */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='color']):not([type='range']),
+  textarea,
+  select {
+    font-size: 16px !important;
   }
 }

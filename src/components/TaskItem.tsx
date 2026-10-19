@@ -10,6 +10,7 @@ import {
 } from 'framer-motion';
 import { ChevronRight, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
+import { useIsPhone } from '../hooks/useMediaQuery';
 import { useIsTouch } from '../hooks/useIsTouch';
 import { getAncestors, getDescendants } from '../lib/tree';
 import { isContextOnly, neighborAfterRemoval, taskPath, visibleOrder } from '../lib/views';
@@ -27,7 +28,7 @@ import { MAX_DIFFICULTY } from '../types';
 import { BreakdownNudge } from './BreakdownNudge';
 import { Checkbox } from './Checkbox';
 import { ConfirmDialog } from './ConfirmDialog';
-import { DifficultyPicker } from './DifficultyPicker';
+import { DifficultyIcon } from './DifficultyIcon';
 import { DuePill } from './DuePill';
 import { TagChip } from './TagChip';
 import { TaskMenu } from './TaskMenu';
@@ -58,6 +59,7 @@ export type RowDrag = Pick<
 
 const NO_PATH: string[] = [];
 const MAX_TAGS_SHOWN = 3;
+const MAX_TAGS_SHOWN_PHONE = 1;
 const SHAKE_X = [0, -7, 7, -5, 5, -2, 0];
 const SHAKE_SECONDS = 0.38;
 
@@ -89,6 +91,7 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
   const dragging = useDragStore((s) => s.activeId === id);
   const anyDragging = useDragStore((s) => s.activeId !== null);
   const touch = useIsTouch();
+  const phone = useIsPhone();
   const hidden = useDragStore((s) => s.hiddenIds.has(id));
   const layoutOff = useDragStore((s) => s.layoutOff);
   const tagFilter = useUIStore((s) => s.tagFilter);
@@ -220,8 +223,9 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
     s.setEditingId(s.add({ title: '', parentId: id }));
   };
 
-  const shownTags = task.tags.slice(0, MAX_TAGS_SHOWN);
-  const hiddenTags = task.tags.slice(MAX_TAGS_SHOWN);
+  const tagLimit = phone ? MAX_TAGS_SHOWN_PHONE : MAX_TAGS_SHOWN;
+  const shownTags = task.tags.slice(0, tagLimit);
+  const hiddenTags = task.tags.slice(tagLimit);
   const edit = () => useTaskStore.getState().setEditingId(id);
 
   return (
@@ -267,6 +271,8 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
               data-dim={dimmed || undefined}
               data-focused={focused || undefined}
               animate={pulse}
+              // Touch: the whole row is the drag handle, picked up with a long press.
+              {...(touch && drag?.enabled ? drag.listeners : {})}
               onClick={(e) => {
                 // A click on the row itself (not a button, input or link inside it) focuses it.
                 if (
@@ -305,7 +311,7 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
                 animate={tint}
                 aria-hidden="true"
               />
-              {drag?.enabled && (
+              {drag?.enabled && !touch && (
                 <button
                   type="button"
                   ref={drag.setActivatorNodeRef}
@@ -375,20 +381,25 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
                             </span>
                           )}
                           {task.dueDate !== null && (
-                            <DuePill dueDate={task.dueDate} done={task.done} />
+                            <span className={styles.due}>
+                              <DuePill dueDate={task.dueDate} done={task.done} />
+                            </span>
                           )}
                         </span>
                       )}
                     </>
                   )}
+                  {flat && path.length > 0 && (
+                    <div className={styles.crumb}>{path.join(' › ')}</div>
+                  )}
                 </div>
-                {flat && path.length > 0 && <div className={styles.crumb}>{path.join(' › ')}</div>}
               </div>
               <div className={styles.meta}>
                 {leaf ? (
-                  <DifficultyPicker
+                  <DifficultyIcon
                     value={task.difficulty}
                     color={task.color}
+                    dimmed={task.done}
                     onChange={(difficulty) => store.update(id, { difficulty })}
                   />
                 ) : (
@@ -401,25 +412,36 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
                 )}
               </div>
               <div className={styles.actions}>
-                <TaskMenu id={id} buttonClassName={styles.iconBtn} motionProps={iconMotion} />
-                <motion.button
-                  {...iconMotion}
-                  type="button"
-                  className={styles.iconBtn}
-                  aria-label="Add subtask"
-                  onClick={addChild}
-                >
-                  <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
-                </motion.button>
-                <motion.button
-                  {...iconMotion}
-                  type="button"
-                  className={`${styles.iconBtn} ${styles.deleteBtn}`}
-                  aria-label="Delete task"
-                  onClick={requestDelete}
-                >
-                  <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
-                </motion.button>
+                <TaskMenu
+                  id={id}
+                  buttonClassName={styles.iconBtn}
+                  motionProps={iconMotion}
+                  onAddSubtask={addChild}
+                  onDelete={requestDelete}
+                />
+                {/* Touch has the menu and swipe-to-delete; the row stays quiet. */}
+                {!touch && (
+                  <>
+                    <motion.button
+                      {...iconMotion}
+                      type="button"
+                      className={styles.iconBtn}
+                      aria-label="Add subtask"
+                      onClick={addChild}
+                    >
+                      <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
+                    </motion.button>
+                    <motion.button
+                      {...iconMotion}
+                      type="button"
+                      className={`${styles.iconBtn} ${styles.deleteBtn}`}
+                      aria-label="Delete task"
+                      onClick={requestDelete}
+                    >
+                      <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
+                    </motion.button>
+                  </>
+                )}
               </div>
             </motion.div>
           </SwipeRow>

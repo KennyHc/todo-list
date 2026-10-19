@@ -47,6 +47,12 @@
   position: relative;
 }
 
+/* Compact variant for the account menu. */
+.sm .option {
+  width: 28px;
+  height: 28px;
+}
+
 @media (max-width: 480px), (hover: none) {
   .option::after {
     content: '';

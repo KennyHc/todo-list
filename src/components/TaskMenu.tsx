@@ -1,24 +1,37 @@
 import { useCallback, useRef, useState } from 'react';
 import { motion, type MotionProps } from 'framer-motion';
-import { MoreHorizontal } from 'lucide-react';
-import { useTask, useTaskStore } from '../store/tasks';
+import { MoreHorizontal, Plus, Trash2 } from 'lucide-react';
+import { useEffectiveDifficulty, useIsLeaf, useTask, useTaskStore } from '../store/tasks';
 import { ColorPicker } from './ColorPicker';
 import { DatePicker } from './DatePicker';
+import { DifficultyPicker } from './DifficultyPicker';
 import { Popover } from './Popover';
 import { TagEditor } from './TagEditor';
 import styles from './TaskMenu.module.css';
 
-type Props = { id: string; buttonClassName: string; motionProps: MotionProps };
+type Props = {
+  id: string;
+  buttonClassName: string;
+  motionProps: MotionProps;
+  onAddSubtask: () => void;
+  onDelete: () => void;
+};
 
-/** The "more" button and its popover: tags, due date and colour. */
-export function TaskMenu({ id, buttonClassName, motionProps }: Props) {
+/** The "more" button and its popover (a sheet on phones): difficulty, tags, due date, colour. */
+export function TaskMenu({ id, buttonClassName, motionProps, onAddSubtask, onDelete }: Props) {
   const task = useTask(id);
+  const leaf = useIsLeaf(id);
+  const sum = useEffectiveDifficulty(id);
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const close = useCallback(() => setOpen(false), []);
   if (!task) return null;
 
   const update = useTaskStore.getState().update;
+  const act = (fn: () => void) => () => {
+    close();
+    fn();
+  };
   return (
     <>
       <motion.button
@@ -31,7 +44,7 @@ export function TaskMenu({ id, buttonClassName, motionProps }: Props) {
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
-        <MoreHorizontal size={15} strokeWidth={1.75} aria-hidden="true" />
+        <MoreHorizontal size={16} strokeWidth={1.75} aria-hidden="true" />
       </motion.button>
       <Popover
         open={open}
@@ -42,6 +55,19 @@ export function TaskMenu({ id, buttonClassName, motionProps }: Props) {
         width={284}
       >
         <div className={styles.sections}>
+          <section className={styles.section}>
+            <h3 className={styles.heading}>Difficulty</h3>
+            {leaf ? (
+              <DifficultyPicker
+                fill
+                value={task.difficulty}
+                color={task.color}
+                onChange={(difficulty) => update(id, { difficulty })}
+              />
+            ) : (
+              <p className={styles.note}>Difficulty is the sum of subtasks (Σ {sum})</p>
+            )}
+          </section>
           <section className={styles.section}>
             <h3 className={styles.heading}>Tags</h3>
             <TagEditor compact tags={task.tags} onChange={(tags) => update(id, { tags })} />
@@ -54,6 +80,21 @@ export function TaskMenu({ id, buttonClassName, motionProps }: Props) {
             <h3 className={styles.heading}>Colour</h3>
             <ColorPicker value={task.color} onChange={(color) => update(id, { color })} />
           </section>
+        </div>
+        <div className={styles.divider} role="separator" />
+        <div className={styles.actions}>
+          <button type="button" className={styles.item} onClick={act(onAddSubtask)}>
+            <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
+            <span>Add subtask</span>
+          </button>
+          <button
+            type="button"
+            className={`${styles.item} ${styles.danger}`}
+            onClick={act(onDelete)}
+          >
+            <Trash2 size={16} strokeWidth={1.75} aria-hidden="true" />
+            <span>Delete</span>
+          </button>
         </div>
       </Popover>
     </>

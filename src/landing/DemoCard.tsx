@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import { Checkbox } from '../components/Checkbox';
-import { DifficultyPicker } from '../components/DifficultyPicker';
+import { DifficultyIcon } from '../components/DifficultyIcon';
 import { StrikeText } from '../components/StrikeText';
 import { toggleDelay } from '../lib/cascade';
 import { effectiveDifficulty, progress } from '../lib/tree';
@@ -121,16 +121,12 @@ function Row({ tree, id, depth, demo, reduced }: RowProps) {
             <span className={styles.badge}>Σ {effectiveDifficulty(tree, id)}</span>
           </span>
         ) : depth > 0 ? (
-          <>
-            <span className={styles.picker}>
-              <DifficultyPicker
-                value={task.difficulty}
-                color={task.color}
-                onChange={(d) => demo.setDifficulty(id, d)}
-              />
-            </span>
-            <span className={`${styles.badge} ${styles.compact}`}>{task.difficulty}</span>
-          </>
+          <DifficultyIcon
+            value={task.difficulty}
+            color={task.color}
+            dimmed={task.done}
+            onChange={(d) => demo.setDifficulty(id, d)}
+          />
         ) : null}
       </div>
       {isParent && (

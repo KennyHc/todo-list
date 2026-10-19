@@ -6,6 +6,13 @@
   margin-top: 16px;
 }
 
+@media (max-width: 480px) {
+  .bar {
+    gap: 8px;
+    margin-top: 12px;
+  }
+}
+
 .actions {
   display: flex;
   align-items: center;

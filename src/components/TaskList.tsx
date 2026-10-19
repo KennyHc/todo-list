@@ -125,7 +125,7 @@ export function TaskList() {
 
   const sensors = useSensors(
     useSensor(MousePenSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 350, tolerance: 5 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: useCallback<KeyboardCoordinateGetter>((event, args) => {
         // Left and right change the nesting by one level, within what the slot allows.
@@ -229,6 +229,8 @@ export function TaskList() {
     session.current.indent = indent > 0 ? indent : INDENT;
     session.current.keyboardX = 0;
     document.body.style.cursor = 'grabbing';
+    // A small haptic cue that the long-press picked the row up (touch only).
+    if (window.matchMedia?.('(hover: none)').matches) navigator.vibrate?.(10);
     setOverId(id);
     setDeltaX(0);
     useDragStore.getState().start(id, new Set(getDescendants(useTaskStore.getState(), id)));

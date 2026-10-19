@@ -63,21 +63,42 @@
     color var(--t-theme);
 }
 
+/* Phone: one calm row, the title and date on the left, progress and avatar on the right. */
 @media (max-width: 480px) {
   .header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 14px;
-    margin-bottom: 20px;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 0 4px;
+  }
+
+  .title {
+    font-size: 24px;
+    line-height: 30px;
+  }
+
+  .date {
+    margin-top: 0;
   }
 
   .controls {
-    justify-content: space-between;
     gap: 12px;
   }
 
-  /* Keep the toggle at the right edge even when there are no stats yet. */
-  .controls > :last-child {
-    margin-left: auto;
+  .stats {
+    gap: 6px;
+  }
+
+  .stats > svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .count {
+    font-size: 12px;
+  }
+
+  /* The load total is a desktop nicety; the phone header keeps only progress. */
+  .pill {
+    display: none;
   }
 }

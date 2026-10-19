@@ -31,6 +31,7 @@ export function TagFilter() {
         ref={anchorRef}
         type="button"
         className={`${styles.button} ${tagFilter !== null ? styles.active : ''}`}
+        aria-label="Filter"
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen(!open)}

@@ -28,3 +28,14 @@
 .done {
   color: var(--muted);
 }
+
+/* Phone: on line 2 the pill starts flush with the title; only the tinted overdue pill keeps padding. */
+@media (max-width: 480px) {
+  .pill {
+    padding-left: 0;
+  }
+
+  .overdue {
+    padding-left: 6px;
+  }
+}

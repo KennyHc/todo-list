@@ -274,6 +274,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
         anchorRef={tagBtnRef}
         label="Tags"
         width={252}
+        sheetOnMobile={false}
       >
         <TagEditor tags={tags} onChange={setTags} autoFocus />
       </Popover>
@@ -283,6 +284,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
         anchorRef={dateBtnRef}
         label="Due date"
         width={252}
+        sheetOnMobile={false}
       >
         <DatePicker value={due} onChange={setDue} onPicked={closePanel} />
       </Popover>

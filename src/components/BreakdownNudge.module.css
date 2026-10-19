@@ -15,6 +15,10 @@
   padding-left: 34px;
 }
 
+.short {
+  display: none;
+}
+
 .message {
   display: inline-flex;
   align-items: flex-start;
@@ -54,5 +58,26 @@
     content: '';
     position: absolute;
     inset: -12px -4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .nudge {
+    /* Align with the title: row padding 12 + chevron 20 + checkbox 20 + two 8px gaps. */
+    padding: 0 12px 10px 68px;
+    color: var(--muted);
+  }
+
+  .flat {
+    padding-left: 40px;
+  }
+
+  /* One short line on a phone. */
+  .full {
+    display: none;
+  }
+
+  .short {
+    display: inline;
   }
 }

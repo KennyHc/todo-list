@@ -157,3 +157,90 @@
 .last {
   margin-bottom: 6px;
 }
+
+.appearance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 12px 2px 12px;
+}
+
+.appearanceLabel {
+  color: var(--text);
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .button {
+    width: 30px;
+    height: 30px;
+  }
+
+  .button::after {
+    content: '';
+    position: absolute;
+    inset: -7px;
+  }
+
+  .button {
+    position: relative;
+  }
+
+  .avatar {
+    width: 30px;
+    height: 30px;
+  }
+
+  .menu {
+    padding: 0;
+  }
+
+  .identity {
+    padding: 4px 12px 12px;
+  }
+
+  .name {
+    font-size: 15px;
+    line-height: 22px;
+  }
+
+  .email {
+    font-size: 13px;
+    line-height: 18px;
+  }
+
+  .sync {
+    margin-top: 10px;
+    font-size: 12.5px;
+  }
+
+  .divider {
+    margin: 8px 0;
+  }
+
+  .section {
+    padding: 8px 12px 4px;
+  }
+
+  .appearance {
+    min-height: 44px;
+    padding: 0 12px;
+  }
+
+  .appearanceLabel {
+    font-size: 15px;
+  }
+
+  .item {
+    height: 48px;
+    margin: 0;
+    width: 100%;
+    padding: 0 12px;
+    font-size: 15px;
+  }
+
+  .last {
+    margin-bottom: 0;
+  }
+}

@@ -16,7 +16,8 @@ export function BreakdownNudge({ onBreakdown, flat }: Props) {
       <div className={`${styles.nudge} ${flat ? styles.flat : ''}`}>
         <span className={styles.message}>
           <Sparkles className={styles.icon} size={13} strokeWidth={1.75} aria-hidden="true" />
-          <span>Large task — consider breaking it down</span>
+          <span className={styles.full}>Large task — consider breaking it down</span>
+          <span className={styles.short}>Large task</span>
         </span>
         <button type="button" className={styles.button} onClick={onBreakdown}>
           Add subtasks →

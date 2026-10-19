@@ -159,17 +159,3 @@
 .row:hover .badge {
   background: var(--surface);
 }
-
-.compact {
-  display: none;
-}
-
-@media (max-width: 520px) {
-  .picker {
-    display: none;
-  }
-
-  .compact {
-    display: inline-block;
-  }
-}

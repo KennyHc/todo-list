@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/auth';
 import { useUIStore } from '../store/ui';
 import { useSyncStore, type SyncStatus } from '../sync/status';
 import { Popover } from './Popover';
+import { ThemeToggle } from './ThemeToggle';
 import styles from './SettingsPopover.module.css';
 
 const SYNC_LABELS: Record<SyncStatus, string> = {
@@ -35,7 +36,8 @@ export function SettingsPopover() {
   };
 
   const onMenuKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    // The theme control claims the arrow keys for itself.
+    if (e.defaultPrevented || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
     e.preventDefault();
     const items = [
       ...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)'),
@@ -94,6 +96,12 @@ export function SettingsPopover() {
               <div className={styles.divider} role="separator" />
             </>
           )}
+          <div className={styles.appearance} role="group" aria-label="Appearance">
+            <span className={styles.appearanceLabel}>Theme</span>
+            <ThemeToggle size="sm" />
+          </div>
+
+          <div className={styles.divider} role="separator" />
           <div className={styles.section}>AI</div>
 
           <button
@@ -102,7 +110,7 @@ export function SettingsPopover() {
             className={styles.item}
             onClick={() => openDialog('copy')}
           >
-            <Sparkles size={15} />
+            <Sparkles size={16} />
             <span>Copy for AI</span>
           </button>
 
@@ -112,7 +120,7 @@ export function SettingsPopover() {
             className={styles.item}
             onClick={() => openDialog('import')}
           >
-            <WandSparkles size={15} />
+            <WandSparkles size={16} />
             <span>Import from AI…</span>
           </button>
 
@@ -125,7 +133,7 @@ export function SettingsPopover() {
             className={styles.item}
             onClick={() => openDialog('export')}
           >
-            <Download size={15} />
+            <Download size={16} />
             <span>Export backup…</span>
           </button>
 
@@ -135,7 +143,7 @@ export function SettingsPopover() {
             className={styles.item}
             onClick={() => openDialog('paste')}
           >
-            <Upload size={15} />
+            <Upload size={16} />
             <span>Import…</span>
           </button>
 
@@ -149,7 +157,7 @@ export function SettingsPopover() {
               void signOut();
             }}
           >
-            <LogOut size={15} />
+            <LogOut size={16} />
             <span>Sign out</span>
           </button>
         </div>

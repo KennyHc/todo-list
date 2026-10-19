@@ -83,7 +83,7 @@
 }
 
 @media (hover: none) {
-  .kbdHint {
+  .kbd {
     display: none;
   }
 }
@@ -243,5 +243,16 @@
 @media (max-width: 480px), (hover: none) {
   .tool {
     height: 30px;
+  }
+}
+
+@media (max-width: 480px) {
+  .field {
+    height: 44px;
+    padding: 0 12px 0 16px;
+  }
+
+  .input {
+    font-size: 15px;
   }
 }

@@ -1,0 +1,16 @@
+.heading {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 16px;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+@media (max-width: 480px) {
+  .heading {
+    margin: 4px 4px 12px;
+  }
+}

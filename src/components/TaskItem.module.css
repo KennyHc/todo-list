@@ -133,6 +133,10 @@
   color: var(--danger);
 }
 
+.due {
+  display: contents;
+}
+
 .tail {
   display: inline-flex;
   flex: 0 1 auto;
@@ -152,6 +156,8 @@
 }
 
 .crumb {
+  flex: 1 0 100%;
+  min-width: 0;
   overflow: hidden;
   color: var(--muted);
   font-size: 12px;
@@ -369,58 +375,110 @@
 
 @media (max-width: 480px) {
   .item {
-    --indent: 10px;
+    --indent: 14px;
+    /* Row padding 12 + chevron 20 + gap 8 + half the 20px checkbox. */
+    --guide-x: 50px;
   }
 
+  /*
+   * Top-aligned, with every first-line item centred in a 28px band, so a row that grows to
+   * two lines or a second line of chips keeps its checkbox and trailing cluster on line 1.
+   */
   .row {
-    flex-wrap: wrap;
-    gap: 2px 8px;
-    min-height: 0;
-    padding: 6px 4px 6px 8px;
+    align-items: flex-start;
+    gap: 0 8px;
+    min-height: 48px;
+    padding: 10px 6px 10px 12px;
+    -webkit-touch-callout: none;
   }
 
   .chevron {
-    height: 24px;
+    height: 28px;
   }
 
-  /* Line 1: chevron + checkbox + title, which takes the rest of the width. */
+  .row > [role='checkbox'] {
+    margin-top: -8px;
+  }
+
   .title {
-    order: 1;
-    flex: 1 1 calc(100% - 54px);
+    padding-top: 3px;
+    font-size: 15px;
+    line-height: 22px;
   }
 
-  /* Tags and due date drop under the title text. */
+  .titleLine {
+    gap: 4px 6px;
+  }
+
+  /* Line 2: chips, due date and (in the deadline view) the breadcrumb, under the title. */
   .titleBtn {
     flex: 1 1 100%;
   }
 
-  /* Line 2: meta on the left, a compact action cluster on the right. */
+  /* One non-wrapping line: the due date first (it matters most), then the chips, cut off at the edge. */
+  .tail {
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+    gap: 6px;
+    overflow: hidden;
+  }
+
+  .due {
+    display: inline-flex;
+    flex: none;
+    order: -1;
+  }
+
+  /* One chip on phones; it may ellipsise a long tag, but never shrinks into an unreadable stub. */
+  .tail > span:not(.due, .more) {
+    flex: 0 1 auto;
+    min-width: 4.5em;
+  }
+
+  .more {
+    flex: none;
+  }
+
+  .more,
+  .crumb {
+    font-size: 12px;
+  }
+
+  .crumb {
+    flex: 1 1 0;
+  }
+
+  /* The trailing cluster: difficulty (or sum) and the menu button. */
   .meta {
-    order: 2;
-    /* Auto basis: when meta and actions don't fit side by side, the actions wrap below. */
-    flex: 1 1 auto;
-    min-width: 0;
-    /* Line up under the title: chevron 20 + checkbox 18 + two 8px gaps. */
-    margin-left: 54px;
+    min-height: 28px;
+    margin-left: 4px;
+  }
+
+  .summary {
+    gap: 6px;
+  }
+
+  .badge {
+    padding: 1px 6px;
+    font-size: 11px;
   }
 
   .actions {
-    order: 3;
-    margin-left: auto;
+    margin-left: -2px;
   }
 
-  /* Three actions plus the 158px difficulty bar must fit side by side, even two levels deep. */
-  .actions .iconBtn {
-    width: 26px;
+  .grip {
+    left: 0;
+    width: 14px;
+    height: 28px;
+    top: 24px;
+    opacity: 0.5;
   }
 
-  /* No chevron in the flat list, so everything shifts left by its width. */
-  .item[data-flat] .title {
-    flex-basis: calc(100% - 26px);
-  }
-
-  .item[data-flat] .meta {
-    margin-left: 26px;
+  .row:hover .grip,
+  .row:has(:focus-visible) .grip,
+  .grip:focus-visible {
+    opacity: 0.5;
   }
 
   /* 44px touch target around each 28px button. */

@@ -8,7 +8,8 @@ import {
   type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useIsPhone } from '../hooks/useMediaQuery';
 import styles from './Popover.module.css';
 
 type Props = {
@@ -19,6 +20,8 @@ type Props = {
   label: string;
   align?: 'start' | 'end';
   width?: number;
+  /** On phones, slide up from the bottom as a full-width sheet instead of anchoring (default). */
+  sheetOnMobile?: boolean;
   children: ReactNode;
 };
 
@@ -33,13 +36,20 @@ function PopoverPanel({
   label,
   align = 'start',
   width = 280,
+  sheetOnMobile = true,
   children,
 }: Omit<Props, 'open'>) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<Pos>({ top: 0, left: 0, flipped: false });
+  const sheet = useIsPhone() && sheetOnMobile;
+  const reduced = useReducedMotion();
+  const dragRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ startY: number; lastY: number; lastT: number; v: number } | null>(null);
+  const [lift, setLift] = useState(0);
 
   // Place under the anchor, flipping above when there is no room and shifting into the viewport.
   useLayoutEffect(() => {
+    if (sheet) return;
     const place = () => {
       const anchor = anchorRef.current;
       const panel = ref.current;
@@ -71,7 +81,22 @@ function PopoverPanel({
       window.removeEventListener('scroll', place, true);
       observer?.disconnect();
     };
-  }, [anchorRef, align]);
+  }, [anchorRef, align, sheet]);
+
+  // A sheet sits on the bottom edge of the layout viewport; lift it above the on-screen keyboard.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!sheet || !vv) return;
+    const update = () =>
+      setLift(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)));
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, [sheet]);
 
   useEffect(() => {
     const panel = ref.current;
@@ -94,6 +119,76 @@ function PopoverPanel({
       document.removeEventListener('keydown', onKey);
     };
   }, [anchorRef, onClose]);
+
+  if (sheet) {
+    const spring = reduced
+      ? { duration: 0.01 }
+      : ({ type: 'spring', stiffness: 420, damping: 38, mass: 0.9 } as const);
+    return (
+      <>
+        <motion.div
+          className={styles.scrim}
+          aria-hidden="true"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: reduced ? 0.01 : 0.18 }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={onClose}
+        />
+        <motion.div
+          ref={ref}
+          className={styles.sheet}
+          style={{ bottom: lift }}
+          role="dialog"
+          aria-label={label}
+          tabIndex={-1}
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '100%' }}
+          transition={spring}
+        >
+          <div ref={dragRef} className={styles.sheetInner}>
+            <div
+              className={styles.handle}
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId);
+                drag.current = { startY: e.clientY, lastY: e.clientY, lastT: e.timeStamp, v: 0 };
+                if (dragRef.current) dragRef.current.style.transition = 'none';
+              }}
+              onPointerMove={(e) => {
+                const d = drag.current;
+                if (!d || !dragRef.current) return;
+                const dt = Math.max(1, e.timeStamp - d.lastT);
+                d.v = (e.clientY - d.lastY) / dt;
+                d.lastY = e.clientY;
+                d.lastT = e.timeStamp;
+                dragRef.current.style.transform = `translateY(${Math.max(0, e.clientY - d.startY)}px)`;
+              }}
+              onPointerUp={(e) => {
+                const d = drag.current;
+                drag.current = null;
+                if (!d || !dragRef.current) return;
+                // Past 80px or flicked downwards: dismiss. Otherwise settle back.
+                if (e.clientY - d.startY > 80 || d.v > 0.5) onClose();
+                else {
+                  dragRef.current.style.transition = 'transform 160ms var(--ease-out)';
+                  dragRef.current.style.transform = '';
+                }
+              }}
+              onPointerCancel={() => {
+                drag.current = null;
+                if (dragRef.current) dragRef.current.style.transform = '';
+              }}
+            >
+              <span className={styles.grabber} aria-hidden="true" />
+            </div>
+            <div className={styles.sheetBody}>{children}</div>
+          </div>
+        </motion.div>
+      </>
+    );
+  }
 
   const style: CSSProperties = {
     top: pos.top,

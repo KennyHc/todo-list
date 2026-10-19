@@ -111,3 +111,34 @@
   flex: 0 1 auto;
   min-width: 0;
 }
+
+@media (max-width: 480px) {
+  .button {
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+  }
+
+  .button span {
+    display: none;
+  }
+
+  .list {
+    gap: 2px;
+    max-height: 60vh;
+    margin: 0;
+  }
+
+  .item {
+    height: 48px;
+    padding: 0 12px;
+    font-size: 15px;
+  }
+
+  .empty {
+    padding: 8px 4px 12px;
+    font-size: 14px;
+    line-height: 20px;
+  }
+}
