@@ -4,6 +4,7 @@ import { DeadlineList } from './components/DeadlineList';
 import { EmptyState } from './components/EmptyState';
 import { HistoryList } from './components/HistoryList';
 import { ProgressRing } from './components/ProgressRing';
+import { SettingsPopover } from './components/SettingsPopover';
 import { TaskInput } from './components/TaskInput';
 import { TaskList } from './components/TaskList';
 import { ThemeToggle } from './components/ThemeToggle';
@@ -45,6 +46,7 @@ function App() {
                 </span>
               </div>
             )}
+            <SettingsPopover />
             <ThemeToggle />
           </div>
         </header>

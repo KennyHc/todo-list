@@ -204,4 +204,80 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'History' }));
     expect(await screen.findByText('No completed tasks yet')).toBeInTheDocument();
   });
+
+  it('imports a valid backup file and shows confirm dialog', async () => {
+    render(<App />);
+    act(() => {
+      useTaskStore.getState().add({ title: 'Existing task' });
+    });
+
+    // Polyfill File.text() if not available (for happy-dom compatibility)
+    if (!File.prototype.text) {
+      Object.defineProperty(File.prototype, 'text', {
+        value: async function (this: File) {
+          return new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsText(this);
+          });
+        },
+      });
+    }
+
+    // Create a backup file
+    const backupData = {
+      app: 'tasks',
+      version: 2,
+      exportedAt: '2026-10-19T10:00:00Z',
+      tasks: {
+        '1': {
+          id: '1',
+          title: 'Restored task',
+          done: false,
+          collapsed: false,
+          childIds: [],
+          parentId: null,
+          tags: [],
+          dueDate: null,
+          difficulty: 1,
+          color: 'none',
+          createdAt: 1000,
+        },
+      },
+      rootIds: ['1'],
+      history: [],
+    };
+
+    const fileContent = JSON.stringify(backupData);
+    const file = new File([fileContent], 'backup.json', { type: 'application/json' });
+
+    // Trigger file input change
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(fileInput).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [file] } });
+      // Wait for async file read
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+
+    // Confirm dialog should appear
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText('Replace all tasks?')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Oct 19, 2026 \(1 task\)/)).toBeInTheDocument();
+
+    // Confirm the import
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Replace' }));
+
+    // Tasks should be replaced
+    await waitFor(() => {
+      const state = useTaskStore.getState();
+      expect(Object.keys(state.tasks)).toHaveLength(1);
+      expect(state.tasks['1'].title).toBe('Restored task');
+    });
+
+    // Undo toast should appear
+    const toast = await screen.findByRole('status');
+    expect(within(toast).getByText('Restored backup (1 task)')).toBeInTheDocument();
+  });
 });
