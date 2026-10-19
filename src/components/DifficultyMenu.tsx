@@ -12,12 +12,11 @@ type Props = {
   onClose: () => void;
   anchorRef: RefObject<HTMLElement | null>;
   value: Difficulty;
-  color: string;
   onChange: (d: Difficulty) => void;
 };
 
 /** The popover (a bottom sheet on phones) behind a row's difficulty icon. */
-export function DifficultyMenu({ open, onClose, anchorRef, value, color, onChange }: Props) {
+export function DifficultyMenu({ open, onClose, anchorRef, value, onChange }: Props) {
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
@@ -37,13 +36,7 @@ export function DifficultyMenu({ open, onClose, anchorRef, value, color, onChang
       width={196}
     >
       <h3 className={styles.heading}>Difficulty</h3>
-      <DifficultyPicker
-        value={value}
-        color={color}
-        onChange={choose}
-        arrowSelects={false}
-        autoFocus
-      />
+      <DifficultyPicker value={value} onChange={choose} arrowSelects={false} autoFocus />
     </Popover>
   );
 }

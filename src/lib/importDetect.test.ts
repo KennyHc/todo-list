@@ -15,12 +15,13 @@ const data: PersistedTasks = {
       tags: [],
       dueDate: null,
       difficulty: 1,
-      color: 'none',
+      color: null,
       createdAt: 1000,
     },
   },
   rootIds: ['a'],
   history: [],
+  tagColors: {},
 };
 
 const backup = serializeBackup(data, new Date('2026-10-19T10:00:00Z'));
@@ -57,7 +58,7 @@ describe('detectImport', () => {
     const r = detectImport(corrupt);
     expect(r.kind).toBe('error');
     expect(r.kind === 'error' && r.error).toMatch(/damaged/);
-    const truncated = detectImport(backup.slice(0, backup.length - 20));
+    const truncated = detectImport(backup.slice(0, backup.length - 60));
     expect(truncated).toMatchObject({ kind: 'error' });
     expect(truncated.kind === 'error' && truncated.error).toMatch(/damaged/);
   });

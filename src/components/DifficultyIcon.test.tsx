@@ -13,20 +13,18 @@ beforeEach(() => {
 
 describe('DifficultyIcon', () => {
   it('fills one bar per level and describes itself', () => {
-    const { container, rerender } = render(
-      <DifficultyIcon value={3} color="#7c9cf0" onChange={() => {}} />,
-    );
+    const { container, rerender } = render(<DifficultyIcon value={3} onChange={() => {}} />);
     const button = screen.getByRole('button', { name: 'Difficulty 3 of 5, Medium — change' });
     expect(button).toHaveAttribute('title', 'Medium');
     expect(container.querySelectorAll('rect')).toHaveLength(5);
     expect(container.querySelectorAll('rect[data-filled="true"]')).toHaveLength(3);
-    rerender(<DifficultyIcon value={5} color="#7c9cf0" onChange={() => {}} />);
+    rerender(<DifficultyIcon value={5} onChange={() => {}} />);
     expect(container.querySelectorAll('rect[data-filled="true"]')).toHaveLength(5);
   });
 
   it('opens a menu and reports the chosen level', () => {
     const onChange = vi.fn();
-    render(<DifficultyIcon value={2} color="#7c9cf0" onChange={onChange} />);
+    render(<DifficultyIcon value={2} onChange={onChange} />);
     fireEvent.click(screen.getByRole('button', { name: /^Difficulty 2 of 5/ }));
     const menu = screen.getByRole('dialog', { name: 'Difficulty' });
     expect(within(menu).getByText('Easy')).toBeInTheDocument();
@@ -35,7 +33,7 @@ describe('DifficultyIcon', () => {
   });
 
   it('closes shortly after a choice, and on Escape', async () => {
-    render(<DifficultyIcon value={2} color="#7c9cf0" onChange={() => {}} />);
+    render(<DifficultyIcon value={2} onChange={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /^Difficulty 2 of 5/ }));
     fireEvent.click(screen.getByRole('radio', { name: 'Difficulty 3 of 5, Medium' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -46,7 +44,7 @@ describe('DifficultyIcon', () => {
 
   it('moves with arrow keys and commits with Enter', () => {
     const onChange = vi.fn();
-    render(<DifficultyIcon value={2} color="#7c9cf0" onChange={onChange} />);
+    render(<DifficultyIcon value={2} onChange={onChange} />);
     fireEvent.click(screen.getByRole('button', { name: /^Difficulty 2 of 5/ }));
     const current = screen.getByRole('radio', { name: 'Difficulty 2 of 5, Easy' });
     expect(current).toHaveFocus();

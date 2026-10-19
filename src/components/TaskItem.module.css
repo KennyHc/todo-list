@@ -18,6 +18,7 @@
   isolation: isolate;
   transition:
     background-color var(--t-fast),
+    box-shadow 200ms ease,
     opacity var(--t-fast);
 }
 

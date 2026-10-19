@@ -13,6 +13,8 @@ import { HistoryList } from './components/HistoryList';
 import { ProgressRing } from './components/ProgressRing';
 import { SettingsPopover } from './components/SettingsPopover';
 import { ShortcutsSheet } from './components/ShortcutsSheet';
+import { FocusProxy } from './components/FocusProxy';
+import { TagColorsDialog } from './components/TagColorsDialog';
 import { TaskInput } from './components/TaskInput';
 import { TaskList } from './components/TaskList';
 import { UndoToast } from './components/UndoToast';
@@ -101,6 +103,8 @@ function App() {
       <ImportFromAiDialog />
       <ExportBackupDialog />
       <ImportDialog />
+      <TagColorsDialog />
+      <FocusProxy />
     </MotionConfig>
   );
 }

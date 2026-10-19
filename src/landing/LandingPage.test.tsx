@@ -1,7 +1,8 @@
 import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DemoCard } from './DemoCard';
 import { LandingPage } from './LandingPage';
-import { useDemo } from './useDemo';
+import { buildDemoTree, DEMO_COLOR, useDemo } from './useDemo';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -13,6 +14,20 @@ describe('LandingPage', () => {
     const headings = screen.getAllByRole('heading', { level: 1 });
     expect(headings).toHaveLength(1);
     expect(headings[0]).toHaveTextContent(/write it down/i);
+  });
+
+  it('the demo shows the row colour edge: an explicit parent colour that its subtasks inherit', () => {
+    const { tree, parentId } = buildDemoTree(1);
+    expect(tree.tasks[parentId].color).toBe(DEMO_COLOR);
+    // Let the autoplay script type the task and add its subtasks.
+    vi.useFakeTimers();
+    render(<DemoCard />);
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+    const rows = document.querySelectorAll('[data-row-color]');
+    expect(rows).toHaveLength(4); // the parent and its three subtasks
+    rows.forEach((row) => expect(row).toHaveAttribute('data-row-color', DEMO_COLOR));
   });
 
   it('calls onSignIn from every call to action', () => {

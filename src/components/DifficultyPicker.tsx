@@ -8,7 +8,6 @@ const POP_STAGGER = 0.03;
 
 type Props = {
   value: Difficulty;
-  color: string;
   onChange: (d: Difficulty) => void;
   /** Arrow keys change the value (true), or only move the cursor until Enter/Space (false). */
   arrowSelects?: boolean;
@@ -20,11 +19,10 @@ type Props = {
 
 /**
  * Five numbered segments with a live name underneath. Segments 1..value are filled with the
- * task colour; hovering (or moving the cursor) previews another level.
+ * accent; hovering (or moving the cursor) previews another level.
  */
 export function DifficultyPicker({
   value,
-  color,
   onChange,
   arrowSelects = true,
   autoFocus = false,
@@ -74,7 +72,6 @@ export function DifficultyPicker({
         role="radiogroup"
         aria-label={difficultyAria(value)}
         className={styles.group}
-        style={{ ['--task-color' as string]: color }}
         onMouseLeave={() => setHover(null)}
       >
         {LEVELS.map((level) => {

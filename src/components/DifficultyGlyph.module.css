@@ -9,13 +9,13 @@
   transition: fill var(--t-theme);
 }
 
-/* Mixing in --text darkens the pastel on light and lightens it on dark. */
+/* Neutral: colour belongs to the row's edge. */
 .on {
-  fill: color-mix(in srgb, var(--task-color) 70%, var(--text));
+  fill: var(--text-2);
   transition: fill var(--t-fast);
 }
 
 /* The top level hints at splitting the task. Kept subtle. */
 .glyph[data-hot] .on {
-  fill: color-mix(in srgb, var(--danger) 80%, transparent);
+  fill: var(--danger);
 }

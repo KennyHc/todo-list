@@ -112,9 +112,54 @@ describe('applyRemote', () => {
   });
 });
 
+describe('applyRemote: tagColors', () => {
+  const base = mkState([mkTask('a')], ['a'], [], { work: '#C9B8F2' });
+
+  it('ignores a deep-equal remote map, keeping identity', () => {
+    const changes = emptyChanges();
+    changes.tagColors = { work: '#C9B8F2' };
+    const out = applyRemote(base, base, changes);
+    expect(out.changed).toBe(false);
+    expect(out.next).toBe(base);
+    expect(out.next.tagColors).toBe(base.tagColors);
+  });
+
+  it('applies a different remote map and does not echo it back', () => {
+    const changes = emptyChanges();
+    changes.tagColors = { work: '#FFD3B6', home: '#B5E5CF' };
+    const out = applyRemote(base, base, changes);
+    expect(out.changed).toBe(true);
+    expect(out.next.tagColors).toEqual({ work: '#FFD3B6', home: '#B5E5CF' });
+    expect(out.nextLast.tagColors).toBe(out.next.tagColors);
+  });
+
+  it('applies a remote removal', () => {
+    const changes = emptyChanges();
+    changes.tagColors = {};
+    expect(applyRemote(base, base, changes).next.tagColors).toEqual({});
+  });
+
+  it('keeps a pending local edit', () => {
+    const cur = { ...base, tagColors: { work: '#000000' } }; // last still has the old map
+    const changes = emptyChanges();
+    changes.tagColors = { work: '#FFD3B6' };
+    const out = applyRemote(cur, base, changes);
+    expect(out.next.tagColors).toBe(cur.tagColors);
+    expect(out.nextLast.tagColors).toBe(base.tagColors);
+  });
+
+  it('is part of buildState', () => {
+    expect(buildState([], [], [], { a: '#fff' }).tagColors).toEqual({ a: '#fff' });
+    expect(buildState([], [], []).tagColors).toEqual({});
+  });
+});
+
 describe('hasChanges', () => {
   it('reports empties', () => {
     expect(hasChanges(emptyChanges())).toBe(false);
+    const t = emptyChanges();
+    t.tagColors = {};
+    expect(hasChanges(t)).toBe(true);
     const c = emptyChanges();
     c.rootIds = [];
     expect(hasChanges(c)).toBe(true);

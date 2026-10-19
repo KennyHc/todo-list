@@ -1,6 +1,7 @@
 import type { HistoryEntry } from '../lib/history';
 import type { PersistedTasks } from '../store/tasks';
 import type { Task } from '../types';
+import { isEqualTagColors } from './schema';
 
 export type StateDiff = {
   taskUpserts: Task[];
@@ -8,6 +9,7 @@ export type StateDiff = {
   historyUpserts: HistoryEntry[];
   historyDeletes: string[];
   rootIdsChanged: boolean;
+  tagColorsChanged: boolean;
 };
 
 const sameIds = (a: string[], b: string[]) =>
@@ -24,6 +26,8 @@ export function diffState(prev: PersistedTasks, next: PersistedTasks): StateDiff
     historyUpserts: [],
     historyDeletes: [],
     rootIdsChanged: prev.rootIds !== next.rootIds && !sameIds(prev.rootIds, next.rootIds),
+    tagColorsChanged:
+      prev.tagColors !== next.tagColors && !isEqualTagColors(prev.tagColors, next.tagColors),
   };
 
   if (prev.tasks !== next.tasks) {
@@ -52,4 +56,5 @@ export const isEmptyDiff = (d: StateDiff) =>
   d.taskDeletes.length === 0 &&
   d.historyUpserts.length === 0 &&
   d.historyDeletes.length === 0 &&
-  !d.rootIdsChanged;
+  !d.rootIdsChanged &&
+  !d.tagColorsChanged;

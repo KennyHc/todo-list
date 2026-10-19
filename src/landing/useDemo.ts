@@ -3,6 +3,8 @@ import type { Difficulty, TaskTree } from '../types';
 import { addTask, emptyTree, toggleDone, updateTask } from '../lib/tree';
 
 export const DEMO_TITLE = 'Plan a weekend trip';
+/** The parent's explicit colour; its subtasks inherit it, so the demo shows the row edge. */
+export const DEMO_COLOR = '#C9B8F2';
 export const DEMO_SUBTASKS: { title: string; difficulty: Difficulty }[] = [
   { title: 'Book the cabin', difficulty: 3 },
   { title: 'Pack hiking gear', difficulty: 2 },
@@ -16,7 +18,7 @@ const FADE_MS = 500;
 /** The finished-looking list used for reduced motion (and as a stable fallback). */
 export function buildDemoTree(checked: number): { tree: TaskTree; parentId: string } {
   let tree = emptyTree();
-  const parent = addTask(tree, { title: DEMO_TITLE });
+  const parent = addTask(tree, { title: DEMO_TITLE, color: DEMO_COLOR });
   tree = parent.tree;
   const childIds: string[] = [];
   for (const sub of DEMO_SUBTASKS) {
@@ -94,7 +96,7 @@ export function useDemo({
     let parentId = '';
     const childIds: string[] = [];
     at(t, () => {
-      const res = addTask(treeRef.current, { title: DEMO_TITLE });
+      const res = addTask(treeRef.current, { title: DEMO_TITLE, color: DEMO_COLOR });
       parentId = res.id;
       setTyped('');
       setTree(res.tree);

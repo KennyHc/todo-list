@@ -48,6 +48,8 @@ const makeSink = () => {
 
 const EMAIL = 'sync@example.com';
 const PASSWORD = 'correct horse battery';
+// Unique per run: a long-lived emulator keeps the accounts earlier runs created.
+const RUN = Date.now();
 const FAST = { debounceMs: 15, maxWaitMs: 60, initialTimeoutMs: 5000 };
 let counter = 0;
 const clients: Client[] = [];
@@ -60,7 +62,7 @@ async function signedInDb(
   const auth = getAuth(app);
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   const cred = create
-    ? await createUserWithEmailAndPassword(auth, `${counter}-${EMAIL}`, PASSWORD)
+    ? await createUserWithEmailAndPassword(auth, `${RUN}-${counter}-${EMAIL}`, PASSWORD)
     : await signInWithEmailAndPassword(auth, EMAIL, PASSWORD);
   const db = initializeFirestore(app, {
     localCache: memoryLocalCache(),
@@ -106,6 +108,20 @@ async function client(
   });
   return c;
 }
+
+const mkOld = (id: string): Task => ({
+  id,
+  title: id,
+  difficulty: 1,
+  color: null,
+  done: false,
+  collapsed: false,
+  tags: [],
+  dueDate: null,
+  parentId: null,
+  childIds: [],
+  createdAt: 1,
+});
 
 const titles = (c: Client) =>
   Object.values(c.store.getState().tasks)
@@ -192,6 +208,60 @@ describe('two clients, one account', () => {
     );
   });
 
+  it('propagates tag colours, their removal, and undo, in both directions', async () => {
+    const [a, b] = await pair();
+    a.store.getState().setTagColor('work', '#C9B8F2');
+    await vi.waitFor(() => expect(b.store.getState().tagColors).toEqual({ work: '#C9B8F2' }), {
+      timeout: 8000,
+    });
+
+    b.store.getState().setTagColor('home', '#FFD3B6');
+    await vi.waitFor(
+      () => expect(a.store.getState().tagColors).toEqual({ work: '#C9B8F2', home: '#FFD3B6' }),
+      { timeout: 8000 },
+    );
+
+    // Removing a colour really removes the key remotely (a plain merge would keep it).
+    a.store.getState().setTagColor('work', null);
+    await vi.waitFor(() => expect(b.store.getState().tagColors).toEqual({ home: '#FFD3B6' }), {
+      timeout: 8000,
+    });
+    const meta = await getDoc(doc(a.db, 'users', uid));
+    expect(meta.data()?.tagColors).toEqual({ home: '#FFD3B6' });
+    expect(meta.data()?.schemaVersion).toBe(3);
+
+    a.store.getState().undoLast();
+    await vi.waitFor(
+      () => expect(b.store.getState().tagColors).toEqual({ work: '#C9B8F2', home: '#FFD3B6' }),
+      { timeout: 8000 },
+    );
+  });
+
+  it('writes tagColors to a fresh account even before any task exists', async () => {
+    const [a] = await pair();
+    a.store.getState().setTagColor('first', '#B5E5CF');
+    await vi.waitFor(
+      async () => {
+        const meta = await getDoc(doc(a.db, 'users', uid));
+        expect(meta.data()).toMatchObject({ tagColors: { first: '#B5E5CF' }, rootIds: [] });
+      },
+      { timeout: 8000 },
+    );
+  });
+
+  it('decodes schema 2 data: the old default blue becomes automatic', async () => {
+    const first = await signedInDb(true);
+    uid = first.uid;
+    await setDoc(doc(first.db, 'users', uid), { rootIds: ['old'], schemaVersion: 2 });
+    await setDoc(
+      doc(first.db, 'users', uid, 'tasks', 'old'),
+      toTaskDoc({ ...mkOld('old'), color: '#A9C6F5' }),
+    );
+    const c = await client(first.app, first.db);
+    expect(c.store.getState().tasks.old.color).toBeNull();
+    expect(c.store.getState().tagColors).toEqual({});
+  });
+
   it('repairs a tree left inconsistent by concurrent edits (applier normalizes)', async () => {
     const [a, b] = await pair();
     const p = a.store.getState().add({ title: 'P' });
@@ -202,7 +272,7 @@ describe('two clients, one account', () => {
       id: 'orphan',
       title: 'Orphan',
       difficulty: 1,
-      color: '#A9C6F5',
+      color: null,
       done: false,
       collapsed: false,
       tags: [],
@@ -237,10 +307,10 @@ describe('initial load and migration', () => {
     const legacyStore = createTaskStore();
     legacyStore.getState().add({ title: 'Old 1' });
     legacyStore.getState().add({ title: 'Old 2' });
-    const { tasks, rootIds, history } = legacyStore.getState();
+    const { tasks, rootIds, history, tagColors } = legacyStore.getState();
     const clear = vi.fn();
     const c = await client(first.app, first.db, {
-      read: () => ({ tasks, rootIds, history }),
+      read: () => ({ tasks, rootIds, history, tagColors }),
       clear,
     });
 

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Download, LogOut, Sparkles, Upload, WandSparkles } from 'lucide-react';
+import { Download, LogOut, Palette, Sparkles, Upload, WandSparkles } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { useUIStore } from '../store/ui';
 import { useSyncStore, type SyncStatus } from '../sync/status';
@@ -100,6 +100,19 @@ export function SettingsPopover() {
             <span className={styles.appearanceLabel}>Theme</span>
             <ThemeToggle size="sm" />
           </div>
+
+          <button
+            type="button"
+            role="menuitem"
+            className={styles.item}
+            onClick={() => {
+              setPopoverOpen(false);
+              useUIStore.getState().setTagColorsOpen(true);
+            }}
+          >
+            <Palette size={16} />
+            <span>Tag colours</span>
+          </button>
 
           <div className={styles.divider} role="separator" />
           <div className={styles.section}>AI</div>

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 import { Check, History as HistoryIcon, X } from 'lucide-react';
+import { normalizeTaskColor } from '../lib/colors';
 import { dayHeader, formatTime } from '../lib/dates';
 import type { HistoryEntry } from '../lib/history';
 import { todayISO } from '../lib/views';
@@ -27,17 +28,22 @@ function groupByDay(entries: HistoryEntry[]): { label: string; entries: HistoryE
 function Entry({ entry }: { entry: HistoryEntry }) {
   const setTagFilter = useUIStore((s) => s.setTagFilter);
   const remove = useTaskStore((s) => s.removeHistoryEntry);
+  // Entries from before tag colours snapshot the old default blue, which meant "no colour".
+  const edge = normalizeTaskColor(entry.color);
   const late = entry.dueDate !== null && todayISO(new Date(entry.completedAt)) > entry.dueDate;
   return (
     <motion.li
       className={styles.entry}
+      data-row-color={edge ?? undefined}
+      data-done=""
+      style={edge ? ({ '--row-color': edge } as CSSProperties) : undefined}
       layout="position"
       initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -12, height: 0, overflow: 'hidden', transition: { duration: 0.2 } }}
       transition={{ type: 'spring', stiffness: 500, damping: 35 }}
     >
-      <span className={styles.check} style={{ background: entry.color }} aria-hidden="true">
+      <span className={styles.check} aria-hidden="true">
         <Check size={12} strokeWidth={3} />
       </span>
       <div className={styles.body}>

@@ -30,20 +30,26 @@ describe('migrateTasksState', () => {
 
   it('adds tags, dueDate and history to v1 data', () => {
     const out = migrateTasksState({ tasks: { a: v1Task }, rootIds: ['a'] });
-    expect(out.tasks.a).toEqual({ ...v1Task, tags: [], dueDate: null });
+    // The old default blue meant "unset": it migrates to automatic (null).
+    expect(out.tasks.a).toEqual({ ...v1Task, color: null, tags: [], dueDate: null });
     expect(out.rootIds).toEqual(['a']);
     expect(out.history).toEqual([]);
   });
 
   it('is idempotent and keeps existing values', () => {
-    const v2 = { ...v1Task, tags: ['x'], dueDate: '2026-01-01' };
+    const v2 = { ...v1Task, color: '#C9B8F2', tags: ['x'], dueDate: '2026-01-01' };
     const out = migrateTasksState({ tasks: { a: v2 }, rootIds: ['a'], history: [] });
     expect(out.tasks.a).toEqual(v2);
     expect(migrateTasksState(out)).toEqual(out);
   });
 
   it('tolerates garbage', () => {
-    expect(migrateTasksState(undefined)).toEqual({ tasks: {}, rootIds: [], history: [] });
+    expect(migrateTasksState(undefined)).toEqual({
+      tasks: {},
+      rootIds: [],
+      history: [],
+      tagColors: {},
+    });
   });
 });
 
@@ -194,7 +200,7 @@ describe('undo', () => {
     expect(get().undo?.label).toBe('Cleared history (1 entry)');
     get().undoLast();
     expect(get().history).toHaveLength(1);
-    get().replaceAll({ tasks: {}, rootIds: [], history: [] }, 'Imported backup');
+    get().replaceAll({ tasks: {}, rootIds: [], history: [], tagColors: {} }, 'Imported backup');
     expect(get().rootIds).toEqual([]);
     get().undoLast();
     expect(get().tasks[a]).toBeDefined();
@@ -259,7 +265,7 @@ describe('legacy local data', () => {
       JSON.stringify({ state: { tasks: { a: task }, rootIds: ['a'] }, version: 1 }),
     );
     const data = readLegacyLocalTasks();
-    expect(data?.tasks.a).toEqual({ ...task, tags: [], dueDate: null });
+    expect(data?.tasks.a).toEqual({ ...task, color: null, tags: [], dueDate: null });
     expect(data?.rootIds).toEqual(['a']);
     clearLegacyLocalTasks();
     expect(localStorage.getItem('tasks-v1')).toBeNull();
@@ -347,5 +353,88 @@ describe('AI import actions', () => {
     get().undoLast();
     expect(get().tasks[a]).toBeDefined();
     expect(get().rootIds).toEqual([a]);
+  });
+});
+
+describe('tag colours', () => {
+  beforeEach(() => resetTaskStore());
+
+  it('sets, changes and clears a tag colour, each with an undo', () => {
+    const { setTagColor } = useTaskStore.getState();
+    setTagColor('#Work', '#C9B8F2');
+    expect(useTaskStore.getState().tagColors).toEqual({ work: '#C9B8F2' });
+    expect(useTaskStore.getState().undo?.label).toBe('Changed #work colour');
+
+    setTagColor('work', '#FFD3B6');
+    expect(useTaskStore.getState().tagColors.work).toBe('#FFD3B6');
+    setTagColor('work', null);
+    expect(useTaskStore.getState().tagColors).toEqual({});
+  });
+
+  it('undo restores the previous map; no-ops record nothing', () => {
+    const { setTagColor } = useTaskStore.getState();
+    setTagColor('work', '#C9B8F2');
+    useTaskStore.getState().dismissUndo();
+    setTagColor('work', '#C9B8F2'); // unchanged
+    expect(useTaskStore.getState().undo).toBeNull();
+    setTagColor('nothing', null); // already unset
+    expect(useTaskStore.getState().undo).toBeNull();
+
+    setTagColor('work', '#FFD3B6');
+    useTaskStore.getState().undoLast();
+    expect(useTaskStore.getState().tagColors).toEqual({ work: '#C9B8F2' });
+    expect(useTaskStore.getState().undo).toBeNull();
+  });
+
+  it('rejects invalid colours and reserved names, and keeps colours of unused tags', () => {
+    const s = useTaskStore.getState();
+    s.setTagColor('work', 'not-a-colour');
+    s.setTagColor('__proto__', '#C9B8F2');
+    expect(useTaskStore.getState().tagColors).toEqual({});
+
+    s.setTagColor('work', '#C9B8F2');
+    const id = s.add({ title: 'x', tags: ['work'] });
+    s.update(id, { tags: [] }); // nobody uses the tag any more
+    expect(useTaskStore.getState().tagColors).toEqual({ work: '#C9B8F2' });
+  });
+
+  it('is replaced by an import (with undo) and applied by hydrate', () => {
+    const s = useTaskStore.getState();
+    s.setTagColor('a', '#C9B8F2');
+    s.replaceAll({ tasks: {}, rootIds: [], history: [], tagColors: { b: '#FFD3B6' } }, 'Imported');
+    expect(useTaskStore.getState().tagColors).toEqual({ b: '#FFD3B6' });
+    useTaskStore.getState().undoLast();
+    expect(useTaskStore.getState().tagColors).toEqual({ a: '#C9B8F2' });
+    useTaskStore.getState().hydrate({ tagColors: { c: '#B5E5CF' } });
+    expect(useTaskStore.getState().tagColors).toEqual({ c: '#B5E5CF' });
+    expect(useTaskStore.getState().undo).toBeNull();
+  });
+});
+
+describe('migrateTasksState: v2 to v3', () => {
+  const base = { id: 'a', title: 'A', difficulty: 1, done: false, collapsed: false, childIds: [] };
+
+  it('turns the old default blue into automatic, keeps explicit colours, adds tagColors', () => {
+    const out = migrateTasksState({
+      tasks: {
+        a: { ...base, parentId: null, color: '#A9C6F5', createdAt: 1 },
+        b: { ...base, id: 'b', parentId: null, color: '#C9B8F2', createdAt: 2 },
+      },
+      rootIds: ['a', 'b'],
+      history: [],
+    });
+    expect(out.tasks.a.color).toBeNull();
+    expect(out.tasks.b.color).toBe('#C9B8F2');
+    expect(out.tagColors).toEqual({});
+  });
+
+  it('is idempotent and keeps tagColors', () => {
+    const once = migrateTasksState({
+      tasks: { a: { ...base, parentId: null, color: '#A9C6F5', createdAt: 1 } },
+      rootIds: ['a'],
+      tagColors: { work: '#C9B8F2', bad: 'zzz' },
+    });
+    expect(once.tagColors).toEqual({ work: '#C9B8F2' });
+    expect(migrateTasksState(once)).toEqual(once);
   });
 });

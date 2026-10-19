@@ -15,12 +15,7 @@ export function DragPreview({ id, subtasks }: Props) {
   return (
     <div className={styles.preview} data-testid="drag-preview">
       <GripVertical className={styles.grip} size={14} strokeWidth={1.75} aria-hidden="true" />
-      <Checkbox
-        checked={task.done}
-        color={task.color}
-        label={`Done: ${task.title}`}
-        onToggle={noop}
-      />
+      <Checkbox checked={task.done} label={`Done: ${task.title}`} onToggle={noop} />
       <span className={styles.title}>
         <StrikeText done={task.done}>{task.title}</StrikeText>
       </span>

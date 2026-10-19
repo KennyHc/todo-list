@@ -163,3 +163,49 @@ input {
     font-size: 16px !important;
   }
 }
+
+/*
+ * Row colour indicator: a short, straight bar of colour on the row's left edge that glows softly
+ * into the row, like a thin strip of coloured light. It is set in from the top and bottom so it
+ * never bends around the row's rounded corners. Rows set `--row-color` + `data-row-color`; rows
+ * without a colour carry neither and show nothing.
+ *
+ * Rows that only inherit their parent's colour show a quieter bar without the glow, so a project
+ * reads as one coloured group instead of a stack of repeated bars.
+ */
+[data-row-color]::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--row-color) 82%, var(--text));
+  box-shadow: 0 0 12px 1px color-mix(in srgb, var(--row-color) 60%, transparent);
+  pointer-events: none;
+  transition:
+    background-color 200ms var(--ease-out),
+    box-shadow 200ms var(--ease-out),
+    opacity 200ms var(--ease-out);
+}
+
+:root[data-theme='dark'] [data-row-color]::after {
+  background: var(--row-color);
+  box-shadow: 0 0 14px 1px color-mix(in srgb, var(--row-color) 45%, transparent);
+}
+
+[data-row-color][data-inherited]::after {
+  opacity: 0.4;
+  box-shadow: none;
+}
+
+[data-row-color][data-done]::after {
+  opacity: 0.4;
+  box-shadow: none;
+}
+
+/* The keyboard-focus bar takes the same spot while a row is focused. */
+[data-row-color][data-focused]::after {
+  opacity: 0;
+}

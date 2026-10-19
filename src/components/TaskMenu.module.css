@@ -94,3 +94,10 @@
     font-size: 15px;
   }
 }
+
+.hint {
+  margin: 6px 4px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}

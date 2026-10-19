@@ -12,9 +12,14 @@ import { ChevronRight, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useIsPhone } from '../hooks/useMediaQuery';
 import { useIsTouch } from '../hooks/useIsTouch';
+import { addSubtask } from '../lib/addSubtask';
+import { ignoreTextEntry } from '../lib/textEntry';
+import { primeKeyboard } from '../lib/focusProxy';
 import { getAncestors, getDescendants } from '../lib/tree';
 import { isContextOnly, neighborAfterRemoval, taskPath, visibleOrder } from '../lib/views';
 import {
+  useColorSource,
+  useEffectiveColor,
   useEffectiveDifficulty,
   useIsLeaf,
   useProgress,
@@ -81,6 +86,8 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
   const liveTask = useTask(id);
   const liveLeaf = useIsLeaf(id);
   const liveSum = useEffectiveDifficulty(id);
+  const liveColor = useEffectiveColor(id);
+  const colorSource = useColorSource(id).source;
   const liveProgress = useProgress(id);
   const editing = useTaskStore((s) => s.editingId === id);
   const focused = useUIStore((s) => s.focusedId === id);
@@ -117,11 +124,12 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
     task: liveTask,
     leaf: liveLeaf,
     sum: liveSum,
+    color: liveColor,
     ...liveProgress,
   };
   const lastView = useRef(view);
   if (liveTask) lastView.current = view;
-  const { task, leaf, sum, done, total } = liveTask ? view : lastView.current;
+  const { task, leaf, sum, color, done, total } = liveTask ? view : lastView.current;
 
   const done_ = task?.done ?? false;
 
@@ -217,16 +225,16 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
   if (!task) return null;
 
   const store = useTaskStore.getState();
-  const addChild = () => {
-    const s = useTaskStore.getState();
-    if (task.collapsed) s.update(id, { collapsed: false });
-    s.setEditingId(s.add({ title: '', parentId: id }));
-  };
+  // Menus close themselves before calling this; addSubtask primes the iOS keyboard first.
+  const addChild = () => void addSubtask(id);
 
   const tagLimit = phone ? MAX_TAGS_SHOWN_PHONE : MAX_TAGS_SHOWN;
   const shownTags = task.tags.slice(0, tagLimit);
   const hiddenTags = task.tags.slice(tagLimit);
-  const edit = () => useTaskStore.getState().setEditingId(id);
+  const edit = () => {
+    primeKeyboard();
+    useTaskStore.getState().setEditingId(id);
+  };
 
   const chevron = (
     <motion.button
@@ -276,7 +284,7 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
         <div className={styles.stack}>
           <SwipeRow
             enabled={touch && !editing && !anyDragging && !dragging}
-            color={task.color}
+            color={color ?? 'var(--accent)'}
             done={task.done}
             deleteKind={leaf ? 'slide' : 'confirm'}
             onComplete={() => useTaskStore.getState().toggle(id)}
@@ -287,9 +295,14 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
               className={`${styles.row} ${task.done ? styles.rowDone : ''} ${editing ? styles.rowEditing : ''} ${focused ? styles.rowFocused : ''}`}
               data-dim={dimmed || undefined}
               data-focused={focused || undefined}
+              data-row-color={color ?? undefined}
+              data-done={(color !== null && task.done) || undefined}
+              data-inherited={(color !== null && colorSource === 'parent') || undefined}
+              style={color ? ({ '--row-color': color } as CSSProperties) : undefined}
               animate={pulse}
-              // Touch: the whole row is the drag handle, picked up with a long press.
-              {...(touch && drag?.enabled ? drag.listeners : {})}
+              // Touch: the whole row is the drag handle, picked up with a long press. Events from
+              // text fields inside it (the title editor) must never reach the sensors.
+              {...(touch && drag?.enabled ? ignoreTextEntry(drag.listeners) : {})}
               onClick={(e) => {
                 // A click on the row itself (not a button, input or link inside it) focuses it.
                 if (
@@ -317,7 +330,7 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
               )}
               <motion.span
                 className={styles.flash}
-                style={{ background: task.color }}
+                style={{ background: color ?? 'var(--accent)' }}
                 initial={{ opacity: 0 }}
                 animate={flash}
                 aria-hidden="true"
@@ -345,7 +358,6 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
               {flat || phone ? null : leaf ? <span className={styles.chevronSpacer} /> : chevron}
               <Checkbox
                 checked={task.done}
-                color={task.color}
                 label={`Done: ${task.title}`}
                 delay={delay}
                 onToggle={() => store.toggle(id)}
@@ -400,7 +412,6 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
                 {leaf ? (
                   <DifficultyIcon
                     value={task.difficulty}
-                    color={task.color}
                     dimmed={task.done}
                     onChange={(difficulty) => store.update(id, { difficulty })}
                   />

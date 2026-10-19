@@ -39,6 +39,21 @@ describe('diffState', () => {
     expect(diffState(prev, { ...prev, rootIds: ['a'] }).rootIdsChanged).toBe(true);
   });
 
+  it('flags tagColors changes by content, not identity', () => {
+    const prev = { ...mkState([a, b]), tagColors: { work: '#C9B8F2' } };
+    expect(diffState(prev, { ...prev, tagColors: { work: '#C9B8F2' } }).tagColorsChanged).toBe(
+      false,
+    );
+    expect(isEmptyDiff(diffState(prev, { ...prev, tagColors: { work: '#C9B8F2' } }))).toBe(true);
+    expect(diffState(prev, { ...prev, tagColors: { work: '#FFD3B6' } }).tagColorsChanged).toBe(
+      true,
+    );
+    // Removing a tag's colour is a change too.
+    const removed = diffState(prev, { ...prev, tagColors: {} });
+    expect(removed.tagColorsChanged).toBe(true);
+    expect(isEmptyDiff(removed)).toBe(false);
+  });
+
   it('diffs history by id and reference', () => {
     const h1 = mkEntry('h1');
     const h2 = mkEntry('h2');

@@ -4,8 +4,11 @@ import {
   fromHistoryDoc,
   fromTaskDoc,
   historyOrds,
+  fromTagColors,
   isEqualEntry,
+  isEqualTagColors,
   isEqualTask,
+  SCHEMA_VERSION,
   toHistoryDoc,
   toTaskDoc,
 } from './schema';
@@ -40,6 +43,17 @@ describe('task docs', () => {
     expect(fromTaskDoc('b', toTaskDoc(done))).toEqual(done);
   });
 
+  it('decodes the old default blue (schema 2) to automatic, and keeps other colours', () => {
+    expect(SCHEMA_VERSION).toBe(3);
+    expect(fromTaskDoc('a', { color: '#A9C6F5' })?.color).toBeNull();
+    expect(fromTaskDoc('a', { color: '#C9B8F2' })?.color).toBe('#C9B8F2');
+    expect(fromTaskDoc('a', { color: null })?.color).toBeNull();
+    expect(fromTaskDoc('a', {})?.color).toBeNull();
+    // Idempotent: re-reading what was written changes nothing.
+    const t = fromTaskDoc('a', { color: '#A9C6F5' })!;
+    expect(fromTaskDoc('a', toTaskDoc(t))).toEqual(t);
+  });
+
   it('sanitizes malformed documents', () => {
     expect(fromTaskDoc('a', null)).toBeNull();
     const t = fromTaskDoc('a', { title: 3, difficulty: 99, tags: ['ok', 4], childIds: 'x' });
@@ -63,5 +77,15 @@ describe('history docs', () => {
 
   it('rejects docs without completedAt', () => {
     expect(fromHistoryDoc('x', { title: 'x' })).toBeNull();
+  });
+});
+
+describe('tagColors', () => {
+  it('decodes defensively and compares by value', () => {
+    expect(fromTagColors({ a: '#C9B8F2', b: 3 })).toEqual({ a: '#C9B8F2' });
+    expect(fromTagColors(undefined)).toEqual({});
+    expect(isEqualTagColors({ a: '#fff' }, { a: '#fff' })).toBe(true);
+    expect(isEqualTagColors({ a: '#fff' }, { a: '#000' })).toBe(false);
+    expect(isEqualTagColors({ a: '#fff' }, {})).toBe(false);
   });
 });

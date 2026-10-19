@@ -11,7 +11,7 @@ const H = 14;
 const X0 = (W - (5 * BAR_W + 4 * GAP)) / 2;
 
 /** A "signal strength" glyph: five ascending bars, the first `value` of them filled. */
-export function DifficultyGlyph({ value, color }: { value: Difficulty; color: string }) {
+export function DifficultyGlyph({ value }: { value: Difficulty }) {
   return (
     <svg
       className={styles.glyph}
@@ -21,7 +21,6 @@ export function DifficultyGlyph({ value, color }: { value: Difficulty; color: st
       aria-hidden="true"
       focusable="false"
       data-hot={value === 5 || undefined}
-      style={{ ['--task-color' as string]: color }}
     >
       {LEVELS.map((level, i) => (
         <rect

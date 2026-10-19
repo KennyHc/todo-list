@@ -1,11 +1,14 @@
+import { normalizeTagColors, normalizeTaskColor } from '../lib/colors';
 import type { HistoryEntry } from '../lib/history';
 import type { Difficulty, Task } from '../types';
 
 /** Plain-data helpers for the Firestore documents. No Firebase imports: unit-testable. */
 
-export const SCHEMA_VERSION = 2;
-
-const DEFAULT_COLOR = '#A9C6F5';
+/**
+ * 3: task `color` may be null ("automatic") and the meta document carries `tagColors`.
+ * Version 2 documents stay readable: their default blue decodes to null.
+ */
+export const SCHEMA_VERSION = 3;
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -57,6 +60,18 @@ export function isEqualEntry(a: HistoryEntry, b: HistoryEntry): boolean {
 
 export const isEqualIds = sameStrings;
 
+export function isEqualTagColors(
+  a: Readonly<Record<string, string>>,
+  b: Readonly<Record<string, string>>,
+): boolean {
+  if (a === b) return true;
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((k) => a[k] === b[k]);
+}
+
+/** Defensive read of the meta document's `tagColors` map (absent means none). */
+export const fromTagColors = normalizeTagColors;
+
 /** Document body for a task. `completedAt` is omitted (not undefined) when unset. */
 export function toTaskDoc(task: Task): Record<string, unknown> {
   const doc: Record<string, unknown> = {
@@ -84,7 +99,7 @@ export function fromTaskDoc(id: string, data: unknown): Task | null {
     id,
     title: str(data.title),
     difficulty,
-    color: str(data.color, DEFAULT_COLOR),
+    color: normalizeTaskColor(data.color),
     done: data.done === true,
     collapsed: data.collapsed === true,
     tags: strings(data.tags),
@@ -143,7 +158,7 @@ export function fromHistoryDoc(id: string, data: unknown): OrderedEntry | null {
       id,
       taskId: str(data.taskId),
       title: str(data.title),
-      color: str(data.color, DEFAULT_COLOR),
+      color: typeof data.color === 'string' ? data.color : null,
       tags: strings(data.tags),
       dueDate: typeof data.dueDate === 'string' ? data.dueDate : null,
       difficulty: num(data.difficulty, 1),

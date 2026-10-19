@@ -7,14 +7,13 @@ import styles from './DifficultyIcon.module.css';
 
 type Props = {
   value: Difficulty;
-  color: string;
   onChange: (d: Difficulty) => void;
   /** Dim the glyph, e.g. on a finished row. */
   dimmed?: boolean;
 };
 
 /** A row's difficulty as a small signal-strength glyph; clicking it opens the level menu. */
-export function DifficultyIcon({ value, color, onChange, dimmed = false }: Props) {
+export function DifficultyIcon({ value, onChange, dimmed = false }: Props) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const close = useCallback(() => setOpen(false), []);
@@ -31,14 +30,13 @@ export function DifficultyIcon({ value, color, onChange, dimmed = false }: Props
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
-        <DifficultyGlyph value={value} color={color} />
+        <DifficultyGlyph value={value} />
       </button>
       <DifficultyMenu
         open={open}
         onClose={close}
         anchorRef={anchorRef}
         value={value}
-        color={color}
         onChange={onChange}
       />
     </>

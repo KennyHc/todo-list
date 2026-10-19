@@ -1,7 +1,13 @@
 import { useCallback, useRef, useState } from 'react';
 import { motion, type MotionProps } from 'framer-motion';
 import { MoreHorizontal, Plus, Trash2 } from 'lucide-react';
-import { useEffectiveDifficulty, useIsLeaf, useTask, useTaskStore } from '../store/tasks';
+import {
+  useColorSource,
+  useEffectiveDifficulty,
+  useIsLeaf,
+  useTask,
+  useTaskStore,
+} from '../store/tasks';
 import { ColorPicker } from './ColorPicker';
 import { DatePicker } from './DatePicker';
 import { DifficultyPicker } from './DifficultyPicker';
@@ -22,12 +28,14 @@ export function TaskMenu({ id, buttonClassName, motionProps, onAddSubtask, onDel
   const task = useTask(id);
   const leaf = useIsLeaf(id);
   const sum = useEffectiveDifficulty(id);
+  const colorSource = useColorSource(id);
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const close = useCallback(() => setOpen(false), []);
   if (!task) return null;
 
   const update = useTaskStore.getState().update;
+  // The menu (a sheet on phones) closes first so it can't cover what the action reveals.
   const act = (fn: () => void) => () => {
     close();
     fn();
@@ -61,7 +69,6 @@ export function TaskMenu({ id, buttonClassName, motionProps, onAddSubtask, onDel
               <DifficultyPicker
                 fill
                 value={task.difficulty}
-                color={task.color}
                 onChange={(difficulty) => update(id, { difficulty })}
               />
             ) : (
@@ -70,7 +77,12 @@ export function TaskMenu({ id, buttonClassName, motionProps, onAddSubtask, onDel
           </section>
           <section className={styles.section}>
             <h3 className={styles.heading}>Tags</h3>
-            <TagEditor compact tags={task.tags} onChange={(tags) => update(id, { tags })} />
+            <TagEditor
+              compact
+              colorEdit
+              tags={task.tags}
+              onChange={(tags) => update(id, { tags })}
+            />
           </section>
           <section className={styles.section}>
             <h3 className={styles.heading}>Due date</h3>
@@ -79,6 +91,15 @@ export function TaskMenu({ id, buttonClassName, motionProps, onAddSubtask, onDel
           <section className={styles.section}>
             <h3 className={styles.heading}>Colour</h3>
             <ColorPicker value={task.color} onChange={(color) => update(id, { color })} />
+            {task.color === null && (
+              <p className={styles.hint}>
+                {colorSource.source === 'tag'
+                  ? `From #${colorSource.tag}`
+                  : colorSource.source === 'parent'
+                    ? 'From parent'
+                    : 'No colour'}
+              </p>
+            )}
           </section>
         </div>
         <div className={styles.divider} role="separator" />

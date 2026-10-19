@@ -15,7 +15,7 @@ describe('backup', () => {
         tags: [],
         dueDate: null,
         difficulty: 1,
-        color: 'none',
+        color: null,
         createdAt: 1000,
       },
       '2': {
@@ -28,12 +28,13 @@ describe('backup', () => {
         tags: ['work'],
         dueDate: '2026-10-20',
         difficulty: 2,
-        color: 'none',
+        color: null,
         createdAt: 2000,
       },
     },
     rootIds: ['1'],
     history: [],
+    tagColors: {},
   };
 
   it('round-trip: serialize then parse gives equal data', () => {
@@ -72,7 +73,7 @@ describe('backup', () => {
           childIds: [],
           parentId: null,
           difficulty: 1,
-          color: 'none',
+          color: null,
           createdAt: 1000,
         },
       },
@@ -126,7 +127,7 @@ describe('backup', () => {
             tags: [],
             dueDate: null,
             difficulty: 1,
-            color: 'none',
+            color: null,
             createdAt: 1000,
           },
         },
@@ -153,7 +154,7 @@ describe('backup', () => {
             tags: [],
             dueDate: null,
             difficulty: 1,
-            color: 'none',
+            color: null,
             createdAt: 1000,
           },
         },
@@ -180,7 +181,7 @@ describe('backup', () => {
             tags: [],
             dueDate: null,
             difficulty: 1,
-            color: 'none',
+            color: null,
             createdAt: 1000,
           },
         },
@@ -189,5 +190,63 @@ describe('backup', () => {
       }),
     );
     expect(result).toEqual({ ok: false, error: 'corrupt' });
+  });
+  describe('versions and tag colours', () => {
+    const task = (over: Record<string, unknown> = {}) => ({
+      id: '1',
+      title: 'T',
+      done: false,
+      collapsed: false,
+      childIds: [],
+      parentId: null,
+      tags: ['work'],
+      dueDate: null,
+      difficulty: 1,
+      color: '#A9C6F5',
+      createdAt: 1,
+      ...over,
+    });
+
+    it('writes version 3 with tagColors, and round-trips them', () => {
+      const data = { ...sampleData, tagColors: { work: '#C9B8F2' } };
+      const parsed = JSON.parse(serializeBackup(data));
+      expect(parsed.version).toBe(3);
+      expect(parsed.tagColors).toEqual({ work: '#C9B8F2' });
+      const result = parseBackup(serializeBackup(data));
+      expect(result.ok && result.data.tagColors).toEqual({ work: '#C9B8F2' });
+    });
+
+    it('imports a version 2 backup: default blue becomes automatic, no tag colours', () => {
+      const v2 = {
+        app: 'tasks',
+        version: 2,
+        exportedAt: '2026-01-01T00:00:00Z',
+        tasks: { '1': task(), '2': task({ id: '2', color: '#FFD3B6' }) },
+        rootIds: ['1', '2'],
+        history: [],
+      };
+      const result = parseBackup(JSON.stringify(v2));
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.tasks['1'].color).toBeNull();
+      expect(result.data.tasks['2'].color).toBe('#FFD3B6');
+      expect(result.data.tagColors).toEqual({});
+    });
+
+    it('re-importing its own export is stable (idempotent migration)', () => {
+      const v2 = { app: 'tasks', version: 2, tasks: { '1': task() }, rootIds: ['1'], history: [] };
+      const first = parseBackup(JSON.stringify(v2));
+      expect(first.ok).toBe(true);
+      if (!first.ok) return;
+      const second = parseBackup(serializeBackup(first.data));
+      expect(second.ok && second.data).toEqual(first.data);
+    });
+
+    it('refuses a backup from a newer version', () => {
+      const result = parseBackup(
+        JSON.stringify({ app: 'tasks', version: 4, tasks: {}, rootIds: [], history: [] }),
+      );
+      expect(result).toEqual({ ok: false, error: 'not-a-backup' });
+    });
   });
 });

@@ -22,12 +22,13 @@ const restored: PersistedTasks = {
       tags: [],
       dueDate: null,
       difficulty: 1,
-      color: 'none',
+      color: null,
       createdAt: 1000,
     },
   },
   rootIds: ['r1'],
   history: [],
+  tagColors: {},
 };
 const BACKUP = serializeBackup(restored, new Date('2026-10-19T10:00:00Z'));
 const AI_REPLY = '```json\n{"tasks":[{"title":"Plan trip"},{"title":"Book flights"}]}\n```';
@@ -63,7 +64,7 @@ describe('Export backup dialog', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Copy' }));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const copied = JSON.parse(writeText.mock.calls[0][0]);
-    expect(copied).toMatchObject({ app: 'tasks', version: 2 });
+    expect(copied).toMatchObject({ app: 'tasks', version: 3 });
     expect(Object.values(copied.tasks as Record<string, { title: string }>)[0].title).toBe(
       'Buy oat milk',
     );

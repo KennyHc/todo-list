@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { tagColor } from '../lib/tags';
+import { useTaskStore } from '../store/tasks';
 import styles from './TagChip.module.css';
 
 type Props = {
@@ -11,13 +12,19 @@ type Props = {
   muted?: boolean;
   /** Shows the label as `#tag`. */
   hash?: boolean;
+  /** Turns the colour dot into a button (e.g. to open that tag's colour picker). */
+  onColor?: () => void;
+  /** Reflects an open colour picker on the dot button. */
+  colorOpen?: boolean;
 };
 
-export function TagChip({ tag, onClick, onRemove, muted, hash }: Props) {
-  const style = { ['--tag' as string]: tagColor(tag) };
+/** A tag chip in the tag's assigned colour, or else its stable hash colour (chips only). */
+export function TagChip({ tag, onClick, onRemove, muted, hash, onColor, colorOpen }: Props) {
+  const assigned = useTaskStore((s) => s.tagColors[tag]);
+  const style = { ['--tag' as string]: assigned ?? tagColor(tag) };
   const body = (
     <>
-      <span className={styles.dot} aria-hidden="true" />
+      {!onColor && <span className={styles.dot} aria-hidden="true" />}
       <span className={styles.label}>
         {hash ? '#' : ''}
         {tag}
@@ -25,7 +32,23 @@ export function TagChip({ tag, onClick, onRemove, muted, hash }: Props) {
     </>
   );
   return (
-    <span className={`${styles.chip} ${muted ? styles.muted : ''}`} style={style}>
+    <span
+      className={`${styles.chip} ${muted ? styles.muted : ''}`}
+      style={style}
+      data-assigned={assigned ? '' : undefined}
+    >
+      {onColor && (
+        <button
+          type="button"
+          className={styles.dotBtn}
+          aria-label={`Colour for #${tag}`}
+          aria-expanded={colorOpen}
+          title={`Colour for #${tag}`}
+          onClick={onColor}
+        >
+          <span className={styles.dot} aria-hidden="true" />
+        </button>
+      )}
       {onClick ? (
         <button
           type="button"

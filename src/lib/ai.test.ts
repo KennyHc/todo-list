@@ -9,7 +9,6 @@ import {
   toAiJson,
   type AiImportTask,
 } from './ai';
-import { TASK_COLORS } from './colors';
 import { effectiveDifficulty, emptyTree, progress } from './tree';
 
 const NOW = new Date(2026, 9, 19, 12, 0, 0); // 2026-10-19 local
@@ -324,7 +323,7 @@ describe('appendAiTasks', () => {
     { title: 'Project B', difficulty: 3, tags: [], subtasks: [] },
   ];
 
-  it('builds structure in order with summed difficulty and distinct root colours', () => {
+  it('builds structure in order with summed difficulty and leaves colours automatic', () => {
     const out = appendAiTasks(emptyTree(), tasks, { now: 100 });
     expect(out.count).toBe(4);
     expect(out.ids).toHaveLength(2);
@@ -335,26 +334,26 @@ describe('appendAiTasks', () => {
     expect(a.tags).toEqual(['work']);
     expect(a.childIds.map((id) => out.tree.tasks[id].title)).toEqual(['A1', 'A2']);
     expect(effectiveDifficulty(out.tree, a.id)).toBe(6);
-    expect(a.color).toBe(TASK_COLORS[0].hex);
-    expect(b.color).toBe(TASK_COLORS[1].hex);
-    expect(out.tree.tasks[a.childIds[0]].color).toBe(a.color);
+    expect(a.color).toBeNull();
+    expect(b.color).toBeNull();
+    expect(out.tree.tasks[a.childIds[0]].color).toBeNull();
     expect(a.createdAt).toBe(100);
   });
 
-  it('appends after existing roots, keeps untouched tasks shared, and continues the colours', () => {
+  it('appends after existing roots, keeps untouched tasks shared', () => {
     const base = appendAiTasks(emptyTree(), [tasks[1]]).tree;
     const out = appendAiTasks(base, tasks);
     expect(out.tree.rootIds.slice(0, 1)).toEqual(base.rootIds);
     expect(out.tree.tasks[base.rootIds[0]]).toBe(base.tasks[base.rootIds[0]]);
-    expect(out.tree.tasks[out.ids[0]].color).toBe(TASK_COLORS[1].hex);
+    expect(out.tree.tasks[out.ids[0]].color).toBeNull();
   });
 
-  it('nests under a parent and inherits its colour; unknown parents are a no-op', () => {
+  it('nests under a parent without writing a colour; unknown parents are a no-op', () => {
     const base = appendAiTasks(emptyTree(), [tasks[1]]).tree;
     const parentId = base.rootIds[0];
     const out = appendAiTasks(base, [tasks[0].subtasks[0]], { parentId });
     expect(out.tree.tasks[parentId].childIds).toEqual(out.ids);
-    expect(out.tree.tasks[out.ids[0]].color).toBe(base.tasks[parentId].color);
+    expect(out.tree.tasks[out.ids[0]].color).toBeNull();
     expect(appendAiTasks(base, tasks, { parentId: 'nope' })).toEqual({
       tree: base,
       ids: [],

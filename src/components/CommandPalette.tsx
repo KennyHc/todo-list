@@ -195,8 +195,8 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
         label: 'Copy backup to clipboard',
         Icon: Copy,
         run: () => {
-          const { tasks, rootIds, history } = useTaskStore.getState();
-          void copyText(serializeBackup({ tasks, rootIds, history })).then((ok) =>
+          const { tasks, rootIds, history, tagColors } = useTaskStore.getState();
+          void copyText(serializeBackup({ tasks, rootIds, history, tagColors })).then((ok) =>
             ui().showNotice(ok ? 'Backup copied' : 'Couldn\u2019t copy the backup'),
           );
         },
@@ -397,7 +397,6 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
                       <>
                         <span
                           className={`${styles.dot} ${row.task.done ? styles.dotDone : ''}`}
-                          style={{ ['--task-color' as string]: row.task.color }}
                           aria-hidden="true"
                         />
                         <span

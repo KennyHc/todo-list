@@ -1,6 +1,5 @@
 import { MAX_TITLE_LENGTH, type Difficulty, type Task, type TaskTree } from '../types';
 import type { PersistedTasks } from '../store/tasks';
-import { TASK_COLORS } from './colors';
 import { normalizeTags } from './tags';
 import { addTask, effectiveDifficulty, progress, sortedChildIds, toggleDone } from './tree';
 import { dueStatus, todayISO } from './views';
@@ -44,7 +43,7 @@ const RECENT_DAYS = 7;
 const RECENT_MAX = 30;
 
 export function toAiJson(
-  state: PersistedTasks,
+  state: Pick<PersistedTasks, 'tasks' | 'rootIds' | 'history'>,
   opts: { includeCompleted: boolean; now?: Date },
 ): AiExport {
   const now = opts.now ?? new Date();
@@ -443,13 +442,13 @@ export function importStats(tasks: AiImportTask[]): { count: number; difficulty:
 
 /**
  * Appends the imported tasks (in order, recursively) at the root or under `parentId`. Each new
- * root gets the next palette colour; subtasks inherit it. Done leaves are marked afterwards via
+ * root is left on automatic colour (tags with a colour apply by themselves). Done leaves are marked afterwards via
  * toggleDone, so parents derive their done state like they do everywhere else.
  */
 export function appendAiTasks(
   tree: TaskTree,
   tasks: AiImportTask[],
-  opts: { parentId?: string | null; color?: string; now?: number } = {},
+  opts: { parentId?: string | null; color?: string | null; now?: number } = {},
 ): { tree: TaskTree; ids: string[]; count: number } {
   const parentId = opts.parentId ?? null;
   const now = opts.now ?? Date.now();
@@ -460,7 +459,7 @@ export function appendAiTasks(
   const ids: string[] = [];
   const doneLeaves: string[] = [];
 
-  const add = (task: AiImportTask, parent: string | null, color: string | undefined): string => {
+  const add = (task: AiImportTask, parent: string | null, color: string | null): string => {
     const result = addTask(
       current,
       {
@@ -478,18 +477,12 @@ export function appendAiTasks(
     if (task.subtasks.length === 0) {
       if (task.done) doneLeaves.push(result.id);
     } else {
-      for (const sub of task.subtasks) add(sub, result.id, undefined);
+      for (const sub of task.subtasks) add(sub, result.id, null);
     }
     return result.id;
   };
 
-  const base = tree.rootIds.length;
-  tasks.forEach((task, i) => {
-    const color =
-      opts.color ??
-      (parentId === null ? TASK_COLORS[(base + i) % TASK_COLORS.length].hex : undefined);
-    ids.push(add(task, parentId, color));
-  });
+  for (const task of tasks) ids.push(add(task, parentId, opts.color ?? null));
 
   for (const id of doneLeaves) current = toggleDone(current, id, now);
   return { tree: current, ids, count };

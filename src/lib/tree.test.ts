@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_TAGS, MAX_TITLE_LENGTH, type Difficulty, type TaskTree } from '../types';
-import { DEFAULT_COLOR } from './colors';
 import {
   addTask,
   clearCompleted,
@@ -51,7 +50,7 @@ describe('addTask', () => {
     expect(tree.tasks[id]).toMatchObject({
       title: 'Hello',
       difficulty: 1,
-      color: DEFAULT_COLOR,
+      color: null,
       done: false,
       collapsed: false,
       parentId: null,
@@ -74,11 +73,12 @@ describe('addTask', () => {
     expect(c.tree.rootIds).toEqual([p.id]);
   });
 
-  it('inherits the parent color, unless one is given', () => {
+  it('never copies a stored colour: children are automatic unless one is given', () => {
+    // Inheritance is computed at render time (lib/colorResolve), not written.
     const p = add(emptyTree(), 'parent', { color: '#123456' });
-    const inherited = add(p.tree, 'a', { parentId: p.id });
-    const explicit = add(inherited.tree, 'b', { parentId: p.id, color: '#abcdef' });
-    expect(explicit.tree.tasks[inherited.id].color).toBe('#123456');
+    const plain = add(p.tree, 'a', { parentId: p.id });
+    const explicit = add(plain.tree, 'b', { parentId: p.id, color: '#abcdef' });
+    expect(explicit.tree.tasks[plain.id].color).toBeNull();
     expect(explicit.tree.tasks[explicit.id].color).toBe('#abcdef');
   });
 

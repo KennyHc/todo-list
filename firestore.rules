@@ -21,10 +21,16 @@ service cloud.firestore {
         && t.done is bool;
     }
 
-    // users/{uid} is the meta document: rootIds, schemaVersion, updatedAt.
+    // users/{uid} is the meta document: rootIds, tagColors (a map, tag -> hex), schemaVersion,
+    // updatedAt.
+    function validMeta() {
+      let m = request.resource.data;
+      return m.rootIds is list && (!('tagColors' in m) || m.tagColors is map);
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid);
-      allow create, update: if isOwner(uid) && request.resource.data.rootIds is list;
+      allow create, update: if isOwner(uid) && validMeta();
       allow delete: if isOwner(uid);
 
       match /tasks/{id} {

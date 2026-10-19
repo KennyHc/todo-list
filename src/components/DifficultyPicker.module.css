@@ -54,7 +54,7 @@
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  background: var(--task-color);
+  background: var(--accent);
   opacity: 0;
   pointer-events: none;
 }

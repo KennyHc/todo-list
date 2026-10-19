@@ -30,7 +30,7 @@ const task = (id: string, over: Record<string, unknown> = {}) => ({
   id,
   title: 'Write rules',
   difficulty: 3,
-  color: '#A9C6F5',
+  color: null,
   done: false,
   collapsed: false,
   tags: ['a'],
@@ -160,5 +160,28 @@ describe('task validation', () => {
   it('requires rootIds on the meta document to be a list', async () => {
     await assertFails(setDoc(doc(alice(), 'users/alice'), { rootIds: 'a' }));
     await assertSucceeds(setDoc(doc(alice(), 'users/alice'), { rootIds: [] }));
+  });
+
+  it('allows tagColors on the meta document only as a map', async () => {
+    const meta = (extra: Record<string, unknown>) =>
+      setDoc(doc(alice(), 'users/alice'), { rootIds: [], schemaVersion: 3, ...extra });
+    await assertSucceeds(meta({ tagColors: { work: '#C9B8F2', home: '#FFD3B6' } }));
+    await assertSucceeds(meta({ tagColors: {} }));
+    await assertSucceeds(meta({})); // absent is fine (schema 2 clients)
+    await assertFails(meta({ tagColors: 'red' }));
+    await assertFails(meta({ tagColors: ['#C9B8F2'] }));
+    await assertFails(meta({ tagColors: null }));
+    // A merge that only touches tagColors still has to leave a valid document.
+    await assertSucceeds(
+      setDoc(doc(alice(), 'users/alice'), { tagColors: { a: '#fff' } }, { merge: true }),
+    );
+    await assertFails(setDoc(doc(alice(), 'users/alice'), { tagColors: 'x' }, { merge: true }));
+    // Someone else's meta stays off limits.
+    await assertFails(setDoc(doc(bob(), 'users/alice'), { rootIds: [], tagColors: {} }));
+  });
+
+  it('accepts tasks with a null (automatic) colour or an explicit one', async () => {
+    await assertSucceeds(write(task('t1', { color: null })));
+    await assertSucceeds(write(task('t1', { color: '#C9B8F2' })));
   });
 });

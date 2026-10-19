@@ -5,6 +5,9 @@ import { useReducedMotion } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import { appendAiTasks, type AiImportTask } from '../lib/ai';
 import { toggleDelay } from '../lib/cascade';
+import { effectiveColor } from '../lib/colorResolve';
+import { isHexColor, isSafeTagKey, normalizeTagColors, normalizeTaskColor } from '../lib/colors';
+import { normalizeTag } from '../lib/tags';
 import { applyHistory, diffCompletions, type HistoryEntry } from '../lib/history';
 import {
   addTask,
@@ -27,15 +30,23 @@ import {
   type TaskPatch,
 } from '../lib/tree';
 import { allTags, deadlineList, visibleTreeIds } from '../lib/views';
+import type { ColorSource } from '../lib/colorResolve';
 import type { Task, TaskTree } from '../types';
 
-export type UndoSnapshot = { tasks: TaskTree['tasks']; rootIds: string[]; history: HistoryEntry[] };
+export type UndoSnapshot = {
+  tasks: TaskTree['tasks'];
+  rootIds: string[];
+  history: HistoryEntry[];
+  tagColors: Record<string, string>;
+};
 
 export type UndoEntry = { id: string; label: string; snapshot: UndoSnapshot; at: number };
 
 type TaskState = TaskTree & {
   /** Completion log, oldest first. Persisted; independent of task deletion. */
   history: HistoryEntry[];
+  /** Tag -> hex colour. Tasks carrying a coloured tag show it (see lib/colorResolve). Persisted. */
+  tagColors: Record<string, string>;
   /** Task whose title input should be in edit mode. Not persisted. */
   editingId: string | null;
   /** Most recent toggle, used to time the cascade animation. Not persisted. */
@@ -57,6 +68,8 @@ type TaskActions = {
   /** Moves a task (with its subtree) to `target` and records an undo. */
   move: (id: string, target: MoveTarget) => void;
   setEditingId: (id: string | null) => void;
+  /** Sets (or, with null, clears) a tag's colour and records an undo. */
+  setTagColor: (tag: string, color: string | null) => void;
   /** Expands every collapsed ancestor of `id` in one update. Not undoable. */
   revealTask: (id: string) => void;
   /**
@@ -64,7 +77,7 @@ type TaskActions = {
    * `lastToggle` is cleared if the toggled task was changed by the update.
    */
   hydrate: (partial: Partial<PersistedTasks>) => void;
-  /** Replaces tasks, rootIds and history (e.g. a backup import) and records an undo. */
+  /** Replaces tasks, rootIds, history and tag colours (e.g. a backup import) and records an undo. */
   replaceAll: (data: PersistedTasks, label: string) => void;
   /** Appends imported (AI) tasks at the root, with an undo. Returns the new root ids. */
   appendTasks: (tasks: AiImportTask[], label: string) => string[];
@@ -77,22 +90,30 @@ type TaskActions = {
 
 export type TaskStore = TaskState & TaskActions;
 
-export type PersistedTasks = Pick<TaskStore, 'tasks' | 'rootIds' | 'history'>;
+export type PersistedTasks = Pick<TaskStore, 'tasks' | 'rootIds' | 'history' | 'tagColors'>;
 
 /**
  * v1 -> v2: every task gains `tags: []` and `dueDate: null`, and the store gains an empty
- * `history`. Idempotent, so it also tolerates partially migrated data.
+ * `history`. v2 -> v3: the old default blue (which meant "unset") becomes `color: null`
+ * ("automatic"), and the store gains `tagColors`. Idempotent, so it also tolerates partially
+ * migrated data.
  */
 export function migrateTasksState(persisted: unknown): PersistedTasks {
   const old = (persisted ?? {}) as Partial<Record<keyof PersistedTasks, unknown>>;
   const tasks: Record<string, Task> = {};
   for (const [id, task] of Object.entries((old.tasks ?? {}) as Record<string, Task>)) {
-    tasks[id] = { ...task, tags: task.tags ?? [], dueDate: task.dueDate ?? null };
+    tasks[id] = {
+      ...task,
+      color: normalizeTaskColor(task.color),
+      tags: task.tags ?? [],
+      dueDate: task.dueDate ?? null,
+    };
   }
   return {
     tasks,
     rootIds: Array.isArray(old.rootIds) ? (old.rootIds as string[]) : [],
     history: Array.isArray(old.history) ? (old.history as HistoryEntry[]) : [],
+    tagColors: normalizeTagColors(old.tagColors),
   };
 }
 
@@ -125,7 +146,7 @@ const treeOf = (s: TaskState): TaskTree => ({ tasks: s.tasks, rootIds: s.rootIds
 const undoEntry = (s: TaskState, label: string): UndoEntry => ({
   id: nanoid(),
   label,
-  snapshot: { tasks: s.tasks, rootIds: s.rootIds, history: s.history },
+  snapshot: { tasks: s.tasks, rootIds: s.rootIds, history: s.history, tagColors: s.tagColors },
   at: Date.now(),
 });
 
@@ -139,6 +160,7 @@ export const createTaskStore = () =>
   create<TaskStore>()((set, get) => ({
     ...emptyTree(),
     history: [],
+    tagColors: {},
     editingId: null,
     lastToggle: null,
     undo: null,
@@ -163,7 +185,7 @@ export const createTaskStore = () =>
       const now = Date.now();
       const after = toggleDone(before, id, now);
       if (after === before) return;
-      const diff = diffCompletions(before, after, id, now);
+      const diff = diffCompletions(before, after, id, now, state.tagColors);
       const history = applyHistory(state.history, diff);
       const title = state.tasks[id]?.title ?? '';
       const label =
@@ -221,6 +243,19 @@ export const createTaskStore = () =>
       });
     },
     setEditingId: (editingId) => set({ editingId }),
+    setTagColor: (rawTag, color) => {
+      const state = get();
+      const tag = normalizeTag(rawTag);
+      if (!isSafeTagKey(tag)) return;
+      const current = state.tagColors[tag] ?? null;
+      // Unlike on tasks, the legacy blue is a legitimate tag colour.
+      const value = color !== null && isHexColor(color) ? color : null;
+      if (value === current) return;
+      const tagColors = { ...state.tagColors };
+      if (value === null) delete tagColors[tag];
+      else tagColors[tag] = value;
+      set({ tagColors, undo: undoEntry(state, `Changed #${tag} colour`) });
+    },
     revealTask: (id) => {
       const state = get();
       const collapsed = getAncestors(treeOf(state), id).filter((a) => state.tasks[a]?.collapsed);
@@ -243,6 +278,7 @@ export const createTaskStore = () =>
         tasks: data.tasks,
         rootIds: data.rootIds,
         history: data.history,
+        tagColors: data.tagColors,
         lastToggle: null,
         undo: undoEntry(get(), label),
       }),
@@ -284,6 +320,7 @@ export const resetTaskStore = () =>
   useTaskStore.setState({
     ...emptyTree(),
     history: [],
+    tagColors: {},
     editingId: null,
     lastToggle: null,
     undo: null,
@@ -373,3 +410,22 @@ export const useDeadlineList = (tag: string | null): string[] =>
 /** `null` means no filter (everything visible). */
 export const useVisibleTreeIds = (tag: string | null): Set<string> | null =>
   useTaskStore(useShallow((s) => visibleTreeIds(treeOf(s), tag)));
+
+/** The colour a row shows (own, tag, parent), as a primitive so rows re-render only on change. */
+export const useEffectiveColor = (id: string): string | null =>
+  useTaskStore((s) => effectiveColor(treeOf(s), s.tagColors, id).color);
+
+/** Where a row's colour comes from, as a primitive `source` or `source:tag` key. */
+export const useColorSource = (id: string): { source: ColorSource; tag?: string } => {
+  const key = useTaskStore((s) => {
+    const r = effectiveColor(treeOf(s), s.tagColors, id);
+    return r.source === null ? '' : `${r.source}\n${r.tag ?? ''}`;
+  });
+  return useMemo(() => {
+    if (key === '') return { source: null };
+    const [source, tag] = key.split('\n');
+    return tag ? { source: source as ColorSource, tag } : { source: source as ColorSource };
+  }, [key]);
+};
+
+export const useTagColors = (): Record<string, string> => useTaskStore((s) => s.tagColors);

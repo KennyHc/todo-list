@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useIsTouch } from '../hooks/useIsTouch';
+import { useIsPhone } from '../hooks/useMediaQuery';
 import { useTaskStore } from '../store/tasks';
 import styles from './TaskItem.module.css';
 
@@ -8,13 +10,30 @@ type Props = { id: string; initial: string; parentId: string | null };
 export function TitleEditor({ id, initial, parentId }: Props) {
   const [draft, setDraft] = useState(initial);
   const ref = useRef<HTMLInputElement>(null);
+  const touch = useIsTouch();
+  const phone = useIsPhone();
   /** Set once a key action has handled saving, so the blur that follows is ignored. */
   const handled = useRef(false);
 
-  useEffect(() => {
-    ref.current?.focus();
-    ref.current?.select();
+  // Focus synchronously on mount (before paint). On iOS this takes focus over from the proxy
+  // input primed in the tap, which keeps the keyboard open.
+  useLayoutEffect(() => {
+    const input = ref.current;
+    if (!input) return;
+    input.focus({ preventScroll: true });
+    input.select();
   }, []);
+
+  // Bring the row into view: centred on phones for a new row (the keyboard takes half the
+  // screen), otherwise only as far as needed. Again once the row has settled.
+  useEffect(() => {
+    const row = ref.current?.closest('[data-row-id]') ?? ref.current;
+    const block = phone && initial === '' ? 'center' : 'nearest';
+    const scroll = () => row?.scrollIntoView?.({ block });
+    scroll();
+    const timer = window.setTimeout(scroll, 260);
+    return () => window.clearTimeout(timer);
+  }, [phone, initial]);
 
   const store = useTaskStore;
   const save = () => {
@@ -25,6 +44,7 @@ export function TitleEditor({ id, initial, parentId }: Props) {
   const finish = () => store.getState().setEditingId(null);
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing) return;
     const { add, update, indent, outdent, remove, setEditingId } = store.getState();
     const title = draft.trim();
     if (e.key === 'Enter') {
@@ -33,10 +53,16 @@ export function TitleEditor({ id, initial, parentId }: Props) {
       if (title === '') {
         remove(id);
         finish();
-        return;
+      } else if (touch) {
+        // Phones: Enter means "done". Save and stop: no new sibling.
+        update(id, { title });
+        finish();
+      } else {
+        update(id, { title });
+        setEditingId(add({ title: '', parentId, afterId: id }));
       }
-      update(id, { title });
-      setEditingId(add({ title: '', parentId, afterId: id }));
+      // Closes the on-screen keyboard.
+      if (touch) ref.current?.blur();
     } else if (e.key === 'Escape') {
       e.preventDefault();
       handled.current = true;
@@ -59,6 +85,8 @@ export function TitleEditor({ id, initial, parentId }: Props) {
       className={styles.titleInput}
       value={draft}
       aria-label="Task title"
+      enterKeyHint={touch ? 'done' : 'next'}
+      autoComplete="off"
       onChange={(e) => setDraft(e.target.value)}
       onKeyDown={onKeyDown}
       onBlur={() => {

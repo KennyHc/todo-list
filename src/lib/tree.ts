@@ -1,6 +1,5 @@
 import { nanoid } from 'nanoid';
 import { MAX_TITLE_LENGTH, type Difficulty, type Task, type TaskTree } from '../types';
-import { DEFAULT_COLOR } from './colors';
 import { normalizeTags } from './tags';
 
 type Tasks = Record<string, Task>;
@@ -10,7 +9,8 @@ export type NewTask = {
   parentId?: string | null;
   afterId?: string;
   difficulty?: Difficulty;
-  color?: string;
+  /** Explicit colour override; omit (null) for automatic. Never inherited at write time. */
+  color?: string | null;
   tags?: string[];
   dueDate?: string | null;
 };
@@ -177,7 +177,7 @@ export function addTask(
     id,
     title: clampTitle(title),
     difficulty,
-    color: color ?? (parentId === null ? undefined : tree.tasks[parentId].color) ?? DEFAULT_COLOR,
+    color: color ?? null,
     done: false,
     collapsed: false,
     tags: normalizeTags(tags ?? []),

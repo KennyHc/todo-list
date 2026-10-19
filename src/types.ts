@@ -11,8 +11,8 @@ export type Task = {
   title: string;
   /** Only meaningful for leaves. */
   difficulty: Difficulty;
-  /** Hex color. */
-  color: string;
+  /** Explicit hex colour override, or null for "automatic" (tag colour, then the parent's). */
+  color: string | null;
   done: boolean;
   collapsed: boolean;
   /** Normalized (see lib/tags): lowercase, no '#', deduped. */

@@ -30,6 +30,43 @@
   font: inherit;
 }
 
+.dotBtn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  /* A small dot with a comfortable hit area that doesn't grow the chip. */
+  width: 22px;
+  height: 20px;
+  margin: -1px 0 -1px 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  cursor: pointer;
+}
+
+.dotBtn .dot {
+  width: 8px;
+  height: 8px;
+  box-shadow: 0 0 0 2px transparent;
+  transition: box-shadow var(--t-fast);
+}
+
+.dotBtn:hover .dot,
+.dotBtn[aria-expanded='true'] .dot {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tag) 35%, transparent);
+}
+
+.dotBtn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 0;
+}
+
+.dotBtn + .body {
+  padding-left: 3px;
+}
+
 .clickable {
   cursor: pointer;
 }

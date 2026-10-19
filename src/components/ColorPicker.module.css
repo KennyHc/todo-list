@@ -19,6 +19,21 @@
   transition: transform var(--t-fast);
 }
 
+.none {
+  /* A dashed ring: "no colour of its own". */
+  background: transparent;
+  box-shadow: none;
+  border: 1.5px dashed var(--muted);
+}
+
+.none[aria-pressed='true'] {
+  border-style: solid;
+  border-color: var(--text-2);
+  box-shadow:
+    0 0 0 2px var(--elevated),
+    0 0 0 4px var(--text);
+}
+
 .swatch:hover {
   transform: scale(1.1);
 }

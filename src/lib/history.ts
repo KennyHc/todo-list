@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
 import type { TaskTree } from '../types';
+import { effectiveColor } from './colorResolve';
 import { taskPath } from './views';
 import { effectiveDifficulty, progress } from './tree';
 
@@ -7,7 +8,8 @@ export type HistoryEntry = {
   id: string;
   taskId: string;
   title: string;
-  color: string;
+  /** The colour the row showed when it was completed; null for none (or the old default blue). */
+  color: string | null;
   tags: string[];
   dueDate: string | null;
   /** effectiveDifficulty at completion time. */
@@ -45,6 +47,7 @@ export function diffCompletions(
   after: TaskTree,
   toggledId: string,
   now: number,
+  tagColors: Readonly<Record<string, string>> = {},
 ): CompletionDiff {
   const completed: HistoryEntry[] = [];
   const reopenedTaskIds: string[] = [];
@@ -63,7 +66,7 @@ export function diffCompletions(
       id: nanoid(),
       taskId: id,
       title: task.title,
-      color: task.color,
+      color: effectiveColor(after, tagColors, id).color,
       tags: task.tags,
       dueDate: task.dueDate,
       difficulty: effectiveDifficulty(after, id),

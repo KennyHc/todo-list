@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { Check, Filter } from 'lucide-react';
-import { useAllTags } from '../store/tasks';
+import { Check, Filter, Palette } from 'lucide-react';
+import { useAllTags, useTagColors } from '../store/tasks';
 import { useUIStore } from '../store/ui';
 import { Popover } from './Popover';
 import { TagChip } from './TagChip';
@@ -9,6 +9,7 @@ import styles from './TagFilter.module.css';
 
 export function TagFilter() {
   const tags = useAllTags();
+  const tagColors = useTagColors();
   const tagFilter = useUIStore((s) => s.tagFilter);
   const setTagFilter = useUIStore((s) => s.setTagFilter);
   const open = useUIStore((s) => s.filterOpen);
@@ -62,7 +63,10 @@ export function TagFilter() {
                     close();
                   }}
                 >
-                  <span className={styles.dot} style={{ background: tagColor(tag) }} />
+                  <span
+                    className={styles.dot}
+                    style={{ background: tagColors[tag] ?? tagColor(tag) }}
+                  />
                   <span className={styles.name}>#{tag}</span>
                   <span className={styles.count}>{count}</span>
                   <Check size={13} strokeWidth={2} className={styles.check} aria-hidden="true" />
@@ -70,6 +74,19 @@ export function TagFilter() {
               </li>
             ))}
           </ul>
+        )}
+        {tags.length > 0 && (
+          <button
+            type="button"
+            className={styles.editColors}
+            onClick={() => {
+              close();
+              useUIStore.getState().setTagColorsOpen(true);
+            }}
+          >
+            <Palette size={13} strokeWidth={1.75} aria-hidden="true" />
+            <span>Edit colours</span>
+          </button>
         )}
       </Popover>
     </div>

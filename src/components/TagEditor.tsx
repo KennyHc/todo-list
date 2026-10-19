@@ -1,7 +1,8 @@
 import { useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { normalizeTag, tagColor } from '../lib/tags';
-import { useAllTags } from '../store/tasks';
+import { useAllTags, useTagColors, useTaskStore } from '../store/tasks';
+import { ColorPicker } from './ColorPicker';
 import { TagChip } from './TagChip';
 import styles from './TagEditor.module.css';
 
@@ -11,13 +12,17 @@ type Props = {
   autoFocus?: boolean;
   /** Only suggest existing tags once something is typed (keeps small popovers short). */
   compact?: boolean;
+  /** Each chip gets a colour dot that opens a swatch row for the tag's colour. */
+  colorEdit?: boolean;
 };
 
 const MAX_SUGGESTIONS = 6;
 
 /** Current tags as removable chips, an input to add more, and existing tags as suggestions. */
-export function TagEditor({ tags, onChange, autoFocus, compact }: Props) {
+export function TagEditor({ tags, onChange, autoFocus, compact, colorEdit }: Props) {
   const existing = useAllTags();
+  const tagColors = useTagColors();
+  const [colorTag, setColorTag] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [active, setActive] = useState(-1);
   const listId = useId();
@@ -75,11 +80,31 @@ export function TagEditor({ tags, onChange, autoFocus, compact }: Props) {
                 exit={{ opacity: 0, scale: 0.85 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 32 }}
               >
-                <TagChip tag={tag} onRemove={() => onChange(tags.filter((t) => t !== tag))} />
+                <TagChip
+                  tag={tag}
+                  onRemove={() => onChange(tags.filter((t) => t !== tag))}
+                  onColor={
+                    colorEdit ? () => setColorTag((c) => (c === tag ? null : tag)) : undefined
+                  }
+                  colorOpen={colorEdit ? colorTag === tag : undefined}
+                />
               </motion.li>
             ))}
           </AnimatePresence>
         </ul>
+      )}
+      {colorEdit && colorTag !== null && tags.includes(colorTag) && (
+        <div className={styles.colorRow}>
+          <p className={styles.colorLabel}>Colour for #{colorTag}</p>
+          <ColorPicker
+            label={`Colour for #${colorTag}`}
+            noneLabel="No colour"
+            custom={false}
+            value={tagColors[colorTag] ?? null}
+            onChange={(hex) => useTaskStore.getState().setTagColor(colorTag, hex)}
+          />
+          <p className={styles.colorHint}>Applies to every task tagged #{colorTag}.</p>
+        </div>
       )}
       <input
         className={styles.input}

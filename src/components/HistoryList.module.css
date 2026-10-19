@@ -42,7 +42,9 @@
   min-width: 0;
   padding: 8px 6px 8px 8px;
   border-radius: var(--r-md);
-  transition: background-color var(--t-fast);
+  transition:
+    background-color var(--t-fast),
+    box-shadow 200ms ease;
 }
 
 .entry:hover,
@@ -59,6 +61,7 @@
   height: 18px;
   margin-top: 1px;
   border-radius: 50%;
+  background: var(--accent);
   color: var(--check-ink);
 }
 

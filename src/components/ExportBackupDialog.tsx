@@ -13,8 +13,8 @@ function Body() {
   const { copiedKey, failed, copy } = useCopy();
   // A snapshot taken when the dialog opens: it is about the list as it was then.
   const backup = useMemo(() => {
-    const { tasks, rootIds, history } = useTaskStore.getState();
-    const json = serializeBackup({ tasks, rootIds, history });
+    const { tasks, rootIds, history, tagColors } = useTaskStore.getState();
+    const json = serializeBackup({ tasks, rootIds, history, tagColors });
     return {
       json,
       tasks: Object.keys(tasks).length,

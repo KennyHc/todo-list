@@ -120,12 +120,13 @@
   flex: none;
   width: 14px;
   height: 14px;
-  border: 1.5px solid var(--task-color);
+  border: 1.5px solid var(--border-strong);
   border-radius: 5px;
 }
 
 .dotDone {
-  background: var(--task-color);
+  border-color: var(--accent);
+  background: var(--accent);
   opacity: 0.55;
 }
 

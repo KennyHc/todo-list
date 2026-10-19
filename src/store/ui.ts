@@ -18,6 +18,8 @@ type UIState = {
   sheetOpen: boolean;
   /** Which AI copy/paste dialog is open. Not persisted. */
   aiDialog: AiDialog;
+  /** Whether the "Tag colours" dialog is open. Not persisted. */
+  tagColorsOpen: boolean;
   /** A one-shot info toast; `n` changes on every notice. Not persisted. */
   notice: { text: string; n: number } | null;
   /** A row asked (by hotkey or palette) to run its own delete flow. Not persisted. */
@@ -31,6 +33,7 @@ type UIState = {
   setPaletteOpen: (open: boolean) => void;
   setSheetOpen: (open: boolean) => void;
   setAiDialog: (dialog: AiDialog) => void;
+  setTagColorsOpen: (open: boolean) => void;
   showNotice: (text: string) => void;
   clearNotice: () => void;
   requestDelete: (id: string) => void;
@@ -48,6 +51,7 @@ export const useUIStore = create<UIState>()(
       paletteOpen: false,
       sheetOpen: false,
       aiDialog: null,
+      tagColorsOpen: false,
       notice: null,
       deleteRequestId: null,
       revealFlash: null,
@@ -58,6 +62,7 @@ export const useUIStore = create<UIState>()(
       setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
       setSheetOpen: (sheetOpen) => set({ sheetOpen }),
       setAiDialog: (aiDialog) => set({ aiDialog }),
+      setTagColorsOpen: (tagColorsOpen) => set({ tagColorsOpen }),
       showNotice: (text) => set((s) => ({ notice: { text, n: (s.notice?.n ?? 0) + 1 } })),
       clearNotice: () => set({ notice: null }),
       requestDelete: (deleteRequestId) => set({ deleteRequestId }),

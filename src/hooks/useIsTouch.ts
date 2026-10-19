@@ -13,6 +13,9 @@ function subscribe(onChange: () => void) {
   return () => m?.removeEventListener?.('change', onChange);
 }
 
+/** Non-hook read of the same query, for event handlers. */
+export const isTouchDevice = (): boolean => mql()?.matches ?? false;
+
 /** True on touch-primary devices (no hover, coarse pointer); follows changes. */
 export function useIsTouch(): boolean {
   return useSyncExternalStore(

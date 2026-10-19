@@ -6,7 +6,7 @@ export const mkTask = (id: string, over: Partial<Task> = {}): Task => ({
   id,
   title: id,
   difficulty: 1,
-  color: '#A9C6F5',
+  color: null,
   done: false,
   collapsed: false,
   tags: [],
@@ -38,8 +38,10 @@ export const mkState = (
   tasks: Task[],
   rootIds: string[] = tasks.filter((t) => t.parentId === null).map((t) => t.id),
   history: HistoryEntry[] = [],
+  tagColors: Record<string, string> = {},
 ): PersistedTasks => ({
   tasks: Object.fromEntries(tasks.map((t) => [t.id, t])),
   rootIds,
   history,
+  tagColors,
 });

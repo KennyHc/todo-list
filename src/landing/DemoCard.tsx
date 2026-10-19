@@ -1,14 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import { Checkbox } from '../components/Checkbox';
 import { DifficultyIcon } from '../components/DifficultyIcon';
 import { StrikeText } from '../components/StrikeText';
 import { toggleDelay } from '../lib/cascade';
+import { effectiveColor } from '../lib/colorResolve';
 import { effectiveDifficulty, progress } from '../lib/tree';
 import type { TaskTree } from '../types';
 import { buildDemoTree, useDemo } from './useDemo';
 import styles from './DemoCard.module.css';
+
+const NO_TAG_COLORS: Record<string, string> = {};
 
 /** True while the element is on screen and the tab is visible. */
 function useInView(ref: React.RefObject<Element | null>): boolean {
@@ -90,6 +93,7 @@ function Row({ tree, id, depth, demo, reduced }: RowProps) {
   const isParent = task.childIds.length > 0;
   const { done, total } = progress(tree, id);
   const delay = demo.toggled ? toggleDelay(tree, demo.toggled, id) : 0;
+  const { color } = effectiveColor(tree, NO_TAG_COLORS, id);
 
   return (
     <motion.li
@@ -100,10 +104,16 @@ function Row({ tree, id, depth, demo, reduced }: RowProps) {
       exit={{ opacity: 0, transition: { duration: 0.15 } }}
       transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
     >
-      <div className={styles.row} data-depth={depth}>
+      <div
+        className={styles.row}
+        data-depth={depth}
+        data-row-color={color ?? undefined}
+        data-done={(color !== null && task.done) || undefined}
+        data-inherited={(color !== null && depth > 0) || undefined}
+        style={color ? ({ '--row-color': color } as CSSProperties) : undefined}
+      >
         <Checkbox
           checked={task.done}
-          color={task.color}
           label={`Mark "${task.title}" done`}
           delay={delay}
           onToggle={() => demo.toggle(id)}
@@ -123,7 +133,6 @@ function Row({ tree, id, depth, demo, reduced }: RowProps) {
         ) : depth > 0 ? (
           <DifficultyIcon
             value={task.difficulty}
-            color={task.color}
             dimmed={task.done}
             onChange={(d) => demo.setDifficulty(id, d)}
           />

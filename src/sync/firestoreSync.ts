@@ -26,6 +26,7 @@ import { applyRemote, buildState, emptyChanges, hasChanges } from './apply';
 import { diffState, isEmptyDiff } from './diff';
 import {
   fromHistoryDoc,
+  fromTagColors,
   fromTaskDoc,
   historyOrds,
   SCHEMA_VERSION,
@@ -37,7 +38,7 @@ import { useSyncStore } from './status';
 import type { Task } from '../types';
 
 /*
- * Layout:   users/{uid}                  meta: rootIds, schemaVersion, updatedAt
+ * Layout:   users/{uid}                  meta: rootIds, tagColors, schemaVersion, updatedAt
  *           users/{uid}/tasks/{id}       one document per task
  *           users/{uid}/history/{id}     one document per completion-log entry
  *
@@ -72,10 +73,11 @@ export type SyncOptions = {
 const BATCH_LIMIT = 450;
 const APPLY_DELAY_MS = 25;
 
-const pick = ({ tasks, rootIds, history }: PersistedTasks): PersistedTasks => ({
+const pick = ({ tasks, rootIds, history, tagColors }: PersistedTasks): PersistedTasks => ({
   tasks,
   rootIds,
   history,
+  tagColors,
 });
 
 type Active = { flush: () => Promise<void>; db: Firestore; stop: () => void };
@@ -174,7 +176,12 @@ export function startSync(uid: string, options: SyncOptions): () => void {
       return;
     }
     last = nextLast;
-    store.getState().hydrate({ tasks: next.tasks, rootIds: next.rootIds, history: next.history });
+    store.getState().hydrate({
+      tasks: next.tasks,
+      rootIds: next.rootIds,
+      history: next.history,
+      tagColors: next.tagColors,
+    });
   };
 
   // Callbacks for the same server update arrive back to back; coalescing them keeps a task
@@ -222,9 +229,12 @@ export function startSync(uid: string, options: SyncOptions): () => void {
   const onMeta = (snap: DocumentSnapshot) => {
     snaps.meta = snap;
     if (live) {
-      const rootIds = snap.data()?.rootIds;
-      if (!snap.metadata.hasPendingWrites && Array.isArray(rootIds)) {
-        changes.rootIds = rootIds.filter((x): x is string => typeof x === 'string');
+      const data = snap.data();
+      if (!snap.metadata.hasPendingWrites && data) {
+        if (Array.isArray(data.rootIds)) {
+          changes.rootIds = data.rootIds.filter((x): x is string => typeof x === 'string');
+        }
+        changes.tagColors = fromTagColors(data.tagColors);
         queueApply();
       }
       updateStatus();
@@ -261,6 +271,30 @@ export function startSync(uid: string, options: SyncOptions): () => void {
           metaRef,
           { rootIds: current.rootIds, schemaVersion: SCHEMA_VERSION, updatedAt: serverTimestamp() },
           { merge: true },
+        ),
+      );
+    }
+    if (diff.tagColorsChanged) {
+      // mergeFields replaces the whole map, so a removed tag disappears (a plain merge would
+      // keep its key). The rules need `rootIds` on a freshly created meta document.
+      const needsRoots = !snaps.meta?.exists() || !Array.isArray(snaps.meta.data()?.rootIds);
+      ops.push((b) =>
+        b.set(
+          metaRef,
+          {
+            tagColors: current.tagColors,
+            ...(needsRoots ? { rootIds: current.rootIds } : {}),
+            schemaVersion: SCHEMA_VERSION,
+            updatedAt: serverTimestamp(),
+          },
+          {
+            mergeFields: [
+              'tagColors',
+              ...(needsRoots ? ['rootIds'] : []),
+              'schemaVersion',
+              'updatedAt',
+            ],
+          },
         ),
       );
     }
@@ -305,7 +339,14 @@ export function startSync(uid: string, options: SyncOptions): () => void {
   let unsubStore: (() => void) | undefined;
   const startLocalWatch = () => {
     unsubStore = store.subscribe((s, p) => {
-      if (s.tasks !== p.tasks || s.rootIds !== p.rootIds || s.history !== p.history) schedule();
+      if (
+        s.tasks !== p.tasks ||
+        s.rootIds !== p.rootIds ||
+        s.history !== p.history ||
+        s.tagColors !== p.tagColors
+      ) {
+        schedule();
+      }
     });
   };
 
@@ -340,11 +381,13 @@ export function startSync(uid: string, options: SyncOptions): () => void {
       const h = fromHistoryDoc(d.id, d.data());
       if (h) history.push(h);
     });
-    const rootIds = snaps.meta?.data()?.rootIds;
+    const meta = snaps.meta?.data();
+    const rootIds = meta?.rootIds;
     return buildState(
       tasks,
       Array.isArray(rootIds) ? rootIds.filter((x): x is string => typeof x === 'string') : [],
       history,
+      fromTagColors(meta?.tagColors),
     );
   };
 
@@ -382,8 +425,10 @@ export function startSync(uid: string, options: SyncOptions): () => void {
         tasks: migrated.tasks,
         rootIds: migrated.rootIds,
         history: migrated.history,
+        tagColors: migrated.tagColors ?? {},
       });
-      last = { tasks: {}, rootIds: [], history: [] }; // everything is new to the cloud
+      // Everything is new to the cloud.
+      last = { tasks: {}, rootIds: [], history: [], tagColors: {} };
       live = true;
       startLocalWatch();
       updateStatus();
@@ -397,9 +442,12 @@ export function startSync(uid: string, options: SyncOptions): () => void {
 
     // `last` is the normalized state, so repairs are kept in memory but not written back.
     const state = normalizeTree(remote);
-    store
-      .getState()
-      .hydrate({ tasks: state.tasks, rootIds: state.rootIds, history: state.history });
+    store.getState().hydrate({
+      tasks: state.tasks,
+      rootIds: state.rootIds,
+      history: state.history,
+      tagColors: state.tagColors,
+    });
     last = pick(state);
     live = true;
     startLocalWatch();
