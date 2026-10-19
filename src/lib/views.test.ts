@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { TaskTree } from '../types';
 import { addTask, emptyTree, toggleDone, updateTask } from './tree';
-import { allTags, deadlineList, dueStatus, taskPath, todayISO, visibleTreeIds } from './views';
+import {
+  allTags,
+  deadlineList,
+  dueStatus,
+  neighborAfterRemoval,
+  taskPath,
+  todayISO,
+  visibleOrder,
+  visibleTreeIds,
+} from './views';
 
 type Spec = { tags?: string[]; dueDate?: string | null; parentId?: string | null };
 
@@ -186,5 +195,71 @@ describe('dueStatus', () => {
     expect(dueStatus('2026-03-30', '2026-03-28')).toBe('soon');
     expect(dueStatus('2026-11-02', '2026-10-31')).toBe('soon');
     expect(dueStatus('2025-12-31', '2026-01-01')).toBe('overdue');
+  });
+});
+
+describe('visibleOrder', () => {
+  function sample() {
+    const b = build();
+    const a = b.add('a', { tags: ['x'] });
+    const a1 = b.add('a1', { parentId: a });
+    const a2 = b.add('a2', { parentId: a, tags: ['x'] });
+    const c = b.add('c', { dueDate: '2026-01-01' });
+    const d = b.add('d');
+    return { b, a, a1, a2, c, d };
+  }
+
+  it('walks the tree depth first', () => {
+    const { b, a, a1, a2, c, d } = sample();
+    expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([a, a1, a2, c, d]);
+  });
+
+  it('puts done tasks after undone siblings, like the list', () => {
+    const { b, a, a1, a2, c, d } = sample();
+    b.tree = toggleDone(b.tree, a1, 10);
+    expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([a, a2, a1, c, d]);
+    b.tree = toggleDone(b.tree, a, 20);
+    expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([c, d, a, a1, a2]);
+  });
+
+  it('skips the children of collapsed parents', () => {
+    const { b, a, c, d } = sample();
+    b.tree = updateTask(b.tree, a, { collapsed: true });
+    expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([a, c, d]);
+  });
+
+  it('respects the tag filter', () => {
+    const { b, a, a1, a2 } = sample();
+    expect(visibleOrder(b.tree, { view: 'tree', tag: 'x' })).toEqual([a, a1, a2]);
+    expect(visibleOrder(b.tree, { view: 'tree', tag: 'none' })).toEqual([]);
+  });
+
+  it('uses deadline order, flat and ignoring collapse', () => {
+    const { b, a, a1, a2, c, d } = sample();
+    b.tree = updateTask(b.tree, a, { collapsed: true });
+    expect(visibleOrder(b.tree, { view: 'deadline', tag: null })).toEqual([c, a, a1, a2, d]);
+    expect(visibleOrder(b.tree, { view: 'deadline', tag: 'x' })).toEqual([a, a2]);
+  });
+
+  it('is empty in the history view', () => {
+    expect(visibleOrder(sample().b.tree, { view: 'history', tag: null })).toEqual([]);
+  });
+});
+
+describe('neighborAfterRemoval', () => {
+  const order = ['a', 'b', 'c', 'd'];
+  it('prefers the next row, then the previous', () => {
+    expect(neighborAfterRemoval(order, 'b')).toBe('c');
+    expect(neighborAfterRemoval(order, 'd')).toBe('c');
+    expect(neighborAfterRemoval(['a'], 'a')).toBeNull();
+  });
+
+  it('skips rows removed along with it', () => {
+    expect(neighborAfterRemoval(order, 'b', new Set(['b', 'c']))).toBe('d');
+    expect(neighborAfterRemoval(order, 'c', new Set(['c', 'd']))).toBe('b');
+  });
+
+  it('returns null for an unknown id', () => {
+    expect(neighborAfterRemoval(order, 'zzz')).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Check, Filter } from 'lucide-react';
 import { useAllTags } from '../store/tasks';
 import { useUIStore } from '../store/ui';
@@ -11,9 +11,13 @@ export function TagFilter() {
   const tags = useAllTags();
   const tagFilter = useUIStore((s) => s.tagFilter);
   const setTagFilter = useUIStore((s) => s.setTagFilter);
-  const [open, setOpen] = useState(false);
+  const open = useUIStore((s) => s.filterOpen);
+  const setOpen = useUIStore((s) => s.setFilterOpen);
   const anchorRef = useRef<HTMLButtonElement>(null);
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => setOpen(false), [setOpen]);
+
+  // The `/` hotkey can ask for the popover while this toolbar isn't mounted; don't let it linger.
+  useEffect(() => () => setOpen(false), [setOpen]);
 
   // A filter on a tag nobody uses any more would show an empty list with no way to tell why.
   useEffect(() => {
@@ -29,7 +33,7 @@ export function TagFilter() {
         className={`${styles.button} ${tagFilter !== null ? styles.active : ''}`}
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen(!open)}
       >
         <Filter size={13} strokeWidth={1.75} aria-hidden="true" />
         <span>Filter</span>

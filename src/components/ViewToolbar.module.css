@@ -5,3 +5,10 @@
   gap: 12px;
   margin-top: 16px;
 }
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}

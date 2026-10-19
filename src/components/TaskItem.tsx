@@ -10,7 +10,7 @@ import { ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useSettledOrder } from '../hooks/useSettledOrder';
 import { getAncestors, getDescendants } from '../lib/tree';
-import { isContextOnly, taskPath } from '../lib/views';
+import { isContextOnly, neighborAfterRemoval, taskPath, visibleOrder } from '../lib/views';
 import {
   useEffectiveDifficulty,
   useIsLeaf,
@@ -68,6 +68,9 @@ function TaskItemInner({ id, depth, flat = false, visible = null }: Props) {
   const liveSum = useEffectiveDifficulty(id);
   const liveProgress = useProgress(id);
   const editing = useTaskStore((s) => s.editingId === id);
+  const focused = useUIStore((s) => s.focusedId === id);
+  const deleteRequested = useUIStore((s) => s.deleteRequestId === id);
+  const revealPulse = useUIStore((s) => (s.revealFlash?.id === id ? s.revealFlash.n : 0));
   const delay = useToggleDelay(id);
   const reduced = useReducedMotion();
   const tagFilter = useUIStore((s) => s.tagFilter);
@@ -85,6 +88,7 @@ function TaskItemInner({ id, depth, flat = false, visible = null }: Props) {
   const pulse = useAnimationControls();
   const flash = useAnimationControls();
   const tint = useAnimationControls();
+  const rowRef = useRef<HTMLDivElement>(null);
   const prevDone = useRef(liveTask?.done ?? false);
 
   // A deleted row stays mounted while AnimatePresence plays its exit, so keep showing its last state.
@@ -123,17 +127,8 @@ function TaskItemInner({ id, depth, flat = false, visible = null }: Props) {
     });
   }, [done_, id, delay, reduced, pulse, flash]);
 
-  if (!task) return null;
-
-  const store = useTaskStore.getState();
-  const addChild = () => {
-    const s = useTaskStore.getState();
-    if (task.collapsed) s.update(id, { collapsed: false });
-    s.setEditingId(s.add({ title: '', parentId: id }));
-  };
-
   /** Shake the row, then remove it so the list's exit animation runs. */
-  const runDelete = async () => {
+  const runDelete = useCallback(async () => {
     if (deleting.current) return;
     deleting.current = true;
     try {
@@ -149,17 +144,57 @@ function TaskItemInner({ id, depth, flat = false, visible = null }: Props) {
           }),
         ]);
       }
+      // Keyboard focus moves on to the neighbouring row, so j/k keep working after a delete.
+      const ui = useUIStore.getState();
+      if (ui.focusedId === id) {
+        const tasks = useTaskStore.getState();
+        const order = visibleOrder(tasks, { view: ui.view, tag: ui.tagFilter });
+        ui.setFocusedId(
+          neighborAfterRemoval(order, id, new Set([id, ...getDescendants(tasks, id)])),
+        );
+      }
       useTaskStore.getState().remove(id);
     } finally {
       deleting.current = false;
     }
-  };
+  }, [id, reduced, pulse, tint]);
 
-  const requestDelete = () => {
+  const requestDelete = useCallback(() => {
     if (deleting.current) return;
     const count = getDescendants(useTaskStore.getState(), id).length;
     if (count > 0) setConfirm({ open: true, count });
     else void runDelete();
+  }, [id, runDelete]);
+
+  // The Delete hotkey asks through the store, so it takes the same path as the delete button.
+  useEffect(() => {
+    if (!deleteRequested) return;
+    useUIStore.getState().clearDeleteRequest();
+    requestDelete();
+  }, [deleteRequested, requestDelete]);
+
+  useEffect(() => {
+    if (focused) rowRef.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [focused]);
+
+  // Revealed from the palette: the row may only just have mounted under a still-expanding
+  // parent, so scroll again once it has settled.
+  useEffect(() => {
+    if (revealPulse === 0) return;
+    const timer = window.setTimeout(
+      () => rowRef.current?.scrollIntoView?.({ block: 'nearest' }),
+      260,
+    );
+    return () => window.clearTimeout(timer);
+  }, [revealPulse]);
+
+  if (!task) return null;
+
+  const store = useTaskStore.getState();
+  const addChild = () => {
+    const s = useTaskStore.getState();
+    if (task.collapsed) s.update(id, { collapsed: false });
+    s.setEditingId(s.add({ title: '', parentId: id }));
   };
 
   const shownTags = task.tags.slice(0, MAX_TAGS_SHOWN);
@@ -178,10 +213,34 @@ function TaskItemInner({ id, depth, flat = false, visible = null }: Props) {
       transition={ENTER}
     >
       <motion.div
-        className={`${styles.row} ${task.done ? styles.rowDone : ''} ${editing ? styles.rowEditing : ''}`}
+        ref={rowRef}
+        className={`${styles.row} ${task.done ? styles.rowDone : ''} ${editing ? styles.rowEditing : ''} ${focused ? styles.rowFocused : ''}`}
         data-dim={dimmed || undefined}
+        data-focused={focused || undefined}
         animate={pulse}
+        onClick={(e) => {
+          // A click on the row itself (not a button, input or link inside it) focuses it.
+          if (
+            (e.target as Element).closest('button, input, a, [role="checkbox"], [role="radio"]')
+          ) {
+            return;
+          }
+          useUIStore.getState().setFocusedId(id);
+        }}
       >
+        {revealPulse > 0 && (
+          // Keyed on the pulse so a repeat reveal replays the CSS animation.
+          <span
+            key={revealPulse}
+            className={styles.reveal}
+            aria-hidden="true"
+            onAnimationEnd={() =>
+              useUIStore.setState((s) =>
+                s.revealFlash?.n === revealPulse ? { revealFlash: null } : s,
+              )
+            }
+          />
+        )}
         <motion.span
           className={styles.flash}
           style={{ background: task.color }}

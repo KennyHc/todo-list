@@ -1,5 +1,5 @@
 import type { TaskTree } from '../types';
-import { getAncestors, getDescendants } from './tree';
+import { getAncestors, getDescendants, sortedChildIds } from './tree';
 
 export type DueStatus = 'overdue' | 'today' | 'soon' | 'later';
 
@@ -87,4 +87,43 @@ export function isContextOnly(tree: TaskTree, id: string, tag: string): boolean 
   const task = tree.tasks[id];
   if (!task || task.tags.includes(tag)) return false;
   return !getAncestors(tree, id).some((ancestorId) => tree.tasks[ancestorId].tags.includes(tag));
+}
+
+/**
+ * Ids of the rows currently on screen, in display order: tree order (undone before done,
+ * skipping collapsed subtrees and anything the tag filter hides) or deadline order. History
+ * rows aren't tasks, so that view has no keyboard order.
+ */
+export function visibleOrder(
+  tree: TaskTree,
+  { view, tag }: { view: 'tree' | 'deadline' | 'history'; tag: string | null },
+): string[] {
+  if (view === 'history') return [];
+  if (view === 'deadline') return deadlineList(tree, { tag });
+  const visible = visibleTreeIds(tree, tag);
+  const out: string[] = [];
+  const walk = (ids: string[]) => {
+    for (const id of sortedChildIds(tree, ids)) {
+      const task = tree.tasks[id];
+      if (!task || (visible && !visible.has(id))) continue;
+      out.push(id);
+      if (!task.collapsed) walk(task.childIds);
+    }
+  };
+  walk(tree.rootIds);
+  return out;
+}
+
+/** The row to focus once `id` (and everything in `removed`) is gone: the next one, else the previous. */
+export function neighborAfterRemoval(
+  order: string[],
+  id: string,
+  removed: ReadonlySet<string> = new Set([id]),
+): string | null {
+  const index = order.indexOf(id);
+  if (index === -1) return null;
+  const after = order.slice(index + 1).find((other) => !removed.has(other));
+  if (after !== undefined) return after;
+  const before = order.slice(0, index).reverse();
+  return before.find((other) => !removed.has(other)) ?? null;
 }

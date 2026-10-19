@@ -31,6 +31,24 @@
   background: var(--surface-2);
 }
 
+.rowFocused,
+.rowFocused:hover {
+  background: var(--surface-2);
+}
+
+/* Keyboard focus: a short accent bar inset on the left edge. */
+.rowFocused::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 2px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
 .rowEditing,
 .rowEditing:hover {
   background: var(--accent-soft);
@@ -43,6 +61,28 @@
   border-radius: var(--r-md);
   opacity: 0;
   pointer-events: none;
+}
+
+.reveal {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  opacity: 0;
+  pointer-events: none;
+  animation: reveal 600ms var(--ease-out);
+}
+
+@keyframes reveal {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  20%,
+  50% {
+    opacity: 1;
+  }
 }
 
 .tint {

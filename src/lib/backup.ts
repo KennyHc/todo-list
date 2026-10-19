@@ -1,4 +1,4 @@
-import { migrateTasksState, type PersistedTasks } from '../store/tasks';
+import { migrateTasksState, useTaskStore, type PersistedTasks } from '../store/tasks';
 
 export type Backup = {
   app: 'tasks';
@@ -117,4 +117,27 @@ export function formatBackupDescription(exportedAt: string | null, taskCount: nu
     return countStr;
   }
   return `${formatExportDate(exportedAt)} (${countStr})`;
+}
+
+/** Download the current tasks as a JSON backup file. Returns false if the download failed. */
+export function exportBackup(): boolean {
+  try {
+    // Read on demand so callers don't re-render on every task change.
+    const { tasks, rootIds, history } = useTaskStore.getState();
+    const blob = new Blob([serializeBackup({ tasks, rootIds, history })], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = backupFilename();
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    return true;
+  } catch (err) {
+    console.error('Export failed:', err);
+    return false;
+  }
 }

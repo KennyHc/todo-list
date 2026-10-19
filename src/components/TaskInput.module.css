@@ -75,6 +75,19 @@
   transform: none;
 }
 
+/* The "N" shortcut hint: shown while the composer is idle, never on touch devices. */
+.kbdHint {
+  opacity: 1;
+  transform: none;
+  color: var(--muted);
+}
+
+@media (hover: none) {
+  .kbdHint {
+    display: none;
+  }
+}
+
 .chipRow {
   padding: 0 14px;
 }

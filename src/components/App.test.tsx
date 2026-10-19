@@ -9,7 +9,16 @@ import { useUIStore } from '../store/ui';
 beforeEach(() => {
   localStorage.clear();
   resetTaskStore();
-  useUIStore.setState({ view: 'tree', tagFilter: null });
+  useUIStore.setState({
+    view: 'tree',
+    tagFilter: null,
+    focusedId: null,
+    filterOpen: false,
+    paletteOpen: false,
+    sheetOpen: false,
+    deleteRequestId: null,
+    revealFlash: null,
+  });
 });
 
 function addViaInput(title: string) {
@@ -279,5 +288,156 @@ describe('App', () => {
     // Undo toast should appear
     const toast = await screen.findByRole('status');
     expect(within(toast).getByText('Restored backup (1 task)')).toBeInTheDocument();
+  });
+});
+
+describe('keyboard workflow', () => {
+  const press = (key: string, init: KeyboardEventInit = {}) =>
+    act(() => {
+      fireEvent.keyDown(document.body, { key, ...init });
+    });
+
+  function seed() {
+    const s = useTaskStore.getState();
+    const a = s.add({ title: 'Alpha' });
+    const b = s.add({ title: 'Bravo' });
+    const c = s.add({ title: 'Charlie' });
+    return { a, b, c };
+  }
+
+  it('moves focus with j and k through the visible rows', () => {
+    const { a, b, c } = seed();
+    render(<App />);
+    press('j');
+    expect(useUIStore.getState().focusedId).toBe(a);
+    press('j');
+    expect(useUIStore.getState().focusedId).toBe(b);
+    press('ArrowDown');
+    press('j');
+    expect(useUIStore.getState().focusedId).toBe(c);
+    press('k');
+    expect(useUIStore.getState().focusedId).toBe(b);
+    expect(screen.getByText('Bravo').closest('[data-focused]')).not.toBeNull();
+    press('Escape');
+    expect(useUIStore.getState().focusedId).toBeNull();
+  });
+
+  it('toggles the focused task with x and Space', () => {
+    const { a } = seed();
+    render(<App />);
+    press('j');
+    press('x');
+    expect(useTaskStore.getState().tasks[a].done).toBe(true);
+    press(' ');
+    expect(useTaskStore.getState().tasks[a].done).toBe(false);
+  });
+
+  it('ignores shortcuts while typing in the composer', () => {
+    seed();
+    render(<App />);
+    const input = screen.getByLabelText('New task');
+    input.focus();
+    fireEvent.keyDown(input, { key: 'j' });
+    fireEvent.keyDown(input, { key: '?' });
+    fireEvent.keyDown(input, { key: '2' });
+    expect(useUIStore.getState().focusedId).toBeNull();
+    expect(useUIStore.getState().sheetOpen).toBe(false);
+    expect(useUIStore.getState().view).toBe('tree');
+  });
+
+  it('n focuses the composer', () => {
+    render(<App />);
+    press('n');
+    expect(screen.getByLabelText('New task')).toHaveFocus();
+  });
+
+  it('opens the shortcuts sheet with ? and closes it with Escape', async () => {
+    render(<App />);
+    press('?', { shiftKey: true });
+    expect(await screen.findByRole('dialog', { name: 'Keyboard shortcuts' })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('deletes through the confirm dialog for a parent, then focuses the next row', async () => {
+    const s = useTaskStore.getState();
+    const p = s.add({ title: 'Parent' });
+    s.add({ title: 'Kid', parentId: p });
+    const next = s.add({ title: 'Next' });
+    render(<App />);
+    press('j');
+    expect(useUIStore.getState().focusedId).toBe(p);
+    press('Backspace');
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(useTaskStore.getState().tasks[p]).toBeUndefined());
+    expect(useUIStore.getState().focusedId).toBe(next);
+  });
+
+  it('sets the difficulty of the focused leaf with Alt+digit', () => {
+    const { a } = seed();
+    render(<App />);
+    press('j');
+    press('¡', { altKey: true, code: 'Digit4' });
+    expect(useTaskStore.getState().tasks[a].difficulty).toBe(4);
+  });
+
+  describe('command palette', () => {
+    it('opens with Cmd+K, filters as you type, and Enter reveals the task', async () => {
+      const s = useTaskStore.getState();
+      const parent = s.add({ title: 'Project' });
+      const child = s.add({ title: 'Write the quarterly report', parentId: parent });
+      s.add({ title: 'Buy milk' });
+      s.update(parent, { collapsed: true });
+      useUIStore.setState({ view: 'deadline' });
+      render(<App />);
+
+      press('k', { metaKey: true });
+      const input = await screen.findByRole('combobox', { name: 'Search tasks and commands' });
+      expect(input).toHaveFocus();
+
+      fireEvent.change(input, { target: { value: 'quarterly' } });
+      const options = screen.getAllByRole('option');
+      expect(options[0]).toHaveTextContent('Write the quarterly report');
+      expect(options[0]).toHaveAttribute('aria-selected', 'true');
+      expect(within(screen.getByRole('dialog')).queryByText('Buy milk')).not.toBeInTheDocument();
+      expect(input).toHaveAttribute('aria-activedescendant', options[0].id);
+
+      fireEvent.keyDown(input, { key: 'Enter' });
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      const state = useUIStore.getState();
+      expect(state.view).toBe('tree');
+      expect(state.focusedId).toBe(child);
+      expect(state.paletteOpen).toBe(false);
+      expect(useTaskStore.getState().tasks[parent].collapsed).toBe(false);
+      expect(screen.getByText('Write the quarterly report')).toBeInTheDocument();
+    });
+
+    it('runs a command, clearing the tag filter if it hides the task', async () => {
+      const s = useTaskStore.getState();
+      s.add({ title: 'Tagged', tags: ['work'] });
+      const plain = s.add({ title: 'Plain' });
+      useUIStore.setState({ tagFilter: 'work' });
+      render(<App />);
+      press('k', { ctrlKey: true });
+      const input = await screen.findByRole('combobox', { name: 'Search tasks and commands' });
+      fireEvent.change(input, { target: { value: 'plain' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+      await waitFor(() => expect(useUIStore.getState().focusedId).toBe(plain));
+      expect(useUIStore.getState().tagFilter).toBeNull();
+    });
+
+    it('lists recent tasks and commands, and runs a command', async () => {
+      seed();
+      render(<App />);
+      press('k', { metaKey: true });
+      expect(await screen.findByText('Recent')).toBeInTheDocument();
+      expect(screen.getByText('Commands')).toBeInTheDocument();
+      const input = screen.getByRole('combobox', { name: 'Search tasks and commands' });
+      fireEvent.change(input, { target: { value: 'history' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+      await waitFor(() => expect(useUIStore.getState().view).toBe('history'));
+      expect(useUIStore.getState().paletteOpen).toBe(false);
+    });
   });
 });

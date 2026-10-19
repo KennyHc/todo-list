@@ -185,3 +185,32 @@ describe('ui store', () => {
     useUIStore.getState().setTagFilter(null);
   });
 });
+
+describe('revealTask', () => {
+  it('expands every collapsed ancestor in one update, without an undo entry', () => {
+    const s = useTaskStore.getState();
+    const a = s.add({ title: 'a' });
+    const b = s.add({ title: 'b', parentId: a });
+    const c = s.add({ title: 'c', parentId: b });
+    s.update(a, { collapsed: true });
+    s.update(b, { collapsed: true });
+    let updates = 0;
+    const unsubscribe = useTaskStore.subscribe(() => (updates += 1));
+    useTaskStore.getState().revealTask(c);
+    unsubscribe();
+    const { tasks, undo } = useTaskStore.getState();
+    expect(tasks[a].collapsed).toBe(false);
+    expect(tasks[b].collapsed).toBe(false);
+    expect(updates).toBe(1);
+    expect(undo).toBeNull();
+  });
+
+  it('does nothing when nothing is collapsed', () => {
+    const s = useTaskStore.getState();
+    const a = s.add({ title: 'a' });
+    const b = s.add({ title: 'b', parentId: a });
+    const before = useTaskStore.getState().tasks;
+    useTaskStore.getState().revealTask(b);
+    expect(useTaskStore.getState().tasks).toBe(before);
+  });
+});

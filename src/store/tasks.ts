@@ -12,6 +12,7 @@ import {
   deleteTask,
   effectiveDifficulty,
   emptyTree,
+  getAncestors,
   getDescendants,
   indentTask,
   isLeaf,
@@ -53,6 +54,8 @@ type TaskActions = {
   indent: (id: string) => void;
   outdent: (id: string) => void;
   setEditingId: (id: string | null) => void;
+  /** Expands every collapsed ancestor of `id` in one update. Not undoable. */
+  revealTask: (id: string) => void;
   /** Replaces tasks, rootIds and history (e.g. a backup import) and records an undo. */
   replaceAll: (data: PersistedTasks, label: string) => void;
   /** Restores the state from before the latest undoable action. */
@@ -166,6 +169,14 @@ export const useTaskStore = create<TaskStore>()(
       indent: (id) => set({ ...indentTask(treeOf(get()), id), lastToggle: null }),
       outdent: (id) => set({ ...outdentTask(treeOf(get()), id), lastToggle: null }),
       setEditingId: (editingId) => set({ editingId }),
+      revealTask: (id) => {
+        const state = get();
+        const collapsed = getAncestors(treeOf(state), id).filter((a) => state.tasks[a]?.collapsed);
+        if (collapsed.length === 0) return;
+        const tasks = { ...state.tasks };
+        for (const a of collapsed) tasks[a] = { ...tasks[a], collapsed: false };
+        set({ tasks });
+      },
       replaceAll: (data, label) =>
         set({
           tasks: data.tasks,

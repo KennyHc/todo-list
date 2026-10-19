@@ -132,6 +132,7 @@ export function TaskInput() {
         <Plus className={styles.icon} size={16} strokeWidth={1.75} aria-hidden="true" />
         <input
           ref={inputRef}
+          id="composer"
           className={styles.input}
           value={value}
           placeholder="Add a task…"
@@ -150,9 +151,15 @@ export function TaskInput() {
           onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
           onKeyDown={onKeyDown}
         />
-        <kbd className={`${styles.kbd} ${parsed.title ? styles.kbdOn : ''}`} aria-hidden="true">
-          ↵
-        </kbd>
+        {!focused && value === '' ? (
+          <kbd className={`${styles.kbd} ${styles.kbdHint}`} aria-hidden="true">
+            N
+          </kbd>
+        ) : (
+          <kbd className={`${styles.kbd} ${parsed.title ? styles.kbdOn : ''}`} aria-hidden="true">
+            ↵
+          </kbd>
+        )}
       </div>
 
       {listOpen && (

@@ -1,12 +1,7 @@
 import { useRef, useState } from 'react';
 import { Download, Settings2, Upload } from 'lucide-react';
 import { useTaskStore, type PersistedTasks } from '../store/tasks';
-import {
-  serializeBackup,
-  backupFilename,
-  parseBackup,
-  formatBackupDescription,
-} from '../lib/backup';
+import { exportBackup, parseBackup, formatBackupDescription } from '../lib/backup';
 import { Popover } from './Popover';
 import { ConfirmDialog } from './ConfirmDialog';
 import styles from './SettingsPopover.module.css';
@@ -35,24 +30,7 @@ export function SettingsPopover() {
   const replaceAll = useTaskStore((s) => s.replaceAll);
 
   const handleExport = () => {
-    try {
-      // Read on demand so this header control doesn't re-render on every task change.
-      const { tasks, rootIds, history } = useTaskStore.getState();
-      const blob = new Blob([serializeBackup({ tasks, rootIds, history })], {
-        type: 'application/json',
-      });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = backupFilename();
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      setPopoverOpen(false);
-    } catch (err) {
-      console.error('Export failed:', err);
-    }
+    if (exportBackup()) setPopoverOpen(false);
   };
 
   const handleImportClick = () => {
