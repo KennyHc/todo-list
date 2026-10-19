@@ -6,9 +6,11 @@ import {
   useReducedMotion,
   type MotionProps,
 } from 'framer-motion';
-import { ChevronRight, Plus, X } from 'lucide-react';
+import { ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useSettledOrder } from '../hooks/useSettledOrder';
-import { getAncestors } from '../lib/tree';
+import { getAncestors, getDescendants } from '../lib/tree';
+import { isContextOnly, taskPath } from '../lib/views';
 import {
   useEffectiveDifficulty,
   useIsLeaf,
@@ -18,16 +20,32 @@ import {
   useTaskStore,
   useToggleDelay,
 } from '../store/tasks';
+import { useUIStore } from '../store/ui';
 import { MAX_DIFFICULTY } from '../types';
 import { BreakdownNudge } from './BreakdownNudge';
 import { Checkbox } from './Checkbox';
-import { ColorPicker } from './ColorPicker';
+import { ConfirmDialog } from './ConfirmDialog';
 import { DifficultyPicker } from './DifficultyPicker';
+import { DuePill } from './DuePill';
+import { TagChip } from './TagChip';
+import { TaskMenu } from './TaskMenu';
 import { StrikeText } from './StrikeText';
 import styles from './TaskItem.module.css';
 import { TitleEditor } from './TitleEditor';
 
-type Props = { id: string; depth: number };
+type Props = {
+  id: string;
+  depth: number;
+  /** Deadline view: no chevron, no children, no indent; shows the ancestor path instead. */
+  flat?: boolean;
+  /** Ids shown under a tag filter (`null` = everything). Hides filtered-out subtrees. */
+  visible?: Set<string> | null;
+};
+
+const NO_PATH: string[] = [];
+const MAX_TAGS_SHOWN = 3;
+const SHAKE_X = [0, -7, 7, -5, 5, -2, 0];
+const SHAKE_SECONDS = 0.38;
 
 /** Shared micro-interaction for icon buttons. */
 const iconMotion: MotionProps = {
@@ -43,7 +61,7 @@ const ENTER = {
   layout: { type: 'spring', stiffness: 380, damping: 34 },
 } as const;
 
-function TaskItemInner({ id, depth }: Props) {
+function TaskItemInner({ id, depth, flat = false, visible = null }: Props) {
   const liveTask = useTask(id);
   const liveLeaf = useIsLeaf(id);
   const liveChildIds = useSortedChildIds(id);
@@ -52,10 +70,21 @@ function TaskItemInner({ id, depth }: Props) {
   const editing = useTaskStore((s) => s.editingId === id);
   const delay = useToggleDelay(id);
   const reduced = useReducedMotion();
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const closePicker = useCallback(() => setPickerOpen(false), []);
+  const tagFilter = useUIStore((s) => s.tagFilter);
+  const setTagFilter = useUIStore((s) => s.setTagFilter);
+  const dimmed = useTaskStore(
+    (s) => !flat && tagFilter !== null && isContextOnly(s, id, tagFilter),
+  );
+  const path = useTaskStore(useShallow((s) => (flat ? taskPath(s, id) : NO_PATH)));
+  const [confirm, setConfirm] = useState<{ open: boolean; count: number }>({
+    open: false,
+    count: 0,
+  });
+  const closeConfirm = useCallback(() => setConfirm((c) => ({ ...c, open: false })), []);
+  const deleting = useRef(false);
   const pulse = useAnimationControls();
   const flash = useAnimationControls();
+  const tint = useAnimationControls();
   const prevDone = useRef(liveTask?.done ?? false);
 
   // A deleted row stays mounted while AnimatePresence plays its exit, so keep showing its last state.
@@ -70,7 +99,10 @@ function TaskItemInner({ id, depth }: Props) {
   if (liveTask) lastView.current = view;
   const { task, leaf, childIds, sum, done, total } = liveTask ? view : lastView.current;
 
-  const shownChildIds = useSettledOrder(childIds);
+  const settledChildIds = useSettledOrder(childIds);
+  const shownChildIds = visible
+    ? settledChildIds.filter((childId) => visible.has(childId))
+    : settledChildIds;
   const done_ = task?.done ?? false;
 
   // Auto-complete pulse: an ancestor of the toggled task that became done as a result.
@@ -100,10 +132,45 @@ function TaskItemInner({ id, depth }: Props) {
     s.setEditingId(s.add({ title: '', parentId: id }));
   };
 
+  /** Shake the row, then remove it so the list's exit animation runs. */
+  const runDelete = async () => {
+    if (deleting.current) return;
+    deleting.current = true;
+    try {
+      if (!reduced) {
+        await Promise.all([
+          pulse.start({
+            x: SHAKE_X,
+            transition: { duration: SHAKE_SECONDS, ease: 'easeInOut' },
+          }),
+          tint.start({
+            opacity: [0, 1, 1, 1, 1, 1, 1],
+            transition: { duration: SHAKE_SECONDS, ease: 'easeOut' },
+          }),
+        ]);
+      }
+      useTaskStore.getState().remove(id);
+    } finally {
+      deleting.current = false;
+    }
+  };
+
+  const requestDelete = () => {
+    if (deleting.current) return;
+    const count = getDescendants(useTaskStore.getState(), id).length;
+    if (count > 0) setConfirm({ open: true, count });
+    else void runDelete();
+  };
+
+  const shownTags = task.tags.slice(0, MAX_TAGS_SHOWN);
+  const hiddenTags = task.tags.slice(MAX_TAGS_SHOWN);
+  const edit = () => useTaskStore.getState().setEditingId(id);
+
   return (
     <motion.li
       className={styles.item}
       data-depth={depth}
+      data-flat={flat || undefined}
       layout="position"
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
@@ -112,6 +179,7 @@ function TaskItemInner({ id, depth }: Props) {
     >
       <motion.div
         className={`${styles.row} ${task.done ? styles.rowDone : ''} ${editing ? styles.rowEditing : ''}`}
+        data-dim={dimmed || undefined}
         animate={pulse}
       >
         <motion.span
@@ -121,7 +189,13 @@ function TaskItemInner({ id, depth }: Props) {
           animate={flash}
           aria-hidden="true"
         />
-        {leaf ? (
+        <motion.span
+          className={styles.tint}
+          initial={{ opacity: 0 }}
+          animate={tint}
+          aria-hidden="true"
+        />
+        {flat ? null : leaf ? (
           <span className={styles.chevronSpacer} />
         ) : (
           <motion.button
@@ -147,19 +221,39 @@ function TaskItemInner({ id, depth }: Props) {
           onToggle={() => store.toggle(id)}
         />
         <div className={styles.title}>
-          {editing ? (
-            <TitleEditor id={id} initial={task.title} parentId={task.parentId} />
-          ) : (
-            <button
-              type="button"
-              className={styles.titleBtn}
-              onClick={() => useTaskStore.getState().setEditingId(id)}
-            >
-              <StrikeText done={task.done} delay={delay}>
-                {task.title}
-              </StrikeText>
-            </button>
-          )}
+          <div
+            className={styles.titleLine}
+            // Blank space after the title edits it, like the title itself.
+            onClick={(e) => {
+              if (!editing && e.target === e.currentTarget) edit();
+            }}
+          >
+            {editing ? (
+              <TitleEditor id={id} initial={task.title} parentId={task.parentId} />
+            ) : (
+              <>
+                <button type="button" className={styles.titleBtn} onClick={edit}>
+                  <StrikeText done={task.done} delay={delay}>
+                    {task.title}
+                  </StrikeText>
+                </button>
+                {(task.tags.length > 0 || task.dueDate !== null) && (
+                  <span className={styles.tail}>
+                    {shownTags.map((tag) => (
+                      <TagChip key={tag} tag={tag} onClick={() => setTagFilter(tag)} />
+                    ))}
+                    {hiddenTags.length > 0 && (
+                      <span className={styles.more} title={hiddenTags.join(', ')}>
+                        +{hiddenTags.length}
+                      </span>
+                    )}
+                    {task.dueDate !== null && <DuePill dueDate={task.dueDate} done={task.done} />}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+          {flat && path.length > 0 && <div className={styles.crumb}>{path.join(' › ')}</div>}
         </div>
         <div className={styles.meta}>
           {leaf ? (
@@ -178,31 +272,7 @@ function TaskItemInner({ id, depth }: Props) {
           )}
         </div>
         <div className={styles.actions}>
-          <div className={styles.pickerAnchor}>
-            <motion.button
-              {...iconMotion}
-              type="button"
-              className={styles.iconBtn}
-              aria-label="Change colour"
-              aria-haspopup="dialog"
-              aria-expanded={pickerOpen}
-              onClick={() => setPickerOpen((o) => !o)}
-            >
-              <span
-                className={styles.colorDot}
-                style={{ background: task.color, ['--task-color' as string]: task.color }}
-              />
-            </motion.button>
-            <AnimatePresence>
-              {pickerOpen && (
-                <ColorPicker
-                  value={task.color}
-                  onChange={(color) => store.update(id, { color })}
-                  onClose={closePicker}
-                />
-              )}
-            </AnimatePresence>
-          </div>
+          <TaskMenu id={id} buttonClassName={styles.iconBtn} motionProps={iconMotion} />
           <motion.button
             {...iconMotion}
             type="button"
@@ -215,23 +285,23 @@ function TaskItemInner({ id, depth }: Props) {
           <motion.button
             {...iconMotion}
             type="button"
-            className={styles.iconBtn}
+            className={`${styles.iconBtn} ${styles.deleteBtn}`}
             aria-label="Delete task"
-            onClick={() => store.remove(id)}
+            onClick={requestDelete}
           >
-            <X size={15} strokeWidth={1.75} aria-hidden="true" />
+            <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
           </motion.button>
         </div>
       </motion.div>
 
       <AnimatePresence initial={false}>
         {leaf && !task.done && task.difficulty === MAX_DIFFICULTY && (
-          <BreakdownNudge key="nudge" onBreakdown={addChild} />
+          <BreakdownNudge key="nudge" flat={flat} onBreakdown={addChild} />
         )}
       </AnimatePresence>
 
       <AnimatePresence initial={false}>
-        {shownChildIds.length > 0 && !task.collapsed && (
+        {!flat && shownChildIds.length > 0 && !task.collapsed && (
           <motion.ul
             key="children"
             className={styles.children}
@@ -247,12 +317,22 @@ function TaskItemInner({ id, depth }: Props) {
           >
             <AnimatePresence initial={false}>
               {shownChildIds.map((childId) => (
-                <TaskItem key={childId} id={childId} depth={depth + 1} />
+                <TaskItem key={childId} id={childId} depth={depth + 1} visible={visible} />
               ))}
             </AnimatePresence>
           </motion.ul>
         )}
       </AnimatePresence>
+      <ConfirmDialog
+        open={confirm.open}
+        title={`Delete "${task.title}"?`}
+        body={`This will also delete ${confirm.count} subtask${confirm.count === 1 ? '' : 's'}.`}
+        onCancel={closeConfirm}
+        onConfirm={() => {
+          closeConfirm();
+          void runDelete();
+        }}
+      />
     </motion.li>
   );
 }

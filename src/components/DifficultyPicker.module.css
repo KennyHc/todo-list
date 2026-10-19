@@ -1,75 +1,92 @@
-/* A five-bar signal meter. Each bar is its own radio button; the group is padded to 28px tall. */
+/* Five joined numbered segments, 22px square with a 2px gap (118px wide). */
 .group {
+  position: relative;
   display: inline-flex;
-  align-items: flex-end;
   flex: none;
-  height: 28px;
-  padding: 7px 2px;
+  gap: 2px;
 }
 
-.hit {
-  display: flex;
-  align-items: flex-end;
-  width: 5px;
-  height: 100%;
-  padding: 0 1px;
-  border: 0;
-  background: none;
-  cursor: pointer;
-}
-
-.hit:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+.seg {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
   border-radius: 2px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color var(--t-theme),
+    border-color var(--t-fast),
+    color var(--t-fast);
 }
 
-.bar {
-  display: block;
-  width: 3px;
-  border-radius: 1px;
-  background: var(--border-strong);
-  transform-origin: 50% 100%;
-  transition: background-color var(--t-fast);
+.seg:first-child {
+  border-radius: var(--r-sm) 2px 2px var(--r-sm);
 }
 
-.hit:nth-child(1) .bar {
-  height: 5px;
+.seg:last-of-type {
+  border-radius: 2px var(--r-sm) var(--r-sm) 2px;
 }
-.hit:nth-child(2) .bar {
-  height: 7px;
+
+.seg:focus-visible {
+  z-index: 1;
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
 }
-.hit:nth-child(3) .bar {
-  height: 9px;
+
+.fill {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: var(--task-color);
+  opacity: 0;
+  pointer-events: none;
 }
-.hit:nth-child(4) .bar {
-  height: 11px;
-}
-.hit:nth-child(5) .bar {
-  height: 13px;
+
+.num {
+  position: relative;
 }
 
 .filled {
-  background: color-mix(in srgb, var(--task-color) 75%, var(--text));
+  border-color: transparent;
+  color: var(--check-ink);
 }
 
-/* Hover previews the value: bars up to the hovered one go to half fill. */
-.hit:hover .bar:not(.filled),
-.hit:has(~ .hit:hover) .bar:not(.filled) {
-  background: color-mix(in srgb, var(--task-color) 50%, transparent);
+.tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 5;
+  padding: 3px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--elevated);
+  box-shadow: var(--shadow-pop);
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
-@media (hover: none), (max-width: 480px) {
-  .hit {
-    position: relative;
-    width: 10px;
-    padding: 0 3.5px;
+@media (max-width: 480px), (hover: none) {
+  .seg {
+    width: 30px;
+    height: 28px;
   }
 
-  /* Stretch the touch target to 44px without growing the row. */
-  .hit::after {
-    content: '';
-    position: absolute;
-    inset: -8px -1px;
+  /* No hover on touch, so the tooltip would only get stuck after a tap. */
+  .tip {
+    display: none;
   }
 }

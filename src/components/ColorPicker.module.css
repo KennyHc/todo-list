@@ -1,29 +1,8 @@
-.popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 10;
+.swatches {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
-  padding: 8px;
-  background: var(--elevated);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-pop);
-  transform-origin: top right;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(4, 20px);
-  gap: 8px;
-}
-
-.sep {
-  align-self: stretch;
-  width: 1px;
-  background: var(--border-strong);
+  padding: 4px;
 }
 
 .swatch {

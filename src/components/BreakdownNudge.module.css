@@ -11,6 +11,10 @@
   transition: color var(--t-theme);
 }
 
+.flat {
+  padding-left: 34px;
+}
+
 .message {
   display: inline-flex;
   align-items: flex-start;

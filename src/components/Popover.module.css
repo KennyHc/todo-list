@@ -1,0 +1,16 @@
+.panel {
+  position: fixed;
+  z-index: 60;
+  max-width: calc(100vw - 16px);
+  padding: 10px;
+  background: var(--elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.panel:focus-visible {
+  outline: none;
+}

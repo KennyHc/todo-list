@@ -1,9 +1,5 @@
 .composer {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 48px;
-  padding: 0 12px 0 14px;
+  position: relative;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   background: var(--surface);
@@ -19,6 +15,14 @@
   box-shadow:
     0 0 0 3px var(--ring),
     var(--shadow-card);
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 12px 0 14px;
 }
 
 .icon {
@@ -69,4 +73,162 @@
 .kbdOn {
   opacity: 1;
   transform: none;
+}
+
+.chipRow {
+  padding: 0 14px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0 0 8px 26px;
+  list-style: none;
+}
+
+.chipItem {
+  display: flex;
+  max-width: 100%;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 8px 10px;
+}
+
+.tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--t-fast),
+    color var(--t-fast);
+}
+
+.tool:hover,
+.tool[aria-expanded='true'] {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.toolSet {
+  color: var(--accent-ink);
+}
+
+.count {
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.dateGroup {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--r-sm);
+}
+
+.dateGroup:has(.clear) .dateBtn {
+  padding-right: 4px;
+}
+
+.clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background-color var(--t-fast),
+    color var(--t-fast);
+}
+
+.clear:hover {
+  background: var(--border-strong);
+  color: var(--text);
+}
+
+.suggest {
+  position: absolute;
+  top: 50px;
+  left: 10px;
+  z-index: 30;
+  min-width: 200px;
+  max-width: calc(100% - 20px);
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--elevated);
+  box-shadow: var(--shadow-pop);
+  list-style: none;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--r-sm);
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.option:hover,
+.optionActive {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.optionDot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.optionLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.optionCount {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 480px), (hover: none) {
+  .tool {
+    height: 30px;
+  }
 }

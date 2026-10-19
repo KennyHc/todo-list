@@ -2,9 +2,9 @@ import { motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
 import styles from './BreakdownNudge.module.css';
 
-type Props = { onBreakdown: () => void };
+type Props = { onBreakdown: () => void; flat?: boolean };
 
-export function BreakdownNudge({ onBreakdown }: Props) {
+export function BreakdownNudge({ onBreakdown, flat }: Props) {
   return (
     <motion.div
       initial={{ height: 0, opacity: 0 }}
@@ -13,7 +13,7 @@ export function BreakdownNudge({ onBreakdown }: Props) {
       transition={{ type: 'spring', stiffness: 400, damping: 36 }}
       style={{ overflow: 'hidden' }}
     >
-      <div className={styles.nudge}>
+      <div className={`${styles.nudge} ${flat ? styles.flat : ''}`}>
         <span className={styles.message}>
           <Sparkles className={styles.icon} size={13} strokeWidth={1.75} aria-hidden="true" />
           <span>Large task — consider breaking it down</span>

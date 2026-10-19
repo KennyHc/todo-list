@@ -78,3 +78,13 @@ export function dueStatus(dueDate: string | null, today: string): DueStatus | nu
   if (days === 0) return 'today';
   return days <= SOON_DAYS ? 'soon' : 'later';
 }
+
+/**
+ * True when a task is only visible under a tag filter for context: it doesn't carry the tag and
+ * neither does any of its ancestors (so it is an ancestor of a match, not part of one).
+ */
+export function isContextOnly(tree: TaskTree, id: string, tag: string): boolean {
+  const task = tree.tasks[id];
+  if (!task || task.tags.includes(tag)) return false;
+  return !getAncestors(tree, id).some((ancestorId) => tree.tasks[ancestorId].tags.includes(tag));
+}

@@ -1,0 +1,113 @@
+.filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color var(--t-fast),
+    border-color var(--t-fast),
+    color var(--t-fast);
+}
+
+.button:hover,
+.button[aria-expanded='true'] {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.active {
+  color: var(--accent-ink);
+}
+
+.empty {
+  margin: 0;
+  padding: 4px;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 260px;
+  margin: -4px;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--text-2);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--t-fast);
+}
+
+.item:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.check {
+  flex: none;
+  width: 13px;
+  color: var(--accent-ink);
+  opacity: 0;
+}
+
+.item[aria-pressed='true'] .check {
+  opacity: 1;
+}
+
+.filter > span {
+  flex: 0 1 auto;
+  min-width: 0;
+}
