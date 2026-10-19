@@ -1,6 +1,5 @@
 import { nanoid } from 'nanoid';
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { useMemo } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
@@ -28,7 +27,6 @@ import {
 } from '../lib/tree';
 import { allTags, deadlineList, visibleTreeIds } from '../lib/views';
 import type { Task, TaskTree } from '../types';
-import { taskStorage } from './storage';
 
 export type UndoSnapshot = { tasks: TaskTree['tasks']; rootIds: string[]; history: HistoryEntry[] };
 
@@ -60,6 +58,11 @@ type TaskActions = {
   setEditingId: (id: string | null) => void;
   /** Expands every collapsed ancestor of `id` in one update. Not undoable. */
   revealTask: (id: string) => void;
+  /**
+   * Applies remote state (cloud sync). Sets only the given fields; never touches `undo`.
+   * `lastToggle` is cleared if the toggled task was changed by the update.
+   */
+  hydrate: (partial: Partial<PersistedTasks>) => void;
   /** Replaces tasks, rootIds and history (e.g. a backup import) and records an undo. */
   replaceAll: (data: PersistedTasks, label: string) => void;
   /** Restores the state from before the latest undoable action. */
@@ -88,6 +91,29 @@ export function migrateTasksState(persisted: unknown): PersistedTasks {
   };
 }
 
+const LEGACY_KEY = 'tasks-v1';
+
+/** Reads and migrates the pre-cloud localStorage data. Null if there is none (or it is empty). */
+export function readLegacyLocalTasks(): PersistedTasks | null {
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { state?: unknown } | null;
+    const data = migrateTasksState(parsed?.state);
+    return Object.keys(data.tasks).length > 0 ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearLegacyLocalTasks(): void {
+  try {
+    localStorage.removeItem(LEGACY_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 const treeOf = (s: TaskState): TaskTree => ({ tasks: s.tasks, rootIds: s.rootIds });
 
 /** Snapshots are the old references: structural sharing makes this free, so nothing is cloned. */
@@ -100,126 +126,130 @@ const undoEntry = (s: TaskState, label: string): UndoEntry => ({
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-export const useTaskStore = create<TaskStore>()(
-  persist(
-    (set, get) => ({
-      ...emptyTree(),
-      history: [],
-      editingId: null,
-      lastToggle: null,
-      undo: null,
+/**
+ * Task data lives in memory only; src/sync mirrors it to Firestore (whose IndexedDB cache gives
+ * offline persistence). A factory so tests can build independent stores.
+ */
+export const createTaskStore = () =>
+  create<TaskStore>()((set, get) => ({
+    ...emptyTree(),
+    history: [],
+    editingId: null,
+    lastToggle: null,
+    undo: null,
 
-      add: (input) => {
-        const { tree, id } = addTask(treeOf(get()), input);
-        set({ tasks: tree.tasks, rootIds: tree.rootIds, lastToggle: null });
-        return id;
-      },
-      update: (id, patch) => set(updateTask(treeOf(get()), id, patch)),
-      remove: (id) => {
-        const state = get();
-        const task = state.tasks[id];
-        if (!task) return;
-        const count = getDescendants(treeOf(state), id).length;
-        const label = `Deleted \u201c${task.title}\u201d${count > 0 ? ` and ${plural(count, 'subtask', 'subtasks')}` : ''}`;
-        set({ ...deleteTask(treeOf(state), id), lastToggle: null, undo: undoEntry(state, label) });
-      },
-      toggle: (id) => {
-        const state = get();
-        const before = treeOf(state);
-        const now = Date.now();
-        const after = toggleDone(before, id, now);
-        if (after === before) return;
-        const diff = diffCompletions(before, after, id, now);
-        const history = applyHistory(state.history, diff);
-        const title = state.tasks[id]?.title ?? '';
-        const label =
-          diff.completed.length > 1
-            ? `Completed ${diff.completed.length} tasks`
-            : `${after.tasks[id]?.done ? 'Completed' : 'Reopened'} \u201c${title}\u201d`;
-        set({
-          tasks: after.tasks,
-          rootIds: after.rootIds,
-          history,
-          lastToggle: { id, at: now },
-          undo: undoEntry(state, label),
-        });
-      },
-      clearCompleted: () => {
-        const state = get();
-        const after = clearCompleted(treeOf(state));
-        const removed = Object.keys(state.tasks).length - Object.keys(after.tasks).length;
-        if (removed === 0) return;
-        set({ ...after, lastToggle: null, undo: undoEntry(state, `Cleared ${removed} completed`) });
-      },
-      clearHistory: () => {
-        const state = get();
-        if (state.history.length === 0) return;
-        set({
-          history: [],
-          undo: undoEntry(
-            state,
-            `Cleared history (${plural(state.history.length, 'entry', 'entries')})`,
-          ),
-        });
-      },
-      removeHistoryEntry: (id) => {
-        const state = get();
-        if (!state.history.some((entry) => entry.id === id)) return;
-        set({
-          history: state.history.filter((entry) => entry.id !== id),
-          undo: undoEntry(state, 'Removed from history'),
-        });
-      },
-      indent: (id) => set({ ...indentTask(treeOf(get()), id), lastToggle: null }),
-      outdent: (id) => set({ ...outdentTask(treeOf(get()), id), lastToggle: null }),
-      move: (id, target) => {
-        const state = get();
-        const task = state.tasks[id];
-        if (!task) return;
-        const before = treeOf(state);
-        const after = moveTask(before, id, target);
-        if (after === before) return;
-        set({
-          tasks: after.tasks,
-          rootIds: after.rootIds,
-          lastToggle: null,
-          undo: undoEntry(state, `Moved \u201c${task.title}\u201d`),
-        });
-      },
-      setEditingId: (editingId) => set({ editingId }),
-      revealTask: (id) => {
-        const state = get();
-        const collapsed = getAncestors(treeOf(state), id).filter((a) => state.tasks[a]?.collapsed);
-        if (collapsed.length === 0) return;
-        const tasks = { ...state.tasks };
-        for (const a of collapsed) tasks[a] = { ...tasks[a], collapsed: false };
-        set({ tasks });
-      },
-      replaceAll: (data, label) =>
-        set({
-          tasks: data.tasks,
-          rootIds: data.rootIds,
-          history: data.history,
-          lastToggle: null,
-          undo: undoEntry(get(), label),
-        }),
-      undoLast: () => {
-        const entry = get().undo;
-        if (!entry) return;
-        set({ ...entry.snapshot, lastToggle: null, undo: null });
-      },
-      dismissUndo: () => set({ undo: null }),
-    }),
-    {
-      // The key stays 'tasks-v1' so existing data survives; `version` drives migrations.
-      name: 'tasks-v1',
-      version: 2,
-      storage: taskStorage<PersistedTasks>(),
-      partialize: ({ tasks, rootIds, history }) => ({ tasks, rootIds, history }),
-      migrate: (persisted) => migrateTasksState(persisted),
+    add: (input) => {
+      const { tree, id } = addTask(treeOf(get()), input);
+      set({ tasks: tree.tasks, rootIds: tree.rootIds, lastToggle: null });
+      return id;
     },
-  ),
-);
+    update: (id, patch) => set(updateTask(treeOf(get()), id, patch)),
+    remove: (id) => {
+      const state = get();
+      const task = state.tasks[id];
+      if (!task) return;
+      const count = getDescendants(treeOf(state), id).length;
+      const label = `Deleted \u201c${task.title}\u201d${count > 0 ? ` and ${plural(count, 'subtask', 'subtasks')}` : ''}`;
+      set({ ...deleteTask(treeOf(state), id), lastToggle: null, undo: undoEntry(state, label) });
+    },
+    toggle: (id) => {
+      const state = get();
+      const before = treeOf(state);
+      const now = Date.now();
+      const after = toggleDone(before, id, now);
+      if (after === before) return;
+      const diff = diffCompletions(before, after, id, now);
+      const history = applyHistory(state.history, diff);
+      const title = state.tasks[id]?.title ?? '';
+      const label =
+        diff.completed.length > 1
+          ? `Completed ${diff.completed.length} tasks`
+          : `${after.tasks[id]?.done ? 'Completed' : 'Reopened'} \u201c${title}\u201d`;
+      set({
+        tasks: after.tasks,
+        rootIds: after.rootIds,
+        history,
+        lastToggle: { id, at: now },
+        undo: undoEntry(state, label),
+      });
+    },
+    clearCompleted: () => {
+      const state = get();
+      const after = clearCompleted(treeOf(state));
+      const removed = Object.keys(state.tasks).length - Object.keys(after.tasks).length;
+      if (removed === 0) return;
+      set({ ...after, lastToggle: null, undo: undoEntry(state, `Cleared ${removed} completed`) });
+    },
+    clearHistory: () => {
+      const state = get();
+      if (state.history.length === 0) return;
+      set({
+        history: [],
+        undo: undoEntry(
+          state,
+          `Cleared history (${plural(state.history.length, 'entry', 'entries')})`,
+        ),
+      });
+    },
+    removeHistoryEntry: (id) => {
+      const state = get();
+      if (!state.history.some((entry) => entry.id === id)) return;
+      set({
+        history: state.history.filter((entry) => entry.id !== id),
+        undo: undoEntry(state, 'Removed from history'),
+      });
+    },
+    indent: (id) => set({ ...indentTask(treeOf(get()), id), lastToggle: null }),
+    outdent: (id) => set({ ...outdentTask(treeOf(get()), id), lastToggle: null }),
+    move: (id, target) => {
+      const state = get();
+      const task = state.tasks[id];
+      if (!task) return;
+      const before = treeOf(state);
+      const after = moveTask(before, id, target);
+      if (after === before) return;
+      set({
+        tasks: after.tasks,
+        rootIds: after.rootIds,
+        lastToggle: null,
+        undo: undoEntry(state, `Moved \u201c${task.title}\u201d`),
+      });
+    },
+    setEditingId: (editingId) => set({ editingId }),
+    revealTask: (id) => {
+      const state = get();
+      const collapsed = getAncestors(treeOf(state), id).filter((a) => state.tasks[a]?.collapsed);
+      if (collapsed.length === 0) return;
+      const tasks = { ...state.tasks };
+      for (const a of collapsed) tasks[a] = { ...tasks[a], collapsed: false };
+      set({ tasks });
+    },
+    hydrate: (partial) =>
+      set((state) => {
+        const toggled = state.lastToggle?.id;
+        const changed =
+          toggled !== undefined &&
+          partial.tasks !== undefined &&
+          partial.tasks[toggled] !== state.tasks[toggled];
+        return { ...partial, ...(changed ? { lastToggle: null } : {}) };
+      }),
+    replaceAll: (data, label) =>
+      set({
+        tasks: data.tasks,
+        rootIds: data.rootIds,
+        history: data.history,
+        lastToggle: null,
+        undo: undoEntry(get(), label),
+      }),
+    undoLast: () => {
+      const entry = get().undo;
+      if (!entry) return;
+      set({ ...entry.snapshot, lastToggle: null, undo: null });
+    },
+    dismissUndo: () => set({ undo: null }),
+  }));
+
+export const useTaskStore = createTaskStore();
 
 export const resetTaskStore = () =>
   useTaskStore.setState({

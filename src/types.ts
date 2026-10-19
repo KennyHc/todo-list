@@ -2,6 +2,9 @@ export type Difficulty = 1 | 2 | 3 | 4 | 5;
 
 /** At this level the UI suggests breaking the task down. */
 export const MAX_DIFFICULTY = 5;
+/** Limits mirrored in firestore.rules; the data layer clamps to them so writes are never rejected. */
+export const MAX_TITLE_LENGTH = 500;
+export const MAX_TAGS = 20;
 
 export type Task = {
   id: string;

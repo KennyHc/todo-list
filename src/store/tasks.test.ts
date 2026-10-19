@@ -1,10 +1,19 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { migrateTasksState, resetTaskStore, useTaskStore } from './tasks';
+import {
+  clearLegacyLocalTasks,
+  migrateTasksState,
+  readLegacyLocalTasks,
+  resetTaskStore,
+  useTaskStore,
+} from './tasks';
 import { useUIStore } from './ui';
 
 const get = () => useTaskStore.getState();
 
-beforeEach(() => resetTaskStore());
+beforeEach(() => {
+  localStorage.clear();
+  resetTaskStore();
+});
 
 describe('migrateTasksState', () => {
   const v1Task = {
@@ -228,5 +237,68 @@ describe('revealTask', () => {
     const before = useTaskStore.getState().tasks;
     useTaskStore.getState().revealTask(b);
     expect(useTaskStore.getState().tasks).toBe(before);
+  });
+});
+
+describe('legacy local data', () => {
+  const task = {
+    id: 'a',
+    title: 'A',
+    difficulty: 2,
+    color: '#A9C6F5',
+    done: false,
+    collapsed: false,
+    parentId: null,
+    childIds: [],
+    createdAt: 5,
+  };
+
+  it('reads and migrates the old persisted state, then clears it', () => {
+    localStorage.setItem(
+      'tasks-v1',
+      JSON.stringify({ state: { tasks: { a: task }, rootIds: ['a'] }, version: 1 }),
+    );
+    const data = readLegacyLocalTasks();
+    expect(data?.tasks.a).toEqual({ ...task, tags: [], dueDate: null });
+    expect(data?.rootIds).toEqual(['a']);
+    clearLegacyLocalTasks();
+    expect(localStorage.getItem('tasks-v1')).toBeNull();
+    expect(readLegacyLocalTasks()).toBeNull();
+  });
+
+  it('returns null for missing, empty or corrupt data', () => {
+    expect(readLegacyLocalTasks()).toBeNull();
+    localStorage.setItem('tasks-v1', JSON.stringify({ state: { tasks: {}, rootIds: [] } }));
+    expect(readLegacyLocalTasks()).toBeNull();
+    localStorage.setItem('tasks-v1', '{nope');
+    expect(readLegacyLocalTasks()).toBeNull();
+  });
+
+  it('no longer persists tasks to localStorage', () => {
+    get().add({ title: 'in memory only' });
+    expect(localStorage.getItem('tasks-v1')).toBeNull();
+  });
+});
+
+describe('hydrate', () => {
+  it('sets remote data without touching undo', () => {
+    const id = get().add({ title: 'A' });
+    get().toggle(id);
+    const undo = get().undo;
+    expect(undo).not.toBeNull();
+    get().hydrate({ rootIds: [id] });
+    expect(get().undo).toBe(undo);
+    expect(get().lastToggle?.id).toBe(id);
+  });
+
+  it('clears lastToggle only when the toggled task changed remotely', () => {
+    const id = get().add({ title: 'A' });
+    const other = get().add({ title: 'B' });
+    get().toggle(id);
+    get().hydrate({ tasks: { ...get().tasks, [other]: { ...get().tasks[other], title: 'B2' } } });
+    expect(get().lastToggle?.id).toBe(id);
+    get().hydrate({ tasks: { ...get().tasks, [id]: { ...get().tasks[id], title: 'A2' } } });
+    expect(get().lastToggle).toBeNull();
+    expect(get().undo).not.toBeNull();
   });
 });

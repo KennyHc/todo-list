@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import type { Difficulty, Task, TaskTree } from '../types';
+import { MAX_TITLE_LENGTH, type Difficulty, type Task, type TaskTree } from '../types';
 import { DEFAULT_COLOR } from './colors';
 import { normalizeTags } from './tags';
 
@@ -18,6 +18,8 @@ export type NewTask = {
 export type TaskPatch = Partial<
   Pick<Task, 'title' | 'difficulty' | 'color' | 'collapsed' | 'tags' | 'dueDate'>
 >;
+
+const clampTitle = (title: string) => title.slice(0, MAX_TITLE_LENGTH);
 
 export const emptyTree = (): TaskTree => ({ tasks: {}, rootIds: [] });
 
@@ -173,7 +175,7 @@ export function addTask(
   const id = nanoid();
   draft.tasks[id] = {
     id,
-    title,
+    title: clampTitle(title),
     difficulty,
     color: color ?? (parentId === null ? undefined : tree.tasks[parentId].color) ?? DEFAULT_COLOR,
     done: false,
@@ -202,8 +204,9 @@ const sameValue = (a: unknown, b: unknown): boolean =>
 export function updateTask(tree: TaskTree, id: string, rawPatch: TaskPatch): TaskTree {
   const task = tree.tasks[id];
   if (!task) return tree;
-  const patch: TaskPatch =
-    rawPatch.tags === undefined ? rawPatch : { ...rawPatch, tags: normalizeTags(rawPatch.tags) };
+  const patch: TaskPatch = { ...rawPatch };
+  if (patch.tags !== undefined) patch.tags = normalizeTags(patch.tags);
+  if (patch.title !== undefined) patch.title = clampTitle(patch.title);
   const changed = (Object.keys(patch) as (keyof TaskPatch)[]).some(
     (key) => patch[key] !== undefined && !sameValue(patch[key], task[key]),
   );

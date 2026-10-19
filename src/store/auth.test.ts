@@ -1,0 +1,156 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const fb = vi.hoisted(() => ({
+  signInWithPopup: vi.fn(),
+  signInWithRedirect: vi.fn(),
+  signOut: vi.fn(),
+  getRedirectResult: vi.fn(),
+  listener: null as null | ((user: unknown) => void),
+}));
+const calls = vi.hoisted(() => [] as string[]);
+
+vi.mock('firebase/auth', () => ({
+  signInWithPopup: fb.signInWithPopup,
+  signInWithRedirect: fb.signInWithRedirect,
+  signOut: fb.signOut,
+  getRedirectResult: fb.getRedirectResult,
+  onAuthStateChanged: (_auth: unknown, cb: (user: unknown) => void) => {
+    fb.listener = cb;
+    return () => {};
+  },
+}));
+vi.mock('../sync/firestoreSync', () => ({
+  flushActiveSync: vi.fn(async () => {
+    calls.push('flush');
+  }),
+  stopActiveSync: vi.fn(() => {
+    calls.push('stop');
+  }),
+}));
+
+import { hasAuthHint, initAuth, useAuthStore } from './auth';
+import { resetTaskStore, useTaskStore } from './tasks';
+
+const reset = () =>
+  useAuthStore.setState({ status: 'loading', user: null, error: null, freshSignIn: false });
+
+const fakeUser = {
+  uid: 'u1',
+  displayName: 'Ada Lovelace',
+  email: 'ada@example.com',
+  photoURL: null,
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  calls.length = 0;
+  localStorage.clear();
+  sessionStorage.clear();
+  fb.getRedirectResult.mockResolvedValue(null);
+  fb.signOut.mockImplementation(async () => {
+    calls.push('signOut');
+    fb.listener?.(null);
+  });
+  reset();
+  resetTaskStore();
+  window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as never;
+});
+
+describe('auth state', () => {
+  it('maps the Firebase user and keeps the auth hint in sync', () => {
+    initAuth();
+    fb.listener!(fakeUser);
+    expect(useAuthStore.getState()).toMatchObject({
+      status: 'signedIn',
+      user: { uid: 'u1', name: 'Ada Lovelace', email: 'ada@example.com', photoURL: null },
+    });
+    expect(hasAuthHint()).toBe(true);
+    fb.listener!(null);
+    expect(useAuthStore.getState().status).toBe('signedOut');
+    expect(hasAuthHint()).toBe(false);
+  });
+
+  it('stops sync before clearing the tasks when the user disappears', () => {
+    initAuth();
+    useTaskStore.getState().add({ title: 'x' });
+    calls.length = 0;
+    fb.listener!(null);
+    expect(calls).toEqual(['stop']);
+    expect(useTaskStore.getState().rootIds).toEqual([]);
+  });
+});
+
+describe('signInWithGoogle', () => {
+  it('uses the popup and flags a fresh sign-in', async () => {
+    fb.signInWithPopup.mockResolvedValue({});
+    await useAuthStore.getState().signInWithGoogle();
+    expect(fb.signInWithPopup).toHaveBeenCalled();
+    expect(useAuthStore.getState()).toMatchObject({ freshSignIn: true, error: null });
+  });
+
+  it('shows no error when the popup is closed', async () => {
+    fb.signInWithPopup.mockRejectedValue({ code: 'auth/popup-closed-by-user' });
+    await useAuthStore.getState().signInWithGoogle();
+    expect(useAuthStore.getState().error).toBeNull();
+    fb.signInWithPopup.mockRejectedValue({ code: 'auth/cancelled-popup-request' });
+    await useAuthStore.getState().signInWithGoogle();
+    expect(useAuthStore.getState().error).toBeNull();
+  });
+
+  it('surfaces other errors', async () => {
+    fb.signInWithPopup.mockRejectedValue({ code: 'auth/network-request-failed' });
+    await useAuthStore.getState().signInWithGoogle();
+    expect(useAuthStore.getState().error).toMatch(/connection/i);
+  });
+
+  it('falls back to redirect when the popup is blocked', async () => {
+    fb.signInWithPopup.mockRejectedValue({ code: 'auth/popup-blocked' });
+    fb.signInWithRedirect.mockResolvedValue(undefined);
+    await useAuthStore.getState().signInWithGoogle();
+    expect(fb.signInWithRedirect).toHaveBeenCalled();
+    expect(useAuthStore.getState().error).toBeNull();
+    expect(hasAuthHint()).toBe(true); // so the splash, not the landing page, shows on return
+  });
+
+  it('redirects straight away on touch devices', async () => {
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as never;
+    fb.signInWithRedirect.mockResolvedValue(undefined);
+    await useAuthStore.getState().signInWithGoogle();
+    expect(fb.signInWithPopup).not.toHaveBeenCalled();
+    expect(fb.signInWithRedirect).toHaveBeenCalled();
+  });
+
+  it('handles the redirect result on startup', async () => {
+    fb.getRedirectResult.mockResolvedValue({ user: fakeUser });
+    initAuth();
+    await vi.waitFor(() => expect(useAuthStore.getState().freshSignIn).toBe(true));
+  });
+});
+
+describe('signOut', () => {
+  it('flushes, stops sync, signs out, then resets the tasks', async () => {
+    initAuth();
+    fb.listener!(fakeUser);
+    useTaskStore.getState().add({ title: 'keep until flushed' });
+    useTaskStore.setState({ editingId: 'x' });
+    calls.length = 0;
+    await useAuthStore.getState().signOut();
+    expect(calls.slice(0, 3)).toEqual(['flush', 'stop', 'signOut']);
+    const s = useTaskStore.getState();
+    expect(s.rootIds).toEqual([]);
+    expect(s.editingId).toBeNull();
+    expect(s.undo).toBeNull();
+    expect(useAuthStore.getState().status).toBe('signedOut');
+    expect(hasAuthHint()).toBe(false);
+  });
+
+  it('keeps UI prefs', async () => {
+    localStorage.setItem('theme', 'dark');
+    localStorage.setItem('ui-v1', '{}');
+    initAuth();
+    fb.listener!(fakeUser);
+    await useAuthStore.getState().signOut();
+    expect(localStorage.getItem('theme')).toBe('dark');
+    expect(localStorage.getItem('ui-v1')).toBe('{}');
+  });
+});

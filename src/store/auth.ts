@@ -1,0 +1,148 @@
+import {
+  getRedirectResult,
+  onAuthStateChanged,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut as firebaseSignOut,
+  type User,
+} from 'firebase/auth';
+import { create } from 'zustand';
+import { auth, googleProvider } from '../lib/firebase';
+import { flushActiveSync, stopActiveSync } from '../sync/firestoreSync';
+import { resetTaskStore } from './tasks';
+
+export type AuthUser = { uid: string; name: string; email: string; photoURL: string | null };
+export type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
+
+type AuthState = {
+  status: AuthStatus;
+  user: AuthUser | null;
+  /** A user-facing message for the last failed sign-in, or null. */
+  error: string | null;
+  /** True after an interactive sign-in this session (drives first-run focus and copy). */
+  freshSignIn: boolean;
+  signInWithGoogle: () => Promise<void>;
+  signOut: () => Promise<void>;
+};
+
+const HINT_KEY = 'auth-hint';
+const REDIRECT_KEY = 'auth-redirecting';
+
+const read = (storage: () => Storage, key: string) => {
+  try {
+    return storage().getItem(key);
+  } catch {
+    return null;
+  }
+};
+const write = (storage: () => Storage, key: string, value: string | null) => {
+  try {
+    if (value === null) storage().removeItem(key);
+    else storage().setItem(key, value);
+  } catch {
+    /* storage unavailable */
+  }
+};
+
+/** A returning user (or one coming back from the redirect flow) is probably signed in. */
+export const hasAuthHint = () =>
+  read(() => localStorage, HINT_KEY) === '1' || read(() => sessionStorage, REDIRECT_KEY) === '1';
+
+const toAuthUser = (user: User): AuthUser => ({
+  uid: user.uid,
+  name: user.displayName ?? user.email?.split('@')[0] ?? 'Account',
+  email: user.email ?? '',
+  photoURL: user.photoURL,
+});
+
+const prefersRedirect = () =>
+  typeof window !== 'undefined' &&
+  (window.matchMedia?.('(hover: none) and (pointer: coarse)').matches ||
+    window.matchMedia?.('(max-width: 600px)').matches ||
+    false);
+
+const SILENT_CODES = new Set([
+  'auth/popup-closed-by-user',
+  'auth/cancelled-popup-request',
+  'auth/user-cancelled',
+]);
+
+function messageFor(error: unknown): string | null {
+  const code = (error as { code?: string } | null)?.code;
+  if (code && SILENT_CODES.has(code)) return null;
+  if (code === 'auth/network-request-failed') return "Can't reach Google. Check your connection.";
+  if (code === 'auth/unauthorized-domain') return "This site isn't authorized for sign-in yet.";
+  return 'Sign-in failed. Please try again.';
+}
+
+export const useAuthStore = create<AuthState>()((set, get) => ({
+  status: 'loading',
+  user: null,
+  error: null,
+  freshSignIn: false,
+
+  signInWithGoogle: async () => {
+    set({ error: null });
+    try {
+      if (prefersRedirect()) {
+        write(() => sessionStorage, REDIRECT_KEY, '1');
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      }
+      try {
+        await signInWithPopup(auth, googleProvider);
+        set({ freshSignIn: true });
+      } catch (error) {
+        if ((error as { code?: string }).code !== 'auth/popup-blocked') throw error;
+        write(() => sessionStorage, REDIRECT_KEY, '1');
+        await signInWithRedirect(auth, googleProvider);
+      }
+    } catch (error) {
+      write(() => sessionStorage, REDIRECT_KEY, null);
+      set({ error: messageFor(error) });
+    }
+  },
+
+  signOut: async () => {
+    if (get().status !== 'signedIn') return;
+    // Push pending edits while still authorized, then stop syncing before anything is reset.
+    await flushActiveSync();
+    stopActiveSync();
+    write(() => localStorage, HINT_KEY, null);
+    set({ freshSignIn: false });
+    try {
+      await firebaseSignOut(auth);
+    } catch (error) {
+      console.error('[auth] sign-out failed', error);
+    }
+    stopActiveSync();
+    resetTaskStore();
+  },
+}));
+
+/** Wires Firebase auth into the store. Call once at startup; returns an unsubscribe. */
+export function initAuth(): () => void {
+  void getRedirectResult(auth)
+    .then((result) => {
+      write(() => sessionStorage, REDIRECT_KEY, null);
+      if (result?.user) useAuthStore.setState({ freshSignIn: true });
+    })
+    .catch((error) => {
+      write(() => sessionStorage, REDIRECT_KEY, null);
+      useAuthStore.setState({ error: messageFor(error) });
+    });
+
+  return onAuthStateChanged(auth, (user) => {
+    if (user) {
+      write(() => localStorage, HINT_KEY, '1');
+      useAuthStore.setState({ status: 'signedIn', user: toAuthUser(user) });
+    } else {
+      write(() => localStorage, HINT_KEY, null);
+      // Anything left from the previous session must not leak into the next account. Sync stops
+      // first: a reset while it is watching the store would be written out as deletions.
+      stopActiveSync();
+      resetTaskStore();
+      useAuthStore.setState({ status: 'signedOut', user: null, freshSignIn: false });
+    }
+  });
+}

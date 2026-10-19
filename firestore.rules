@@ -1,0 +1,41 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Deny everything by default; only the paths below are reachable.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function validTask(id) {
+      let t = request.resource.data;
+      return t.id == id
+        && t.title is string && t.title.size() <= 500
+        && t.difficulty is int && t.difficulty >= 1 && t.difficulty <= 5
+        && t.tags is list && t.tags.size() <= 20
+        && t.done is bool;
+    }
+
+    // users/{uid} is the meta document: rootIds, schemaVersion, updatedAt.
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) && request.resource.data.rootIds is list;
+      allow delete: if isOwner(uid);
+
+      match /tasks/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validTask(id);
+      }
+
+      // Completion log. Shape is owned by the client; only ownership is enforced.
+      match /history/{id} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+  }
+}

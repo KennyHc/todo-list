@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react';
-import { Download, Settings2, Upload } from 'lucide-react';
+import { Download, LogOut, Upload } from 'lucide-react';
 import { useTaskStore, type PersistedTasks } from '../store/tasks';
 import { exportBackup, parseBackup, formatBackupDescription } from '../lib/backup';
+import { useAuthStore } from '../store/auth';
+import { useSyncStore, type SyncStatus } from '../sync/status';
 import { Popover } from './Popover';
 import { ConfirmDialog } from './ConfirmDialog';
 import styles from './SettingsPopover.module.css';
@@ -14,6 +16,21 @@ type ImportState = {
   taskCount: number;
 };
 
+const SYNC_LABELS: Record<SyncStatus, string> = {
+  loading: 'Syncing\u2026',
+  ready: 'Synced',
+  offline: 'Offline \u2014 changes will sync',
+  error: 'Sync error',
+};
+
+const initialsOf = (name: string, email: string) => {
+  const parts = (name || email).trim().split(/\s+/).filter(Boolean);
+  const letters =
+    parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] ?? '?').slice(0, 1);
+  return letters.toUpperCase();
+};
+
+/** The header's account menu: who is signed in, sync state, backup and sign-out. */
 export function SettingsPopover() {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -28,6 +45,10 @@ export function SettingsPopover() {
   });
 
   const replaceAll = useTaskStore((s) => s.replaceAll);
+  const user = useAuthStore((s) => s.user);
+  const signOut = useAuthStore((s) => s.signOut);
+  const syncStatus = useSyncStore((s) => s.syncStatus);
+  const [photoFailed, setPhotoFailed] = useState(false);
 
   const handleExport = () => {
     if (exportBackup()) setPopoverOpen(false);
@@ -111,23 +132,50 @@ export function SettingsPopover() {
       <button
         ref={buttonRef}
         type="button"
-        aria-label="Settings"
-        title="Settings"
+        aria-label="Account"
+        title={user?.email || 'Account'}
+        aria-haspopup="menu"
+        aria-expanded={popoverOpen}
         className={styles.button}
         onClick={() => setPopoverOpen(!popoverOpen)}
       >
-        <Settings2 size={15} strokeWidth={1.75} />
+        {user?.photoURL && !photoFailed ? (
+          <img
+            className={styles.avatar}
+            src={user.photoURL}
+            alt=""
+            referrerPolicy="no-referrer"
+            onError={() => setPhotoFailed(true)}
+          />
+        ) : (
+          <span className={styles.avatar} aria-hidden="true">
+            {initialsOf(user?.name ?? '', user?.email ?? '')}
+          </span>
+        )}
       </button>
 
       <Popover
         open={popoverOpen}
         onClose={() => setPopoverOpen(false)}
         anchorRef={buttonRef}
-        label="Settings"
+        label="Account"
         align="end"
-        width={220}
+        width={240}
       >
-        <div className={styles.menu} role="menu" aria-label="Settings" onKeyDown={onMenuKeyDown}>
+        <div className={styles.menu} role="menu" aria-label="Account" onKeyDown={onMenuKeyDown}>
+          {user && (
+            <>
+              <div className={styles.identity}>
+                <div className={styles.name}>{user.name}</div>
+                {user.email && <div className={styles.email}>{user.email}</div>}
+                <div className={styles.sync} data-status={syncStatus} role="status">
+                  <span className={styles.dot} aria-hidden="true" />
+                  {SYNC_LABELS[syncStatus]}
+                </div>
+              </div>
+              <div className={styles.divider} role="separator" />
+            </>
+          )}
           <div className={styles.section}>Data</div>
 
           <button type="button" role="menuitem" className={styles.item} onClick={handleExport}>
@@ -149,6 +197,20 @@ export function SettingsPopover() {
           {importState.error && (
             <div className={styles.error}>{errorMessages[importState.error]}</div>
           )}
+
+          <div className={styles.divider} role="separator" />
+          <button
+            type="button"
+            role="menuitem"
+            className={`${styles.item} ${styles.last}`}
+            onClick={() => {
+              setPopoverOpen(false);
+              void signOut();
+            }}
+          >
+            <LogOut size={15} />
+            <span>Sign out</span>
+          </button>
         </div>
       </Popover>
 

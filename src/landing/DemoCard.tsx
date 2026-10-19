@@ -1,0 +1,154 @@
+import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { Plus } from 'lucide-react';
+import { Checkbox } from '../components/Checkbox';
+import { DifficultyPicker } from '../components/DifficultyPicker';
+import { StrikeText } from '../components/StrikeText';
+import { toggleDelay } from '../lib/cascade';
+import { effectiveDifficulty, progress } from '../lib/tree';
+import type { TaskTree } from '../types';
+import { buildDemoTree, useDemo } from './useDemo';
+import styles from './DemoCard.module.css';
+
+/** True while the element is on screen and the tab is visible. */
+function useInView(ref: React.RefObject<Element | null>): boolean {
+  const [intersecting, setIntersecting] = useState(true);
+  const [tabVisible, setTabVisible] = useState(
+    typeof document === 'undefined' || document.visibilityState !== 'hidden',
+  );
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([entry]) => setIntersecting(entry.isIntersecting), {
+      threshold: 0.1,
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref]);
+
+  useEffect(() => {
+    const onChange = () => setTabVisible(document.visibilityState !== 'hidden');
+    document.addEventListener('visibilitychange', onChange);
+    return () => document.removeEventListener('visibilitychange', onChange);
+  }, []);
+
+  return intersecting && tabVisible;
+}
+
+export function DemoCard({ autoplay = true }: { autoplay?: boolean }) {
+  const reduced = useReducedMotion() ?? false;
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref);
+  const [initial] = useState(() => (reduced ? buildDemoTree(2).tree : undefined));
+  const demo = useDemo({ enabled: autoplay && !reduced, active: inView, initial });
+  const { tree } = demo;
+
+  return (
+    <div className={styles.stage}>
+      <div className={styles.glow} aria-hidden="true" />
+      <div ref={ref} className={styles.card} role="group" aria-label="Interactive demo">
+        <div className={styles.composer} aria-hidden="true">
+          <Plus size={16} strokeWidth={2} className={styles.plus} />
+          {demo.typed ? (
+            <span className={styles.typed}>
+              {demo.typed}
+              <span className={styles.caret} />
+            </span>
+          ) : (
+            <span className={styles.placeholder}>Add a task…</span>
+          )}
+          <kbd className={styles.kbd}>N</kbd>
+        </div>
+        <motion.ul
+          className={styles.list}
+          animate={{ opacity: demo.fading ? 0 : 1 }}
+          transition={{ duration: 0.45, ease: 'easeInOut' }}
+        >
+          <AnimatePresence initial={false}>
+            {tree.rootIds.map((id) => (
+              <Row key={id} tree={tree} id={id} depth={0} demo={demo} reduced={reduced} />
+            ))}
+          </AnimatePresence>
+        </motion.ul>
+      </div>
+    </div>
+  );
+}
+
+type RowProps = {
+  tree: TaskTree;
+  id: string;
+  depth: number;
+  demo: ReturnType<typeof useDemo>;
+  reduced: boolean;
+};
+
+function Row({ tree, id, depth, demo, reduced }: RowProps) {
+  const task = tree.tasks[id];
+  if (!task) return null;
+  const isParent = task.childIds.length > 0;
+  const { done, total } = progress(tree, id);
+  const delay = demo.toggled ? toggleDelay(tree, demo.toggled, id) : 0;
+
+  return (
+    <motion.li
+      layout={reduced ? false : 'position'}
+      className={styles.item}
+      initial={reduced ? false : { opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, transition: { duration: 0.15 } }}
+      transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
+    >
+      <div className={styles.row} data-depth={depth}>
+        <Checkbox
+          checked={task.done}
+          color={task.color}
+          label={`Mark "${task.title}" done`}
+          delay={delay}
+          onToggle={() => demo.toggle(id)}
+        />
+        <span className={styles.title}>
+          <StrikeText done={task.done} delay={delay}>
+            {task.title}
+          </StrikeText>
+        </span>
+        {isParent ? (
+          <span className={styles.meta}>
+            <span className={styles.count} aria-label={`${done} of ${total} done`}>
+              {done}/{total}
+            </span>
+            <span className={styles.badge}>Σ {effectiveDifficulty(tree, id)}</span>
+          </span>
+        ) : depth > 0 ? (
+          <>
+            <span className={styles.picker}>
+              <DifficultyPicker
+                value={task.difficulty}
+                color={task.color}
+                onChange={(d) => demo.setDifficulty(id, d)}
+              />
+            </span>
+            <span className={`${styles.badge} ${styles.compact}`}>{task.difficulty}</span>
+          </>
+        ) : null}
+      </div>
+      {isParent && (
+        <ul className={styles.children}>
+          <AnimatePresence initial={false}>
+            {task.childIds.map((childId) => (
+              <Row
+                key={childId}
+                tree={tree}
+                id={childId}
+                depth={depth + 1}
+                demo={demo}
+                reduced={reduced}
+              />
+            ))}
+          </AnimatePresence>
+        </ul>
+      )}
+    </motion.li>
+  );
+}

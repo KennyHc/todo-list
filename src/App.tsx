@@ -3,6 +3,7 @@ import { AnimatedNumber } from './components/AnimatedNumber';
 import { DeadlineList } from './components/DeadlineList';
 import { CommandPalette } from './components/CommandPalette';
 import { EmptyState } from './components/EmptyState';
+import { MigrationToast } from './components/MigrationToast';
 import { HistoryList } from './components/HistoryList';
 import { ProgressRing } from './components/ProgressRing';
 import { SettingsPopover } from './components/SettingsPopover';
@@ -13,6 +14,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { UndoToast } from './components/UndoToast';
 import { ViewToolbar } from './components/ViewToolbar';
 import { useHotkeys } from './hooks/useHotkeys';
+import { useAuthStore } from './store/auth';
 import { useUIStore } from './store/ui';
 import { useTaskStore, useTotals } from './store/tasks';
 import styles from './App.module.css';
@@ -27,6 +29,7 @@ function App() {
   const isEmpty = useTaskStore((s) => s.rootIds.length === 0);
   const hasHistory = useTaskStore((s) => s.history.length > 0);
   const view = useUIStore((s) => s.view);
+  const freshSignIn = useAuthStore((s) => s.freshSignIn);
   const { openDifficulty, done, total } = useTotals();
   useHotkeys();
 
@@ -54,9 +57,9 @@ function App() {
             <ThemeToggle />
           </div>
         </header>
-        <TaskInput />
+        <TaskInput autoFocus={freshSignIn} />
         {isEmpty && !hasHistory ? (
-          <EmptyState />
+          <EmptyState welcome={freshSignIn} />
         ) : (
           <>
             <ViewToolbar />
@@ -71,7 +74,7 @@ function App() {
                 {view === 'history' ? (
                   <HistoryList />
                 ) : isEmpty ? (
-                  <EmptyState />
+                  <EmptyState welcome={freshSignIn} />
                 ) : view === 'deadline' ? (
                   <DeadlineList />
                 ) : (
@@ -83,6 +86,7 @@ function App() {
         )}
       </main>
       <UndoToast />
+      <MigrationToast />
       <CommandPalette />
       <ShortcutsSheet />
     </MotionConfig>

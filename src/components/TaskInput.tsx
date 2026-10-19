@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useId,
   useLayoutEffect,
   useMemo,
@@ -10,6 +11,7 @@ import {
 } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Calendar, Plus, Tag, X } from 'lucide-react';
+import { useIsTouch } from '../hooks/useIsTouch';
 import { dueLabel } from '../lib/dates';
 import { normalizeTags, parseQuickAdd, tagColor } from '../lib/tags';
 import { useAllTags, useTaskStore } from '../store/tasks';
@@ -26,7 +28,7 @@ const OPEN_TOKEN = /(^|\s)#([\p{L}\p{N}_-]+)$/u;
 const MAX_SUGGESTIONS = 5;
 const SLIDE = { type: 'spring', stiffness: 420, damping: 38 } as const;
 
-export function TaskInput() {
+export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const add = useTaskStore((s) => s.add);
   const existing = useAllTags();
   const [value, setValue] = useState('');
@@ -45,6 +47,12 @@ export function TaskInput() {
   const pendingCaret = useRef<number | null>(null);
   const listId = useId();
   const closePanel = useCallback(() => setPanel(null), []);
+
+  const isTouch = useIsTouch();
+  // First run after sign-in: ready to type. Skipped on touch so the keyboard doesn't pop up.
+  useEffect(() => {
+    if (autoFocus && !isTouch) inputRef.current?.focus();
+  }, [autoFocus, isTouch]);
 
   const parsed = useMemo(() => parseQuickAdd(value), [value]);
   const allTags = useMemo(() => normalizeTags([...tags, ...parsed.tags]), [tags, parsed.tags]);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Difficulty, TaskTree } from '../types';
+import { MAX_TAGS, MAX_TITLE_LENGTH, type Difficulty, type TaskTree } from '../types';
 import { DEFAULT_COLOR } from './colors';
 import {
   addTask,
@@ -770,5 +770,17 @@ describe('moveTask', () => {
     // The input is never mutated.
     expect(before.tasks[x].childIds).toEqual([x1]);
     expect(before.tasks[y].childIds).toEqual([y1]);
+  });
+});
+
+describe('limits mirrored from firestore.rules', () => {
+  it('clamps titles and tag counts so cloud writes are never rejected', () => {
+    const long = 'x'.repeat(600);
+    const tags = Array.from({ length: 25 }, (_, i) => `t${i}`);
+    const { tree, id } = addTask(emptyTree(), { title: long, tags });
+    expect(tree.tasks[id].title).toHaveLength(MAX_TITLE_LENGTH);
+    expect(tree.tasks[id].tags).toHaveLength(MAX_TAGS);
+    const updated = updateTask(tree, id, { title: 'y'.repeat(700) });
+    expect(updated.tasks[id].title).toHaveLength(MAX_TITLE_LENGTH);
   });
 });

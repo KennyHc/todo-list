@@ -1,3 +1,4 @@
+import { MAX_TAGS } from '../types';
 import { TASK_COLORS } from './colors';
 
 export const MAX_TAG_LENGTH = 24;
@@ -6,12 +7,13 @@ export const MAX_TAG_LENGTH = 24;
 export const normalizeTag = (s: string): string =>
   s.trim().replace(/^#+/, '').trim().toLowerCase().slice(0, MAX_TAG_LENGTH);
 
-/** Normalizes each tag, drops empties and duplicates (first occurrence wins). */
+/** Normalizes each tag, drops empties and duplicates (first occurrence wins), keeps at most MAX_TAGS. */
 export function normalizeTags(list: readonly string[]): string[] {
   const seen = new Set<string>();
   for (const raw of list) {
     const tag = normalizeTag(raw);
     if (tag) seen.add(tag);
+    if (seen.size === MAX_TAGS) break;
   }
   return [...seen];
 }

@@ -7,5 +7,7 @@ export default defineConfig({
     environment: 'happy-dom',
     globals: true,
     setupFiles: 'src/test/setup.ts',
+    // Emulator tests need running emulators: `npm run test:emulators`.
+    include: ['src/**/*.test.{ts,tsx}'],
   },
 });

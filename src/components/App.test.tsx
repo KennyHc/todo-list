@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import App from '../App';
 import { addDays } from '../lib/dates';
 import { todayISO } from '../lib/views';
+import { useAuthStore } from '../store/auth';
 import { resetTaskStore, useTaskStore } from '../store/tasks';
 import { useUIStore } from '../store/ui';
 
@@ -36,6 +37,17 @@ function addViaInput(title: string) {
   fireEvent.change(input, { target: { value: title } });
   fireEvent.keyDown(input, { key: 'Enter' });
 }
+
+describe('first run after sign-in', () => {
+  it('focuses the composer and welcomes the user when there are no tasks', () => {
+    useAuthStore.setState({ freshSignIn: true });
+    render(<App />);
+    expect(screen.getByLabelText('New task')).toHaveFocus();
+    expect(screen.getByText("What's on your mind?")).toBeInTheDocument();
+    expect(screen.getByText('Type a task above and press Enter.')).toBeInTheDocument();
+    useAuthStore.setState({ freshSignIn: false });
+  });
+});
 
 describe('App', () => {
   it('shows the empty state, then a task added via the input', () => {
