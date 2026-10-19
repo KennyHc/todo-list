@@ -1,0 +1,43 @@
+.hit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin: -10px -8px -10px -10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+
+.hit:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: -4px;
+}
+
+.box {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  border: 2px solid;
+  border-radius: 6px;
+  align-items: center;
+  justify-content: center;
+}
+
+.svg {
+  width: 16px;
+  height: 16px;
+}
+
+.check {
+  fill: none;
+  stroke: var(--text);
+  stroke-opacity: 0.8;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

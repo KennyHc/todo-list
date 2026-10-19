@@ -1,0 +1,37 @@
+.group {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
+.dot {
+  position: relative;
+  width: 18px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.dot::before {
+  content: '';
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 10px;
+  height: 10px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: transparent;
+}
+
+.filled::before {
+  background: var(--task-color);
+  border-color: color-mix(in srgb, var(--task-color) 70%, var(--text));
+}
+
+.dot:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  border-radius: 6px;
+}
