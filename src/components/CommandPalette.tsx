@@ -13,6 +13,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   CalendarClock,
   CheckCheck,
+  Copy,
   Download,
   FilterX,
   History,
@@ -26,10 +27,12 @@ import {
   Sun,
   Tag,
   Undo2,
+  Upload,
   WandSparkles,
   type LucideIcon,
 } from 'lucide-react';
-import { exportBackup } from '../lib/backup';
+import { serializeBackup } from '../lib/backup';
+import { copyText } from '../lib/clipboard';
 import { fuzzyMatch } from '../lib/fuzzy';
 import { taskPath } from '../lib/views';
 import { revealTask } from '../store/reveal';
@@ -180,7 +183,31 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
         run: () => ui().setAiDialog('import'),
       },
     );
-    list.push({ id: 'export', label: 'Export backup', Icon: Download, run: () => exportBackup() });
+    list.push(
+      {
+        id: 'export',
+        label: 'Export backup',
+        Icon: Download,
+        run: () => ui().setAiDialog('export'),
+      },
+      {
+        id: 'backup-copy',
+        label: 'Copy backup to clipboard',
+        Icon: Copy,
+        run: () => {
+          const { tasks, rootIds, history } = useTaskStore.getState();
+          void copyText(serializeBackup({ tasks, rootIds, history })).then((ok) =>
+            ui().showNotice(ok ? 'Backup copied' : 'Couldn\u2019t copy the backup'),
+          );
+        },
+      },
+      {
+        id: 'import-paste',
+        label: 'Import (paste)',
+        Icon: Upload,
+        run: () => ui().setAiDialog('paste'),
+      },
+    );
     if (undo) {
       list.push({
         id: 'undo',

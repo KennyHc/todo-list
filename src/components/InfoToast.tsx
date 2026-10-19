@@ -1,0 +1,46 @@
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { X } from 'lucide-react';
+import styles from './UndoToast.module.css';
+
+/** A one-shot info toast (no undo) that dismisses itself via the CSS timer bar. */
+export function InfoToast({
+  id,
+  message,
+  onDismiss,
+}: {
+  /** Changes for every new message so a repeat restarts the timer. */
+  id: string | number;
+  message: string | null;
+  onDismiss: () => void;
+}) {
+  const reduced = useReducedMotion();
+
+  return (
+    <div className={styles.region}>
+      <AnimatePresence>
+        {message !== null && (
+          <motion.div
+            key={id}
+            className={styles.card}
+            role="status"
+            aria-live="polite"
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
+            animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.15 } }}
+            transition={
+              reduced ? { duration: 0.15 } : { type: 'spring', stiffness: 520, damping: 34 }
+            }
+          >
+            <span className={styles.label} style={{ whiteSpace: 'normal' }}>
+              {message}
+            </span>
+            <button type="button" className={styles.close} aria-label="Dismiss" onClick={onDismiss}>
+              <X size={14} strokeWidth={1.75} aria-hidden="true" />
+            </button>
+            <span className={styles.bar} aria-hidden="true" onAnimationEnd={onDismiss} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

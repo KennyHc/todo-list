@@ -133,7 +133,7 @@ describe('Import from AI', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /Next: paste reply/ }));
     paste('Sorry, I cannot help with that.');
     expect(await within(dialog).findByText(/Couldn.t find any JSON/)).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Add 0 tasks' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Import' })).toBeDisabled();
   });
 
   it('asks for confirmation before replacing the list', async () => {

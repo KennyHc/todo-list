@@ -3,7 +3,8 @@ import { persist } from 'zustand/middleware';
 import { taskStorage } from './storage';
 
 export type View = 'tree' | 'deadline' | 'history';
-export type AiDialog = 'copy' | 'import' | null;
+/** copy/import: the AI dialogs. export/paste: backup export and the unified paste import. */
+export type AiDialog = 'copy' | 'import' | 'export' | 'paste' | null;
 
 type UIState = {
   view: View;
@@ -17,6 +18,8 @@ type UIState = {
   sheetOpen: boolean;
   /** Which AI copy/paste dialog is open. Not persisted. */
   aiDialog: AiDialog;
+  /** A one-shot info toast; `n` changes on every notice. Not persisted. */
+  notice: { text: string; n: number } | null;
   /** A row asked (by hotkey or palette) to run its own delete flow. Not persisted. */
   deleteRequestId: string | null;
   /** Latest "reveal" pulse; `n` changes on every pulse so the same row can flash again. */
@@ -28,6 +31,8 @@ type UIState = {
   setPaletteOpen: (open: boolean) => void;
   setSheetOpen: (open: boolean) => void;
   setAiDialog: (dialog: AiDialog) => void;
+  showNotice: (text: string) => void;
+  clearNotice: () => void;
   requestDelete: (id: string) => void;
   clearDeleteRequest: () => void;
   flashRow: (id: string) => void;
@@ -43,6 +48,7 @@ export const useUIStore = create<UIState>()(
       paletteOpen: false,
       sheetOpen: false,
       aiDialog: null,
+      notice: null,
       deleteRequestId: null,
       revealFlash: null,
       setView: (view) => set({ view }),
@@ -52,6 +58,8 @@ export const useUIStore = create<UIState>()(
       setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
       setSheetOpen: (sheetOpen) => set({ sheetOpen }),
       setAiDialog: (aiDialog) => set({ aiDialog }),
+      showNotice: (text) => set((s) => ({ notice: { text, n: (s.notice?.n ?? 0) + 1 } })),
+      clearNotice: () => set({ notice: null }),
       requestDelete: (deleteRequestId) => set({ deleteRequestId }),
       clearDeleteRequest: () => set({ deleteRequestId: null }),
       flashRow: (id) => set((s) => ({ revealFlash: { id, n: (s.revealFlash?.n ?? 0) + 1 } })),

@@ -31,7 +31,7 @@ export function backupFilename(now = new Date()): string {
 }
 
 /** Format ISO timestamp as a locale-specific date string (e.g. "Oct 19, 2026"). */
-function formatExportDate(exportedAt: string): string {
+export function formatExportDate(exportedAt: string): string {
   const date = new Date(exportedAt);
   const formatter = new Intl.DateTimeFormat(undefined, {
     month: 'short',

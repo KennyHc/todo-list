@@ -2,10 +2,13 @@ import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { AnimatedNumber } from './components/AnimatedNumber';
 import { DeadlineList } from './components/DeadlineList';
 import { CopyForAiDialog } from './components/CopyForAiDialog';
+import { ExportBackupDialog } from './components/ExportBackupDialog';
+import { ImportDialog } from './components/ImportDialog';
 import { ImportFromAiDialog } from './components/ImportFromAiDialog';
 import { CommandPalette } from './components/CommandPalette';
 import { EmptyState } from './components/EmptyState';
 import { MigrationToast } from './components/MigrationToast';
+import { NoticeToast } from './components/NoticeToast';
 import { HistoryList } from './components/HistoryList';
 import { ProgressRing } from './components/ProgressRing';
 import { SettingsPopover } from './components/SettingsPopover';
@@ -16,6 +19,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { UndoToast } from './components/UndoToast';
 import { ViewToolbar } from './components/ViewToolbar';
 import { useHotkeys } from './hooks/useHotkeys';
+import { usePasteImport } from './hooks/usePasteImport';
 import { useAuthStore } from './store/auth';
 import { useUIStore } from './store/ui';
 import { useTaskStore, useTotals } from './store/tasks';
@@ -34,6 +38,7 @@ function App() {
   const freshSignIn = useAuthStore((s) => s.freshSignIn);
   const { openDifficulty, done, total } = useTotals();
   useHotkeys();
+  usePasteImport();
 
   return (
     <MotionConfig reducedMotion="user">
@@ -89,10 +94,13 @@ function App() {
       </main>
       <UndoToast />
       <MigrationToast />
+      <NoticeToast />
       <CommandPalette />
       <ShortcutsSheet />
       <CopyForAiDialog />
       <ImportFromAiDialog />
+      <ExportBackupDialog />
+      <ImportDialog />
     </MotionConfig>
   );
 }

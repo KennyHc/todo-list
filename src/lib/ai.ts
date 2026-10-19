@@ -246,7 +246,7 @@ function tryParse(json: string): { value: unknown } | null {
 const MAX_CANDIDATES = 20;
 
 /** Every top-level JSON object/array in `text` (code fences and prose around them are skipped). */
-function* jsonCandidates(text: string): Generator<{ value: unknown } | null> {
+export function* jsonCandidates(text: string): Generator<{ value: unknown } | null> {
   let attempts = 0;
   let i = 0;
   while (attempts < MAX_CANDIDATES) {
