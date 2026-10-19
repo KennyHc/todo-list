@@ -14,19 +14,18 @@
   cursor: pointer;
 }
 
-.dot::before {
-  content: '';
+.pip {
   position: absolute;
-  inset: 50% auto auto 50%;
+  top: 9px;
+  left: 4px;
   width: 10px;
   height: 10px;
-  transform: translate(-50%, -50%);
   border-radius: 50%;
   border: 1.5px solid var(--border);
   background: transparent;
 }
 
-.filled::before {
+.filled {
   background: var(--task-color);
   border-color: color-mix(in srgb, var(--task-color) 70%, var(--text));
 }

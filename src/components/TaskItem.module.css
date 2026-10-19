@@ -11,6 +11,16 @@
   min-width: 0;
   padding: 10px 8px 10px 14px;
   border-radius: var(--radius);
+  isolation: isolate;
+}
+
+.flash {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--radius);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .row:hover,
@@ -65,10 +75,6 @@
 .chevron {
   width: 20px;
   transition: none;
-}
-
-.open {
-  transform: rotate(90deg);
 }
 
 .title {

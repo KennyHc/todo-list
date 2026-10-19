@@ -1,14 +1,20 @@
+import { AnimatePresence, LayoutGroup } from 'framer-motion';
+import { useSettledOrder } from '../hooks/useSettledOrder';
 import { useSortedChildIds } from '../store/tasks';
 import { TaskItem } from './TaskItem';
 import styles from './TaskList.module.css';
 
 export function TaskList() {
-  const ids = useSortedChildIds(null);
+  const ids = useSettledOrder(useSortedChildIds(null));
   return (
-    <ul className={styles.list}>
-      {ids.map((id) => (
-        <TaskItem key={id} id={id} depth={0} />
-      ))}
-    </ul>
+    <LayoutGroup>
+      <ul className={styles.list}>
+        <AnimatePresence initial={false}>
+          {ids.map((id) => (
+            <TaskItem key={id} id={id} depth={0} />
+          ))}
+        </AnimatePresence>
+      </ul>
+    </LayoutGroup>
   );
 }

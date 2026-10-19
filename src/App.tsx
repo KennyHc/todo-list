@@ -1,3 +1,5 @@
+import { MotionConfig } from 'framer-motion';
+import { AnimatedNumber } from './components/AnimatedNumber';
 import { TaskInput } from './components/TaskInput';
 import { TaskList } from './components/TaskList';
 import { useTaskStore, useTotals } from './store/tasks';
@@ -8,22 +10,26 @@ function App() {
   const { openDifficulty, done, total } = useTotals();
 
   return (
-    <main className="app">
-      <header className={styles.header}>
-        <h1 className={styles.title}>Tasks</h1>
-        {total > 0 && (
-          <p className={styles.stat}>
-            Open difficulty {openDifficulty} · {done}/{total} done
-          </p>
+    <MotionConfig reducedMotion="user">
+      <main className="app">
+        <header className={styles.header}>
+          <h1 className={styles.title}>Tasks</h1>
+          {total > 0 && (
+            <p className={styles.stat}>
+              Open difficulty <AnimatedNumber value={openDifficulty} /> ·{' '}
+              <AnimatedNumber value={done} />/
+              <AnimatedNumber value={total} /> done
+            </p>
+          )}
+        </header>
+        <TaskInput />
+        {isEmpty ? (
+          <p className={styles.empty}>Nothing here yet. Add your first task above.</p>
+        ) : (
+          <TaskList />
         )}
-      </header>
-      <TaskInput />
-      {isEmpty ? (
-        <p className={styles.empty}>Nothing here yet. Add your first task above.</p>
-      ) : (
-        <TaskList />
-      )}
-    </main>
+      </main>
+    </MotionConfig>
   );
 }
 

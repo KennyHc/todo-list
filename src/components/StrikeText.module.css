@@ -1,6 +1,7 @@
 .wrap {
   position: relative;
-  display: block;
+  display: inline-block;
+  vertical-align: top;
   min-width: 0;
   max-width: 100%;
 }
@@ -12,10 +13,6 @@
   white-space: nowrap;
 }
 
-.done .text {
-  color: var(--muted);
-}
-
 .line {
   position: absolute;
   left: 0;
@@ -24,11 +21,7 @@
   height: 2px;
   background: var(--muted);
   border-radius: 1px;
-  transform-origin: left center;
   transform: scaleX(0);
+  will-change: transform;
   pointer-events: none;
-}
-
-.lineOn {
-  transform: scaleX(1);
 }

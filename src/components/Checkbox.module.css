@@ -1,4 +1,5 @@
 .hit {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -19,6 +20,7 @@
 }
 
 .box {
+  position: relative;
   display: inline-flex;
   width: 22px;
   height: 22px;
@@ -40,4 +42,16 @@
   stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 6px;
+  opacity: 0;
+  pointer-events: none;
 }

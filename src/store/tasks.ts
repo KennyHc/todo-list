@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useReducedMotion } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
+import { toggleDelay } from '../lib/cascade';
 import {
   addTask,
   deleteTask,
@@ -22,6 +24,8 @@ import { taskStorage } from './storage';
 type TaskState = TaskTree & {
   /** Task whose title input should be in edit mode. Not persisted. */
   editingId: string | null;
+  /** Most recent toggle, used to time the cascade animation. Not persisted. */
+  lastToggle: { id: string; at: number } | null;
 };
 
 type TaskActions = {
@@ -43,17 +47,18 @@ export const useTaskStore = create<TaskStore>()(
     (set, get) => ({
       ...emptyTree(),
       editingId: null,
+      lastToggle: null,
 
       add: (input) => {
         const { tree, id } = addTask(treeOf(get()), input);
-        set({ tasks: tree.tasks, rootIds: tree.rootIds });
+        set({ tasks: tree.tasks, rootIds: tree.rootIds, lastToggle: null });
         return id;
       },
       update: (id, patch) => set(updateTask(treeOf(get()), id, patch)),
-      remove: (id) => set(deleteTask(treeOf(get()), id)),
-      toggle: (id) => set(toggleDone(treeOf(get()), id)),
-      indent: (id) => set(indentTask(treeOf(get()), id)),
-      outdent: (id) => set(outdentTask(treeOf(get()), id)),
+      remove: (id) => set({ ...deleteTask(treeOf(get()), id), lastToggle: null }),
+      toggle: (id) => set({ ...toggleDone(treeOf(get()), id), lastToggle: { id, at: Date.now() } }),
+      indent: (id) => set({ ...indentTask(treeOf(get()), id), lastToggle: null }),
+      outdent: (id) => set({ ...outdentTask(treeOf(get()), id), lastToggle: null }),
       setEditingId: (editingId) => set({ editingId }),
     }),
     {
@@ -65,7 +70,8 @@ export const useTaskStore = create<TaskStore>()(
   ),
 );
 
-export const resetTaskStore = () => useTaskStore.setState({ ...emptyTree(), editingId: null });
+export const resetTaskStore = () =>
+  useTaskStore.setState({ ...emptyTree(), editingId: null, lastToggle: null });
 
 // --- Selector hooks --------------------------------------------------------
 
@@ -108,3 +114,15 @@ export const useTotals = (): { openDifficulty: number; done: number; total: numb
       return { openDifficulty, done, total };
     }),
   );
+
+/**
+ * Seconds this row should wait before animating a done-state change, relative to the latest
+ * toggle. Returns a primitive so unaffected rows never re-render.
+ */
+export const useToggleDelay = (id: string): number => {
+  const reduced = useReducedMotion();
+  const delay = useTaskStore((s) =>
+    s.lastToggle === null ? 0 : toggleDelay(treeOf(s), s.lastToggle.id, id),
+  );
+  return reduced ? 0 : delay;
+};
