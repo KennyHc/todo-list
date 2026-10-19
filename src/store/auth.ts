@@ -55,11 +55,14 @@ const toAuthUser = (user: User): AuthUser => ({
   photoURL: user.photoURL,
 });
 
-const prefersRedirect = () =>
-  typeof window !== 'undefined' &&
-  (window.matchMedia?.('(hover: none) and (pointer: coarse)').matches ||
-    window.matchMedia?.('(max-width: 600px)').matches ||
-    false);
+/**
+ * Google refuses OAuth inside embedded in-app browsers (Instagram, Facebook, LinkedIn, …), so the
+ * landing page asks those visitors to open the site in their real browser instead.
+ */
+export const isInAppBrowser = (ua = typeof navigator === 'undefined' ? '' : navigator.userAgent) =>
+  /FBAN|FBAV|FB_IAB|Instagram|LinkedInApp|Line\/|Twitter|MicroMessenger|Snapchat|TikTok|musical_ly/i.test(
+    ua,
+  );
 
 const SILENT_CODES = new Set([
   'auth/popup-closed-by-user',
@@ -84,11 +87,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   signInWithGoogle: async () => {
     set({ error: null });
     try {
-      if (prefersRedirect()) {
-        write(() => sessionStorage, REDIRECT_KEY, '1');
-        await signInWithRedirect(auth, googleProvider);
-        return;
-      }
+      // Popup first everywhere, phones included. The redirect flow hands off between the auth
+      // domain (firebaseapp.com) and the site (web.app), which Safari and Chrome's storage
+      // partitioning break: the user comes back signed out. On mobile the popup opens a tab.
+      // It must open synchronously inside the click, so nothing is awaited before this call.
       try {
         await signInWithPopup(auth, googleProvider);
         set({ freshSignIn: true });

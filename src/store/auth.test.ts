@@ -28,7 +28,7 @@ vi.mock('../sync/firestoreSync', () => ({
   }),
 }));
 
-import { hasAuthHint, initAuth, useAuthStore } from './auth';
+import { hasAuthHint, initAuth, isInAppBrowser, useAuthStore } from './auth';
 import { resetTaskStore, useTaskStore } from './tasks';
 
 const reset = () =>
@@ -112,12 +112,12 @@ describe('signInWithGoogle', () => {
     expect(hasAuthHint()).toBe(true); // so the splash, not the landing page, shows on return
   });
 
-  it('redirects straight away on touch devices', async () => {
+  it('uses the popup on touch devices too (redirect breaks under storage partitioning)', async () => {
     window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as never;
-    fb.signInWithRedirect.mockResolvedValue(undefined);
+    fb.signInWithPopup.mockResolvedValue({ user: fakeUser });
     await useAuthStore.getState().signInWithGoogle();
-    expect(fb.signInWithPopup).not.toHaveBeenCalled();
-    expect(fb.signInWithRedirect).toHaveBeenCalled();
+    expect(fb.signInWithPopup).toHaveBeenCalled();
+    expect(fb.signInWithRedirect).not.toHaveBeenCalled();
   });
 
   it('handles the redirect result on startup', async () => {
@@ -152,5 +152,22 @@ describe('signOut', () => {
     await useAuthStore.getState().signOut();
     expect(localStorage.getItem('theme')).toBe('dark');
     expect(localStorage.getItem('ui-v1')).toBe('{}');
+  });
+});
+
+describe('isInAppBrowser', () => {
+  it('flags embedded app browsers that Google blocks', () => {
+    expect(isInAppBrowser('Mozilla/5.0 (iPhone) AppleWebKit Instagram 300.0')).toBe(true);
+    expect(isInAppBrowser('Mozilla/5.0 (iPhone) [FBAN/FBIOS;FBAV/400.0]')).toBe(true);
+  });
+  it('allows regular mobile browsers', () => {
+    expect(
+      isInAppBrowser(
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0) AppleWebKit/605.1.15 Version/18.0 Mobile Safari/604.1',
+      ),
+    ).toBe(false);
+    expect(
+      isInAppBrowser('Mozilla/5.0 (Linux; Android 15) Chrome/130.0 Mobile Safari/537.36'),
+    ).toBe(false);
   });
 });
