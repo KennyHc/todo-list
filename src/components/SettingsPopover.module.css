@@ -261,3 +261,17 @@
     font-size: 13px;
   }
 }
+
+.hint {
+  margin: 2px 6px 6px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.hintIcon {
+  display: inline-block;
+  vertical-align: -2px;
+  color: var(--accent-ink);
+}

@@ -6,6 +6,13 @@ export type View = 'tree' | 'deadline' | 'history';
 /** copy/import: the AI dialogs. export/paste: backup export and the unified paste import. */
 export type AiDialog = 'copy' | 'import' | 'export' | 'paste' | null;
 
+/** An optional button on a notice, and whether the notice stays until dismissed. */
+export type NoticeOptions = {
+  action?: { label: string; run: () => void };
+  persistent?: boolean;
+};
+export type Notice = NoticeOptions & { text: string; n: number };
+
 type UIState = {
   view: View;
   /** Normalized tag the lists are filtered by, or null for everything. */
@@ -23,7 +30,7 @@ type UIState = {
   /** Whether the "Tag colours" dialog is open. Not persisted. */
   tagColorsOpen: boolean;
   /** A one-shot info toast; `n` changes on every notice. Not persisted. */
-  notice: { text: string; n: number } | null;
+  notice: Notice | null;
   /** A row asked (by hotkey or palette) to run its own delete flow. Not persisted. */
   deleteRequestId: string | null;
   /** Latest "reveal" pulse; `n` changes on every pulse so the same row can flash again. */
@@ -37,7 +44,7 @@ type UIState = {
   setAiDialog: (dialog: AiDialog) => void;
   setDeleteAccountOpen: (open: boolean) => void;
   setTagColorsOpen: (open: boolean) => void;
-  showNotice: (text: string) => void;
+  showNotice: (text: string, options?: NoticeOptions) => void;
   clearNotice: () => void;
   requestDelete: (id: string) => void;
   clearDeleteRequest: () => void;
@@ -68,7 +75,8 @@ export const useUIStore = create<UIState>()(
       setAiDialog: (aiDialog) => set({ aiDialog }),
       setDeleteAccountOpen: (deleteAccountOpen) => set({ deleteAccountOpen }),
       setTagColorsOpen: (tagColorsOpen) => set({ tagColorsOpen }),
-      showNotice: (text) => set((s) => ({ notice: { text, n: (s.notice?.n ?? 0) + 1 } })),
+      showNotice: (text, options) =>
+        set((s) => ({ notice: { ...options, text, n: (s.notice?.n ?? 0) + 1 } })),
       clearNotice: () => set({ notice: null }),
       requestDelete: (deleteRequestId) => set({ deleteRequestId }),
       clearDeleteRequest: () => set({ deleteRequestId: null }),

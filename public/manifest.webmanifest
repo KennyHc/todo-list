@@ -1,18 +1,25 @@
 {
   "name": "Tasks",
   "short_name": "Tasks",
-  "description": "A beautiful task manager with subtasks",
+  "description": "The calmest way to capture todos. Break big ones into small steps and check them off.",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#F7F8FA",
   "theme_color": "#F7F8FA",
   "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
     {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
+      "name": "New task",
+      "short_name": "New task",
+      "url": "/?new=1",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }

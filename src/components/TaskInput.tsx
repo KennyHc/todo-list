@@ -21,6 +21,7 @@ import { useAllTags, useTaskStore } from '../store/tasks';
 import type { Repeat } from '../types';
 import { DatePicker } from './DatePicker';
 import { DifficultyGlyph } from './DifficultyGlyph';
+import { consumeNewTaskParam } from '../pwa/newTaskShortcut';
 import { Popover } from './Popover';
 import { QuickChip } from './QuickChip';
 import { TagChip } from './TagChip';
@@ -78,6 +79,11 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   useEffect(() => {
     if (autoFocus && !isTouch) inputRef.current?.focus();
   }, [autoFocus, isTouch]);
+
+  // Manifest shortcut "New task" (/?new=1): focus the composer once, then clean the URL.
+  useEffect(() => {
+    if (consumeNewTaskParam()) inputRef.current?.focus();
+  }, []);
 
   const parsed = useMemo(
     () => parseQuickAdd(value, { ignore: ignored, repeats: SUPPORTS_REPEAT }),

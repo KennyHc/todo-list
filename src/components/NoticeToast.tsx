@@ -8,6 +8,8 @@ export function NoticeToast() {
     <InfoToast
       id={notice?.n ?? 0}
       message={notice?.text ?? null}
+      action={notice?.action}
+      persistent={notice?.persistent}
       onDismiss={() => useUIStore.getState().clearNotice()}
     />
   );

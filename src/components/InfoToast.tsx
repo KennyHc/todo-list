@@ -6,11 +6,17 @@ import styles from './UndoToast.module.css';
 export function InfoToast({
   id,
   message,
+  action,
+  persistent = false,
   onDismiss,
 }: {
   /** Changes for every new message so a repeat restarts the timer. */
   id: string | number;
   message: string | null;
+  /** An optional button, styled like Undo. Running it also dismisses the toast. */
+  action?: { label: string; run: () => void };
+  /** Stays until dismissed: no countdown bar, no auto-dismiss. */
+  persistent?: boolean;
   onDismiss: () => void;
 }) {
   const reduced = useReducedMotion();
@@ -34,10 +40,24 @@ export function InfoToast({
             <span className={styles.label} style={{ whiteSpace: 'normal' }}>
               {message}
             </span>
+            {action && (
+              <button
+                type="button"
+                className={styles.undo}
+                onClick={() => {
+                  action.run();
+                  onDismiss();
+                }}
+              >
+                {action.label}
+              </button>
+            )}
             <button type="button" className={styles.close} aria-label="Dismiss" onClick={onDismiss}>
               <X size={14} strokeWidth={1.75} aria-hidden="true" />
             </button>
-            <span className={styles.bar} aria-hidden="true" onAnimationEnd={onDismiss} />
+            {!persistent && (
+              <span className={styles.bar} aria-hidden="true" onAnimationEnd={onDismiss} />
+            )}
           </motion.div>
         )}
       </AnimatePresence>

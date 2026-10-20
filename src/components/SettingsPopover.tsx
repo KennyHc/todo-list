@@ -1,5 +1,21 @@
-import { useRef, useState } from 'react';
-import { Download, LogOut, Palette, Sparkles, Upload, WandSparkles } from 'lucide-react';
+import { useRef, useState, useSyncExternalStore } from 'react';
+import {
+  Download,
+  LogOut,
+  MonitorSmartphone,
+  Palette,
+  Share,
+  Sparkles,
+  Upload,
+  WandSparkles,
+} from 'lucide-react';
+import {
+  canPromptInstall,
+  isIosSafari,
+  isStandalone,
+  promptInstall,
+  subscribeInstall,
+} from '../pwa/install';
 import { useAuthStore } from '../store/auth';
 import { useUIStore } from '../store/ui';
 import { useSyncStore, type SyncStatus } from '../sync/status';
@@ -29,6 +45,10 @@ export function SettingsPopover() {
   const signOut = useAuthStore((s) => s.signOut);
   const syncStatus = useSyncStore((s) => s.syncStatus);
   const [photoFailed, setPhotoFailed] = useState(false);
+  const installable = useSyncExternalStore(subscribeInstall, canPromptInstall, () => false);
+  const [standalone] = useState(isStandalone);
+  const [iosSafari] = useState(() => isIosSafari());
+  const [iosHintOpen, setIosHintOpen] = useState(false);
 
   const openDialog = (dialog: 'copy' | 'import' | 'export' | 'paste') => {
     setPopoverOpen(false);
@@ -113,6 +133,42 @@ export function SettingsPopover() {
             <Palette size={16} />
             <span>Tag colours</span>
           </button>
+
+          {!standalone && installable && (
+            <button
+              type="button"
+              role="menuitem"
+              className={styles.item}
+              onClick={() => {
+                setPopoverOpen(false);
+                void promptInstall();
+              }}
+            >
+              <MonitorSmartphone size={16} />
+              <span>Install app</span>
+            </button>
+          )}
+
+          {!standalone && !installable && iosSafari && (
+            <>
+              <button
+                type="button"
+                role="menuitem"
+                className={styles.item}
+                aria-expanded={iosHintOpen}
+                onClick={() => setIosHintOpen(!iosHintOpen)}
+              >
+                <Download size={16} />
+                <span>Add to Home Screen</span>
+              </button>
+              {iosHintOpen && (
+                <p className={styles.hint}>
+                  Tap <Share size={13} aria-label="Share" className={styles.hintIcon} />, then{' '}
+                  <strong>Add to Home Screen</strong>.
+                </p>
+              )}
+            </>
+          )}
 
           <div className={styles.divider} role="separator" />
           <div className={styles.section}>AI</div>
