@@ -9,14 +9,18 @@ import {
   type FocusEvent,
   type KeyboardEvent,
 } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Calendar, Plus, Tag, X } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { Calendar, Plus, Repeat, Tag, X } from 'lucide-react';
 import { useIsTouch } from '../hooks/useIsTouch';
 import { dueLabel } from '../lib/dates';
-import { normalizeTags, parseQuickAdd, tagColor } from '../lib/tags';
+import { parseQuickAdd, SUPPORTS_REPEAT, tokenKey, type QuickToken } from '../lib/quickAdd';
+import { normalizeTag, normalizeTags, tagColor } from '../lib/tags';
+import { dueStatus, todayISO } from '../lib/views';
 import { useAllTags, useTaskStore } from '../store/tasks';
 import { DatePicker } from './DatePicker';
+import { DifficultyGlyph } from './DifficultyGlyph';
 import { Popover } from './Popover';
+import { QuickChip } from './QuickChip';
 import { TagChip } from './TagChip';
 import { TagEditor } from './TagEditor';
 import styles from './TaskInput.module.css';
@@ -27,6 +31,19 @@ type Panel = 'tag' | 'date' | null;
 const OPEN_TOKEN = /(^|\s)#([\p{L}\p{N}_-]+)$/u;
 const MAX_SUGGESTIONS = 5;
 const SLIDE = { type: 'spring', stiffness: 420, damping: 38 } as const;
+const CHIP_FADE = { duration: 0.14, ease: 'easeOut' } as const;
+const CHIP_HIDDEN = { opacity: 0, scale: 0.96 };
+const CHIP_SHOWN = { opacity: 1, scale: 1 };
+
+/** The empty composer cycles through these so the shorthand is discoverable. */
+const PLACEHOLDERS = [
+  'Add a task…',
+  'Pay rent tomorrow #home',
+  ...(SUPPORTS_REPEAT ? ['Gym every monday'] : []),
+  'Draft report fri !3',
+];
+const PLACEHOLDER_EVERY_MS = 4000;
+const PLACEHOLDER_FADE_MS = 160;
 
 export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const add = useTaskStore((s) => s.add);
@@ -40,6 +57,10 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const [active, setActive] = useState(0);
   /** Text before the caret at the moment Escape closed the suggestions. */
   const [dismissed, setDismissed] = useState<string | null>(null);
+  /** Keys of recognised phrases the user dismissed; they stay in the title as typed. */
+  const [ignored, setIgnored] = useState<ReadonlySet<string>>(() => new Set());
+  const [phrase, setPhrase] = useState(0);
+  const [phraseFading, setPhraseFading] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const tagBtnRef = useRef<HTMLButtonElement>(null);
@@ -54,8 +75,40 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
     if (autoFocus && !isTouch) inputRef.current?.focus();
   }, [autoFocus, isTouch]);
 
-  const parsed = useMemo(() => parseQuickAdd(value), [value]);
+  const parsed = useMemo(
+    () => parseQuickAdd(value, { ignore: ignored, repeats: SUPPORTS_REPEAT }),
+    [value, ignored],
+  );
   const allTags = useMemo(() => normalizeTags([...tags, ...parsed.tags]), [tags, parsed.tags]);
+
+  const reduceMotion = useReducedMotion();
+  const cycling = focused && value === '' && !reduceMotion;
+  useEffect(() => {
+    if (!cycling) {
+      setPhrase(0);
+      setPhraseFading(false);
+      return;
+    }
+    let swap: ReturnType<typeof setTimeout> | undefined;
+    const tick = setInterval(() => {
+      setPhraseFading(true);
+      swap = setTimeout(() => {
+        setPhrase((n) => (n + 1) % PLACEHOLDERS.length);
+        setPhraseFading(false);
+      }, PLACEHOLDER_FADE_MS);
+    }, PLACEHOLDER_EVERY_MS);
+    return () => {
+      clearInterval(tick);
+      clearTimeout(swap);
+    };
+  }, [cycling]);
+
+  const ignore = (...tokens: QuickToken[]) =>
+    setIgnored((prev) => new Set([...prev, ...tokens.map(tokenKey)]));
+  const dateToken = parsed.tokens.find((t) => t.kind === 'date');
+  const difficultyToken = parsed.tokens.find((t) => t.kind === 'difficulty');
+  const repeatToken = parsed.tokens.find((t) => t.kind === 'repeat');
+  const tagTokens = parsed.tokens.filter((t) => t.kind === 'tag');
 
   const before = value.slice(0, caret);
   const token = OPEN_TOKEN.exec(before);
@@ -73,6 +126,12 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const activeIndex = Math.min(active, suggestions.length - 1);
   // Don't preview the half-typed tag while its suggestions are showing.
   const previewTags = listOpen ? allTags.filter((t) => t !== prefix) : allTags;
+
+  const hasChips =
+    previewTags.length > 0 ||
+    (dateToken !== undefined && parsed.dueDate !== null) ||
+    difficultyToken !== undefined ||
+    (SUPPORTS_REPEAT && repeatToken !== undefined);
 
   // Put the caret back after accepting a suggestion rewrites the value.
   useLayoutEffect(() => {
@@ -92,10 +151,17 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   };
 
   const submit = () => {
-    const { title, tags: quickTags } = parsed;
+    const { title, tags: quickTags, dueDate, difficulty } = parsed;
     if (!title) return;
-    add({ title, tags: normalizeTags([...tags, ...quickTags]), dueDate: due });
+    // parsed.repeat is recognised too, but tasks can't store it yet (NewTask has no such field).
+    add({
+      title,
+      tags: normalizeTags([...tags, ...quickTags]),
+      dueDate: due ?? dueDate,
+      ...(difficulty !== null && { difficulty }),
+    });
     setValue('');
+    setIgnored(new Set());
     setCaret(0);
     setTags([]);
     setDue(null);
@@ -141,9 +207,9 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
         <input
           ref={inputRef}
           id="composer"
-          className={styles.input}
+          className={`${styles.input} ${phraseFading ? styles.phFade : ''}`}
           value={value}
-          placeholder="Add a task…"
+          placeholder={PLACEHOLDERS[phrase]}
           aria-label="New task"
           role="combobox"
           aria-expanded={listOpen}
@@ -153,6 +219,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
           autoComplete="off"
           onChange={(e) => {
             setValue(e.target.value);
+            if (e.target.value === '') setIgnored(new Set());
             setCaret(e.target.selectionStart ?? e.target.value.length);
             setActive(0);
           }}
@@ -191,7 +258,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
       )}
 
       <AnimatePresence initial={false}>
-        {previewTags.length > 0 && (
+        {hasChips && (
           <motion.div
             key="chips"
             className={styles.chipRow}
@@ -201,17 +268,82 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
             transition={SLIDE}
             style={{ overflow: 'hidden' }}
           >
-            <ul className={styles.chips} aria-label="Tags for this task">
-              {previewTags.map((tag) => (
-                <li key={tag} className={styles.chipItem}>
-                  <TagChip
-                    tag={tag}
-                    onRemove={
-                      tags.includes(tag) ? () => setTags(tags.filter((t) => t !== tag)) : undefined
-                    }
-                  />
-                </li>
-              ))}
+            <ul className={styles.chips} aria-label="Recognised in this task">
+              <AnimatePresence initial={false}>
+                {dateToken && parsed.dueDate && (
+                  <motion.li
+                    key="date"
+                    className={styles.chipItem}
+                    initial={CHIP_HIDDEN}
+                    animate={CHIP_SHOWN}
+                    exit={CHIP_HIDDEN}
+                    transition={CHIP_FADE}
+                  >
+                    <QuickChip
+                      icon={<Calendar size={12} strokeWidth={1.75} aria-hidden="true" />}
+                      label={dateToken.label}
+                      accent={dueStatus(parsed.dueDate, todayISO()) === 'today'}
+                      muted={due !== null}
+                      title={due !== null ? 'The due date you picked is used instead' : undefined}
+                      removeLabel={`Don't treat "${dateToken.raw}" as a due date`}
+                      onRemove={() => ignore(dateToken)}
+                    />
+                  </motion.li>
+                )}
+                {difficultyToken && parsed.difficulty && (
+                  <motion.li
+                    key="difficulty"
+                    className={styles.chipItem}
+                    initial={CHIP_HIDDEN}
+                    animate={CHIP_SHOWN}
+                    exit={CHIP_HIDDEN}
+                    transition={CHIP_FADE}
+                  >
+                    <QuickChip
+                      icon={<DifficultyGlyph value={parsed.difficulty} />}
+                      label={String(parsed.difficulty)}
+                      title={difficultyToken.label}
+                      removeLabel={`Don't treat "${difficultyToken.raw}" as a difficulty`}
+                      onRemove={() => ignore(difficultyToken)}
+                    />
+                  </motion.li>
+                )}
+                {SUPPORTS_REPEAT && repeatToken && (
+                  <motion.li
+                    key="repeat"
+                    className={styles.chipItem}
+                    initial={CHIP_HIDDEN}
+                    animate={CHIP_SHOWN}
+                    exit={CHIP_HIDDEN}
+                    transition={CHIP_FADE}
+                  >
+                    <QuickChip
+                      icon={<Repeat size={12} strokeWidth={1.75} aria-hidden="true" />}
+                      label={repeatToken.label}
+                      removeLabel={`Don't treat "${repeatToken.raw}" as a repeat`}
+                      onRemove={() => ignore(repeatToken)}
+                    />
+                  </motion.li>
+                )}
+                {previewTags.map((tag) => (
+                  <motion.li
+                    key={`tag:${tag}`}
+                    className={styles.chipItem}
+                    initial={CHIP_HIDDEN}
+                    animate={CHIP_SHOWN}
+                    exit={CHIP_HIDDEN}
+                    transition={CHIP_FADE}
+                  >
+                    <TagChip
+                      tag={tag}
+                      onRemove={() => {
+                        setTags(tags.filter((t) => t !== tag));
+                        ignore(...tagTokens.filter((t) => normalizeTag(t.raw) === tag));
+                      }}
+                    />
+                  </motion.li>
+                ))}
+              </AnimatePresence>
             </ul>
           </motion.div>
         )}

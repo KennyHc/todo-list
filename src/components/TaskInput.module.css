@@ -47,6 +47,11 @@
 
 .input::placeholder {
   color: var(--muted);
+  transition: opacity 160ms ease;
+}
+
+.phFade::placeholder {
+  opacity: 0;
 }
 
 .input:focus-visible {
@@ -243,6 +248,24 @@
 @media (max-width: 480px), (hover: none) {
   .tool {
     height: 30px;
+  }
+}
+
+/* Phone: one scrolling line of chips instead of wrapping. */
+@media (max-width: 480px) {
+  .chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-right: 4px;
+  }
+
+  .chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .chipItem {
+    flex: none;
   }
 }
 
