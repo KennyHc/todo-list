@@ -146,6 +146,18 @@
   font-size: 12.5px;
 }
 
+.notice {
+  max-width: 420px;
+  margin: 12px 0 0;
+  padding: 8px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .error {
   max-width: 420px;
   margin: 12px 0 0;

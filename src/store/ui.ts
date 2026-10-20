@@ -18,6 +18,8 @@ type UIState = {
   sheetOpen: boolean;
   /** Which AI copy/paste dialog is open. Not persisted. */
   aiDialog: AiDialog;
+  /** Whether the "Delete your account?" dialog is open. Not persisted. */
+  deleteAccountOpen: boolean;
   /** Whether the "Tag colours" dialog is open. Not persisted. */
   tagColorsOpen: boolean;
   /** A one-shot info toast; `n` changes on every notice. Not persisted. */
@@ -33,6 +35,7 @@ type UIState = {
   setPaletteOpen: (open: boolean) => void;
   setSheetOpen: (open: boolean) => void;
   setAiDialog: (dialog: AiDialog) => void;
+  setDeleteAccountOpen: (open: boolean) => void;
   setTagColorsOpen: (open: boolean) => void;
   showNotice: (text: string) => void;
   clearNotice: () => void;
@@ -51,6 +54,7 @@ export const useUIStore = create<UIState>()(
       paletteOpen: false,
       sheetOpen: false,
       aiDialog: null,
+      deleteAccountOpen: false,
       tagColorsOpen: false,
       notice: null,
       deleteRequestId: null,
@@ -62,6 +66,7 @@ export const useUIStore = create<UIState>()(
       setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
       setSheetOpen: (sheetOpen) => set({ sheetOpen }),
       setAiDialog: (aiDialog) => set({ aiDialog }),
+      setDeleteAccountOpen: (deleteAccountOpen) => set({ deleteAccountOpen }),
       setTagColorsOpen: (tagColorsOpen) => set({ tagColorsOpen }),
       showNotice: (text) => set((s) => ({ notice: { text, n: (s.notice?.n ?? 0) + 1 } })),
       clearNotice: () => set({ notice: null }),

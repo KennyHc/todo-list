@@ -9,6 +9,8 @@ type Props = {
   onSignIn: () => void;
   signingIn?: boolean;
   error?: string | null;
+  /** A neutral one-off message, e.g. confirmation that the account was deleted. */
+  notice?: string | null;
 };
 
 const EASE = [0.2, 0.8, 0.2, 1] as const;
@@ -91,7 +93,7 @@ function Item({ children, className }: { children: ReactNode; className?: string
   );
 }
 
-export function LandingPage({ onSignIn, signingIn = false, error = null }: Props) {
+export function LandingPage({ onSignIn, signingIn = false, error = null, notice = null }: Props) {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -136,6 +138,11 @@ export function LandingPage({ onSignIn, signingIn = false, error = null }: Props
           <Item className={styles.cta}>
             <GoogleButton onClick={onSignIn} loading={signingIn} />
             <p className={styles.fine}>No credit card. No setup. One click.</p>
+            {notice && (
+              <p className={styles.notice} role="status">
+                {notice}
+              </p>
+            )}
             {error && (
               <p className={styles.error} role="alert">
                 {error}

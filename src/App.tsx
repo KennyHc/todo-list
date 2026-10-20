@@ -2,6 +2,7 @@ import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { AnimatedNumber } from './components/AnimatedNumber';
 import { DeadlineList } from './components/DeadlineList';
 import { CopyForAiDialog } from './components/CopyForAiDialog';
+import { DeleteAccountDialog } from './components/DeleteAccountDialog';
 import { ExportBackupDialog } from './components/ExportBackupDialog';
 import { ImportDialog } from './components/ImportDialog';
 import { ImportFromAiDialog } from './components/ImportFromAiDialog';
@@ -102,6 +103,7 @@ function App() {
       <CopyForAiDialog />
       <ImportFromAiDialog />
       <ExportBackupDialog />
+      <DeleteAccountDialog />
       <ImportDialog />
       <TagColorsDialog />
       <FocusProxy />

@@ -158,6 +158,18 @@
   margin-bottom: 6px;
 }
 
+/* Present but quiet: a small muted text item that only turns red on intent. */
+.danger {
+  height: 28px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.danger:hover,
+.danger:focus-visible {
+  color: var(--danger);
+}
+
 .appearance {
   display: flex;
   align-items: center;
@@ -242,5 +254,10 @@
 
   .last {
     margin-bottom: 0;
+  }
+
+  .danger {
+    height: 44px;
+    font-size: 13px;
   }
 }

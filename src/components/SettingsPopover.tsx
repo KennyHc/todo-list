@@ -164,7 +164,7 @@ export function SettingsPopover() {
           <button
             type="button"
             role="menuitem"
-            className={`${styles.item} ${styles.last}`}
+            className={styles.item}
             onClick={() => {
               setPopoverOpen(false);
               void signOut();
@@ -172,6 +172,19 @@ export function SettingsPopover() {
           >
             <LogOut size={16} />
             <span>Sign out</span>
+          </button>
+
+          <div className={styles.divider} role="separator" />
+          <button
+            type="button"
+            role="menuitem"
+            className={`${styles.item} ${styles.danger} ${styles.last}`}
+            onClick={() => {
+              setPopoverOpen(false);
+              useUIStore.getState().setDeleteAccountOpen(true);
+            }}
+          >
+            <span>Delete account…</span>
           </button>
         </div>
       </Popover>
