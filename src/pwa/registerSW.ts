@@ -56,6 +56,30 @@ function reloadOnStaleChunk(): void {
 }
 
 /**
+ * With skipWaiting/clientsClaim a new deploy's worker takes control by itself. If this page was
+ * already controlled by an older worker, it is now running an outdated build: reload straight
+ * away while untouched, otherwise offer the reload. A first install (no previous controller) is
+ * not an update and is ignored.
+ */
+function applyWhenNewWorkerTakesOver(): void {
+  const sw = typeof navigator === 'undefined' ? undefined : navigator.serviceWorker;
+  if (!sw || !sw.controller) return;
+  let handled = false;
+  sw.addEventListener('controllerchange', () => {
+    if (handled) return;
+    handled = true;
+    if (!interacted) {
+      window.location.reload();
+      return;
+    }
+    useUIStore.getState().showNotice('New version ready', {
+      persistent: true,
+      action: { label: 'Reload', run: () => window.location.reload() },
+    });
+  });
+}
+
+/**
  * Registers the service worker. A new version is applied at once if the page hasn't been used
  * yet (so opening or reloading always lands on the latest build), and otherwise offered through
  * a "New version ready · Reload" notice so it never reloads under someone's fingers.
@@ -63,6 +87,7 @@ function reloadOnStaleChunk(): void {
 export function registerServiceWorker(): void {
   watchFirstInteraction();
   reloadOnStaleChunk();
+  applyWhenNewWorkerTakesOver();
 
   const updateSW = registerSW({
     onNeedRefresh() {

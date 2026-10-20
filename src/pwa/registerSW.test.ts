@@ -88,3 +88,50 @@ describe('stale chunks after a deploy', () => {
     Object.defineProperty(window, 'location', { value: original, configurable: true });
   });
 });
+
+describe('a new worker taking control', () => {
+  const setup = (hasController: boolean) => {
+    const listeners: Record<string, () => void> = {};
+    const sw = {
+      controller: hasController ? {} : null,
+      addEventListener: (type: string, fn: () => void) => (listeners[type] = fn),
+    };
+    Object.defineProperty(navigator, 'serviceWorker', { value: sw, configurable: true });
+    const reload = vi.fn();
+    const original = window.location;
+    Object.defineProperty(window, 'location', {
+      value: { ...original, reload },
+      configurable: true,
+    });
+    resetInteractionForTests();
+    useUIStore.setState({ notice: null });
+    registerServiceWorker();
+    const restore = () =>
+      Object.defineProperty(window, 'location', { value: original, configurable: true });
+    return { fire: () => listeners.controllerchange?.(), reload, restore };
+  };
+
+  it('reloads an untouched page that was running an older build', () => {
+    const { fire, reload, restore } = setup(true);
+    fire();
+    expect(reload).toHaveBeenCalledTimes(1);
+    restore();
+  });
+
+  it('offers a reload instead once the person is using the page', () => {
+    const { fire, reload, restore } = setup(true);
+    window.dispatchEvent(new Event('pointerdown'));
+    fire();
+    expect(reload).not.toHaveBeenCalled();
+    expect(useUIStore.getState().notice?.text).toBe('New version ready');
+    restore();
+  });
+
+  it('ignores the very first install, which is not an update', () => {
+    const { fire, reload, restore } = setup(false);
+    fire();
+    expect(reload).not.toHaveBeenCalled();
+    expect(useUIStore.getState().notice).toBeNull();
+    restore();
+  });
+});

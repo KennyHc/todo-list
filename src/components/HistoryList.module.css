@@ -497,3 +497,18 @@
     display: none;
   }
 }
+
+/*
+ * Trailing cluster alignment. The title's first line is centred in the --band (see .body), so
+ * the time, badge and glyph are offset from the row's top padding by the same amount, measured
+ * from their own height. They then share the title's first-line centre instead of sitting high.
+ * (.check, .restore and .minus already use this formula in their margins.)
+ */
+.time,
+.badge {
+  margin-top: calc(var(--band) / 2 - var(--pad-y) - 8px);
+}
+
+.glyph {
+  margin-top: calc(var(--band) / 2 - var(--pad-y) - var(--lh) / 2);
+}

@@ -40,6 +40,11 @@ export default defineConfig({
         // Served as plain files (and excluded from the SPA fallback above); no need to precache.
         globIgnores: ['privacy.html', 'terms.html', 'og-image.*'],
         cleanupOutdatedCaches: true,
+        // A new deploy takes over at once instead of waiting for every tab to close or for a
+        // "Reload" tap. Pages already open keep running until they reload (see registerSW.ts),
+        // and older clients still on the waiting-SW code are rescued by the next plain reload.
+        skipWaiting: true,
+        clientsClaim: true,
         // Every JS chunk, lazy ones included, is precached so the app also starts offline.
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         // No runtimeCaching: the Firebase SDKs handle their own offline persistence.
