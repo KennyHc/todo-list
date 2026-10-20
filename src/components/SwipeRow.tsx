@@ -1,8 +1,8 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { motion, useTransform } from 'framer-motion';
-import { Check, RotateCcw, Trash2 } from 'lucide-react';
+import { CalendarClock, Check, RotateCcw, Trash2 } from 'lucide-react';
 import { useSwipeRow } from '../hooks/useSwipeRow';
-import { swipeThreshold } from '../lib/swipe';
+import { REVEAL_WIDTH, swipeThreshold } from '../lib/swipe';
 import styles from './SwipeRow.module.css';
 
 type Props = {
@@ -15,6 +15,11 @@ type Props = {
   allowDelete?: boolean;
   /** The right action's label; defaults to Done / Reopen. */
   completeLabel?: string;
+  /**
+   * With it, swiping left is two-stage: a short swipe opens Later and Delete buttons behind the
+   * row (Later calls this with the button, to anchor a menu); a full swipe still deletes.
+   */
+  onLater?: (anchor: HTMLElement) => void;
   onComplete: () => void;
   onDelete: () => void;
   children: ReactNode;
@@ -22,7 +27,10 @@ type Props = {
 
 const POP = { type: 'spring', stiffness: 600, damping: 14 } as const;
 
-/** Wraps a row's content: swipe right to complete or reopen, left to delete. Touch only. */
+/**
+ * Wraps a row's content: swipe right to complete or reopen, left to delete (or, with `onLater`,
+ * left to open Later and Delete buttons first). Touch only.
+ */
 export function SwipeRow({
   enabled,
   color,
@@ -30,14 +38,17 @@ export function SwipeRow({
   deleteKind,
   allowDelete = true,
   completeLabel,
+  onLater,
   onComplete,
   onDelete,
   children,
 }: Props) {
-  const { x, swiping, armed, handlers } = useSwipeRow({
+  const staged = allowDelete && onLater !== undefined;
+  const { x, root, swiping, armed, open, deleteNow, closeRow, handlers } = useSwipeRow({
     enabled,
     deleteKind,
     allowDelete,
+    staged,
     onComplete,
     onDelete,
   });
@@ -53,10 +64,14 @@ export function SwipeRow({
   const rightIconOpacity = useTransform(rightProgress, [0, 1], [0.4, 1]);
   const leftIconOpacity = useTransform(leftProgress, [0, 1], [0.4, 1]);
 
+  // The button tray is as wide as the revealed strip, and Delete takes the extra on a long pull.
+  const trayWidth = useTransform(x, (v) => Math.max(REVEAL_WIDTH, -v));
+
   const Icon = done ? RotateCcw : Check;
 
   return (
     <div
+      ref={root}
       className={styles.swipe}
       data-swiping={swiping || undefined}
       data-enabled={enabled || undefined}
@@ -84,7 +99,48 @@ export function SwipeRow({
               {completeLabel ?? (done ? 'Reopen' : 'Done')}
             </motion.span>
           </motion.div>
-          {allowDelete && (
+          {staged && (
+            <motion.div
+              className={styles.layer}
+              style={{ opacity: leftOpacity }}
+              data-open={open || undefined}
+              data-armed={armed === 'left' || undefined}
+            >
+              <motion.div className={styles.tray} style={{ width: trayWidth }}>
+                <button
+                  type="button"
+                  className={`${styles.trayBtn} ${styles.later}`}
+                  tabIndex={open ? 0 : -1}
+                  aria-hidden={open ? undefined : true}
+                  onClick={(e) => {
+                    const anchor = e.currentTarget;
+                    closeRow();
+                    onLater(anchor);
+                  }}
+                >
+                  <CalendarClock size={18} strokeWidth={2} aria-hidden="true" />
+                  Later
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.trayBtn} ${styles.delete}`}
+                  tabIndex={open ? 0 : -1}
+                  aria-hidden={open ? undefined : true}
+                  onClick={deleteNow}
+                >
+                  <motion.span
+                    className={styles.pop}
+                    animate={{ scale: armed === 'left' ? [1, 1.3, 1] : 1 }}
+                    transition={POP}
+                  >
+                    <Trash2 size={18} strokeWidth={2} aria-hidden="true" />
+                  </motion.span>
+                  Delete
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+          {allowDelete && !staged && (
             <motion.div
               className={`${styles.layer} ${styles.remove}`}
               style={{ opacity: leftOpacity }}

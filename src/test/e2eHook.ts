@@ -8,6 +8,8 @@ declare global {
       signIn: (sub: string, email?: string) => Promise<void>;
       /** Deletes the account with the re-authentication step stubbed out. */
       deleteAccount: () => Promise<void>;
+      /** Sets the due date of the open task with this exact title (e.g. a past date). */
+      setDueDate: (title: string, dueDate: string | null) => Promise<void>;
     };
   }
 }
@@ -27,6 +29,13 @@ export function installE2eHook(auth: Auth): void {
     async deleteAccount() {
       const { deleteAccount } = await import('../sync/deleteAccount');
       await deleteAccount({ reauthenticate: async () => {} });
+    },
+    async setDueDate(title, dueDate) {
+      const { useTaskStore } = await import('../store/tasks');
+      const { tasks, update } = useTaskStore.getState();
+      const found = Object.values(tasks).find((t) => t.title === title && !t.done);
+      if (!found) throw new Error(`no open task titled "${title}"`);
+      update(found.id, { dueDate });
     },
   };
 }

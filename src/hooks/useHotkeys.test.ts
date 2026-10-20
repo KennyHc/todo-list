@@ -28,6 +28,7 @@ describe('matchHotkey', () => {
     expect(matchHotkey(ev('x'), ctx())).toEqual({ type: 'toggle' });
     expect(matchHotkey(ev('Enter'), ctx())).toEqual({ type: 'edit' });
     expect(matchHotkey(ev('Backspace'), ctx())).toEqual({ type: 'delete' });
+    expect(matchHotkey(ev('s'), ctx())).toEqual({ type: 'reschedule' });
     expect(matchHotkey(ev('ArrowLeft'), ctx())).toEqual({ type: 'collapse', collapsed: true });
     expect(matchHotkey(ev('ArrowRight'), ctx())).toEqual({ type: 'collapse', collapsed: false });
     expect(matchHotkey(ev('?', { shiftKey: true }), ctx())).toEqual({ type: 'help' });
@@ -78,7 +79,7 @@ describe('matchHotkey', () => {
   });
 
   it('ignores everything else while typing or over a dialog', () => {
-    for (const key of ['n', 'j', 'x', '/', '1', ' ', 'Enter', 'Backspace', '?']) {
+    for (const key of ['n', 'j', 'x', 's', '/', '1', ' ', 'Enter', 'Backspace', '?']) {
       expect(matchHotkey(ev(key), ctx({ typing: true }))).toBeNull();
       expect(matchHotkey(ev(key), ctx({ modalOpen: true }))).toBeNull();
     }
@@ -93,7 +94,7 @@ describe('matchHotkey', () => {
 
   it('needs a focused row for row actions, but not for navigation', () => {
     const none = ctx({ hasFocus: false });
-    for (const key of ['x', ' ', 'e', 'Enter', 'Backspace', 'Delete', 'ArrowLeft']) {
+    for (const key of ['x', ' ', 'e', 's', 'Enter', 'Backspace', 'Delete', 'ArrowLeft']) {
       expect(matchHotkey(ev(key), none)).toBeNull();
     }
     expect(matchHotkey(ev('j'), none)).toEqual({ type: 'move', step: 1 });

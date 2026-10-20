@@ -167,6 +167,12 @@ export function SettingsPopover() {
                   <strong>Add to Home Screen</strong>.
                 </p>
               )}
+              {iosHintOpen && (
+                <p className={`${styles.hint} ${styles.tip}`}>
+                  Tip: any link to tasks-app-956r6.web.app/?add={'\u2026'} opens Tasks with that
+                  text ready to add {'\u2014'} use it from Shortcuts or bookmarks.
+                </p>
+              )}
             </>
           )}
 

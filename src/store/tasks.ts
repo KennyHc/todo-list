@@ -9,6 +9,7 @@ import { effectiveColor } from '../lib/colorResolve';
 import { isHexColor, isSafeTagKey, normalizeTagColors, normalizeTaskColor } from '../lib/colors';
 import { normalizeTag } from '../lib/tags';
 import { nextLabel, normalizeRepeat, spawnNextOccurrence } from '../lib/recur';
+import { overdueIds, overdueMoveLabel, rescheduleLabel } from '../lib/reschedule';
 import {
   applyHistory,
   diffCompletions,
@@ -65,6 +66,13 @@ type TaskState = TaskTree & {
 type TaskActions = {
   add: (input: NewTask) => string;
   update: (id: string, patch: TaskPatch) => void;
+  /** Sets (or, with null, clears) a due date and records an undo ("Moved \u201cX\u201d to Sat, Oct 24"). */
+  reschedule: (id: string, dueDate: string | null) => void;
+  /**
+   * Moves every open overdue task (with `tag`, only those carrying it) to today in one undo
+   * entry; repeat rules are kept. Returns how many moved.
+   */
+  moveOverdueToToday: (tag?: string | null) => number;
   remove: (id: string) => void;
   toggle: (id: string) => void;
   clearCompleted: () => void;
@@ -214,6 +222,24 @@ export const createTaskStore = () =>
       return id;
     },
     update: (id, patch) => set(updateTask(treeOf(get()), id, patch)),
+    reschedule: (id, dueDate) => {
+      const state = get();
+      const task = state.tasks[id];
+      if (!task) return;
+      const after = updateTask(treeOf(state), id, { dueDate });
+      if (after.tasks === state.tasks) return;
+      set({ ...after, undo: undoEntry(state, rescheduleLabel(task.title, dueDate)) });
+    },
+    moveOverdueToToday: (tag = null) => {
+      const state = get();
+      const today = todayISO();
+      const ids = overdueIds(treeOf(state), today, tag);
+      if (ids.length === 0) return 0;
+      let after = treeOf(state);
+      for (const id of ids) after = updateTask(after, id, { dueDate: today });
+      set({ ...after, undo: undoEntry(state, overdueMoveLabel(ids.length)) });
+      return ids.length;
+    },
     remove: (id) => {
       const state = get();
       const task = state.tasks[id];
@@ -538,6 +564,10 @@ export const useAllTags = (): { tag: string; count: number }[] => {
     [key],
   );
 };
+
+/** Ids of the open overdue tasks (see overdueIds), compared shallowly so rows don't re-render. */
+export const useOverdueIds = (tag: string | null): string[] =>
+  useTaskStore(useShallow((s) => overdueIds(treeOf(s), todayISO(), tag)));
 
 export const useDeadlineList = (tag: string | null): string[] =>
   useTaskStore(useShallow((s) => deadlineList(treeOf(s), { tag })));

@@ -12,6 +12,7 @@ import { DeadlineList } from './components/DeadlineList';
 import { EmptyState } from './components/EmptyState';
 import { MigrationToast } from './components/MigrationToast';
 import { NoticeToast } from './components/NoticeToast';
+import { OverdueNudge } from './components/OverdueNudge';
 import { HistoryList } from './components/HistoryList';
 import { ProgressRing } from './components/ProgressRing';
 import { SettingsPopover } from './components/SettingsPopover';
@@ -94,6 +95,7 @@ function App() {
   const isEmpty = useTaskStore((s) => s.rootIds.length === 0);
   const hasHistory = useTaskStore((s) => s.history.length > 0);
   const view = useUIStore((s) => s.view);
+  const tagFilter = useUIStore((s) => s.tagFilter);
   const freshSignIn = useAuthStore((s) => s.freshSignIn);
   const syncStatus = useSyncStore((s) => s.syncStatus);
   const phone = useIsPhone();
@@ -141,6 +143,9 @@ function App() {
                 exit={{ opacity: 0, y: 4, transition: { duration: dur.fast, ease: ease.out } }}
                 transition={{ duration: dur.base, ease: ease.out }}
               >
+                {(view === 'tree' || view === 'deadline') && !isEmpty && (
+                  <OverdueNudge tag={tagFilter} />
+                )}
                 {view === 'history' ? (
                   <HistoryList />
                 ) : isEmpty ? (

@@ -1,4 +1,4 @@
-import { addDays } from '../lib/dates';
+import { quickPicks } from '../lib/reschedule';
 import type { Repeat } from '../types';
 import { todayISO } from '../lib/views';
 import { RepeatPicker } from './RepeatPicker';
@@ -14,35 +14,26 @@ type Props = {
   onRepeatChange?: (repeat: Repeat | null) => void;
 };
 
-const QUICK = [
-  { label: 'Today', days: 0 },
-  { label: 'Tomorrow', days: 1 },
-  { label: 'Next week', days: 7 },
-] as const;
-
 /** Quick picks plus a native date input. */
 export function DatePicker({ value, onChange, onPicked, repeat = null, onRepeatChange }: Props) {
   const today = todayISO();
   return (
     <div className={styles.picker}>
       <div className={styles.quick}>
-        {QUICK.map(({ label, days }) => {
-          const date = addDays(today, days);
-          return (
-            <button
-              key={label}
-              type="button"
-              className={styles.pick}
-              aria-pressed={value === date}
-              onClick={() => {
-                onChange(date);
-                onPicked?.();
-              }}
-            >
-              {label}
-            </button>
-          );
-        })}
+        {quickPicks(today).map(({ key, label, date }) => (
+          <button
+            key={key}
+            type="button"
+            className={styles.pick}
+            aria-pressed={value === date}
+            onClick={() => {
+              onChange(date);
+              onPicked?.();
+            }}
+          >
+            {label.replace(/^(This|Next) weekend$/, 'Weekend')}
+          </button>
+        ))}
       </div>
       <input
         type="date"

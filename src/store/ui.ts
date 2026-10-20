@@ -37,6 +37,8 @@ type UIState = {
   notice: Notice | null;
   /** A row asked (by hotkey or palette) to run its own delete flow. Not persisted. */
   deleteRequestId: string | null;
+  /** A row asked (by the `s` hotkey) to open its Reschedule menu. Not persisted. */
+  rescheduleRequestId: string | null;
   /** Latest "reveal" pulse; `n` changes on every pulse so the same row can flash again. */
   revealFlash: { id: string; n: number } | null;
   setView: (view: View) => void;
@@ -54,6 +56,8 @@ type UIState = {
   clearNotice: () => void;
   requestDelete: (id: string) => void;
   clearDeleteRequest: () => void;
+  requestReschedule: (id: string) => void;
+  clearRescheduleRequest: () => void;
   flashRow: (id: string) => void;
 };
 
@@ -73,6 +77,7 @@ export const useUIStore = create<UIState>()(
       tagColorsOpen: false,
       notice: null,
       deleteRequestId: null,
+      rescheduleRequestId: null,
       revealFlash: null,
       setView: (view) => set({ view }),
       setTagFilter: (tagFilter) => set({ tagFilter }),
@@ -90,6 +95,8 @@ export const useUIStore = create<UIState>()(
       clearNotice: () => set({ notice: null }),
       requestDelete: (deleteRequestId) => set({ deleteRequestId }),
       clearDeleteRequest: () => set({ deleteRequestId: null }),
+      requestReschedule: (rescheduleRequestId) => set({ rescheduleRequestId }),
+      clearRescheduleRequest: () => set({ rescheduleRequestId: null }),
       flashRow: (id) => set((s) => ({ revealFlash: { id, n: (s.revealFlash?.n ?? 0) + 1 } })),
     }),
     {

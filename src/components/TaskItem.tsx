@@ -18,13 +18,14 @@ import {
   type MotionProps,
   type TargetAndTransition,
 } from 'framer-motion';
-import { ChevronRight, GripVertical, Plus, Trash2 } from 'lucide-react';
+import { CalendarClock, ChevronRight, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import type { DeadlineBucket } from '../lib/dates';
 import { popDelays } from '../hooks/useCompletionHold';
 import { useIsPhone } from '../hooks/useMediaQuery';
 import { useIsTouch } from '../hooks/useIsTouch';
 import { addSubtask } from '../lib/addSubtask';
+import { splitTitleLinks } from '../lib/links';
 import { ignoreTextEntry } from '../lib/textEntry';
 import { primeKeyboard } from '../lib/focusProxy';
 import { getAncestors, getDescendants } from '../lib/tree';
@@ -47,6 +48,8 @@ import { Checkbox } from './Checkbox';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DifficultyIcon } from './DifficultyIcon';
 import { DuePill } from './DuePill';
+import { LinkChip } from './LinkChip';
+import { RescheduleMenu } from './RescheduleMenu';
 import { Sparks } from './Sparks';
 import { TagChip } from './TagChip';
 import { TaskMenu } from './TaskMenu';
@@ -91,6 +94,7 @@ export type RowDrag = Pick<
 const NO_PATH: string[] = [];
 const MAX_TAGS_SHOWN = 3;
 const MAX_TAGS_SHOWN_PHONE = 2;
+const MAX_LINKS_SHOWN = 2;
 const SHAKE_X = [0, -7, 7, -5, 5, -2, 0];
 const SHAKE_SECONDS = 0.38;
 
@@ -181,6 +185,7 @@ function TaskItemInner({
   const editing = useTaskStore((s) => s.editingId === id);
   const focused = useUIStore((s) => s.focusedId === id);
   const deleteRequested = useUIStore((s) => s.deleteRequestId === id);
+  const rescheduleRequested = useUIStore((s) => s.rescheduleRequestId === id);
   const revealPulse = useUIStore((s) => (s.revealFlash?.id === id ? s.revealFlash.n : 0));
   const delay = useToggleDelay(id);
   const reduced = useReducedMotion();
@@ -198,6 +203,10 @@ function TaskItemInner({
   const path = useTaskStore(useShallow((s) => (flat ? taskPath(s, id) : NO_PATH)));
   // Phones carry no ⋯ on the row: the title editor's ⋯ opens the options sheet instead.
   const [menuOpen, setMenuOpen] = useState(false);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  /** What the Reschedule menu hangs off: the hover button, the swipe's Later button or the row. */
+  const rescheduleAnchor = useRef<HTMLElement | null>(null);
+  const closeReschedule = useCallback(() => setRescheduleOpen(false), []);
   const [confirm, setConfirm] = useState<{ open: boolean; count: number }>({
     open: false,
     count: 0,
@@ -322,6 +331,14 @@ function TaskItemInner({
     requestDelete();
   }, [deleteRequested, requestDelete]);
 
+  // The `s` hotkey asks through the store; the menu opens under the row.
+  useEffect(() => {
+    if (!rescheduleRequested) return;
+    useUIStore.getState().clearRescheduleRequest();
+    rescheduleAnchor.current = rowRef.current;
+    setRescheduleOpen(true);
+  }, [rescheduleRequested]);
+
   useEffect(() => {
     if (focused) rowRef.current?.scrollIntoView?.({ block: 'nearest' });
   }, [focused]);
@@ -350,7 +367,13 @@ function TaskItemInner({
         ? 'weekday'
         : 'full';
   const showDue = task.dueDate !== null && (dueDisplay !== 'icon' || task.repeat !== null);
-  const hasMeta = showDue || task.tags.length > 0 || (flat && path.length > 0);
+  // A link in the title becomes a chip on the meta line; the title shows the rest of its words.
+  // A title that is only a link keeps showing the link itself.
+  const { text: linkless, links } = splitTitleLinks(task.title);
+  const shownTitle = linkless === '' ? task.title : linkless;
+  const chipLinks = linkless === '' ? [] : [...new Set(links)].slice(0, MAX_LINKS_SHOWN);
+  const hasTail = showDue || chipLinks.length > 0 || task.tags.length > 0;
+  const hasMeta = hasTail || (flat && path.length > 0);
   const tagLimit = phone ? MAX_TAGS_SHOWN_PHONE : MAX_TAGS_SHOWN;
   const shownTags = task.tags.slice(0, tagLimit);
   const hiddenTags = task.tags.slice(tagLimit);
@@ -425,6 +448,14 @@ function TaskItemInner({
               color={color ?? 'var(--accent)'}
               done={task.done}
               deleteKind={leaf ? 'slide' : 'confirm'}
+              onLater={
+                task.done
+                  ? undefined
+                  : (anchor) => {
+                      rescheduleAnchor.current = anchor;
+                      setRescheduleOpen(true);
+                    }
+              }
               onComplete={() => useTaskStore.getState().toggle(id)}
               onDelete={swipeDelete}
             >
@@ -522,10 +553,10 @@ function TaskItemInner({
                           onClick={edit}
                         >
                           <StrikeText done={task.done} delay={delay}>
-                            {task.title}
+                            {shownTitle}
                           </StrikeText>
                         </button>
-                        {(showDue || task.tags.length > 0) && (
+                        {hasTail && (
                           <span className={styles.tail}>
                             {showDue && task.dueDate !== null && (
                               <DuePill
@@ -535,6 +566,9 @@ function TaskItemInner({
                                 display={dueDisplay}
                               />
                             )}
+                            {chipLinks.map((href) => (
+                              <LinkChip key={href} href={href} />
+                            ))}
                             {shownTags.map((tag) => (
                               <TagChip
                                 key={tag}
@@ -562,6 +596,24 @@ function TaskItemInner({
                     empty space, so nothing reserves room for them at rest. */}
                   {!phone && (
                     <div className={styles.actions}>
+                      {/* Touch reschedules by swipe; the mouse gets a button. */}
+                      {!touch && (
+                        <motion.button
+                          {...iconMotion}
+                          type="button"
+                          data-press="off"
+                          className={styles.iconBtn}
+                          aria-label="Reschedule"
+                          aria-haspopup="dialog"
+                          aria-expanded={rescheduleOpen}
+                          onClick={(e) => {
+                            rescheduleAnchor.current = e.currentTarget;
+                            setRescheduleOpen(!rescheduleOpen);
+                          }}
+                        >
+                          <CalendarClock size={15} strokeWidth={1.75} aria-hidden="true" />
+                        </motion.button>
+                      )}
                       <TaskMenu
                         id={id}
                         buttonClassName={styles.iconBtn}
@@ -644,6 +696,12 @@ function TaskItemInner({
           delay={(popDelays.get(id) ?? 0) + SHRINK_S}
         />
       )}
+      <RescheduleMenu
+        id={id}
+        open={rescheduleOpen}
+        onClose={closeReschedule}
+        anchorRef={rescheduleAnchor}
+      />
       <ConfirmDialog
         open={confirm.open}
         title={`Delete "${task.title}"?`}

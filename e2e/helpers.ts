@@ -67,7 +67,7 @@ export async function swipe(page: Page, target: Locator, dx: number): Promise<vo
   // Start well inside the row, clear of the check on the left and the buttons on the right.
   const startX = box.x + box.width * (dx > 0 ? 0.4 : 0.6);
   const cdp = await page.context().newCDPSession(page);
-  const send = (type: string, x: number) =>
+  const send = (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number) =>
     cdp.send('Input.dispatchTouchEvent', {
       type,
       touchPoints: type === 'touchEnd' ? [] : [{ x, y }],

@@ -47,6 +47,15 @@ describe('install item in the account menu', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Add to Home Screen' }));
     expect(screen.getByText('Add to Home Screen', { selector: 'strong' })).toBeInTheDocument();
     expect(screen.getByLabelText('Share')).toBeInTheDocument();
+    expect(screen.getByText(/tasks-app-956r6\.web\.app\/\?add=/)).toBeInTheDocument();
+  });
+
+  it('keeps the quick-capture tip out of sight until the iOS explainer is open', () => {
+    vi.mocked(install.canPromptInstall).mockReturnValue(false);
+    vi.mocked(install.isIosSafari).mockReturnValue(true);
+    render(<SettingsPopover />);
+    open();
+    expect(screen.queryByText(/\?add=/)).toBeNull();
   });
 
   it('shows nothing when already installed', () => {

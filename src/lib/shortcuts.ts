@@ -27,6 +27,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { label: 'Complete or reopen', keys: [['x'], ['Space']] },
       { label: 'Edit title', keys: [['e'], ['↵']] },
       { label: 'Delete', keys: [['⌫']] },
+      { label: 'Reschedule', keys: [['s']] },
       { label: 'Set difficulty', keys: [['alt', '1–5']] },
       {
         label: 'Move up or down',
@@ -42,6 +43,15 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
           ['alt', '←'],
         ],
       },
+    ],
+  },
+  {
+    title: 'In the Reschedule menu',
+    items: [
+      { label: 'Today', keys: [['t']] },
+      { label: 'Tomorrow', keys: [['m']] },
+      { label: 'This weekend', keys: [['w']] },
+      { label: 'Next week', keys: [['n']] },
     ],
   },
   {

@@ -277,3 +277,10 @@
   vertical-align: -2px;
   color: var(--accent-ink);
 }
+
+/* A second, quieter line under the Add to Home Screen steps. */
+.tip {
+  margin-top: 0;
+  color: var(--muted);
+  font-size: 12px;
+}

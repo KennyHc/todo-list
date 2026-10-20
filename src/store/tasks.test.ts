@@ -784,3 +784,84 @@ describe('removing an abandoned draft', () => {
     expect(useTaskStore.getState().undo?.label).toMatch(/and 1 subtask/);
   });
 });
+
+describe('rescheduling', () => {
+  // Tue 20 Oct 2026, local time.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 20, 10, 30));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('reschedule sets the date with a labelled undo that restores the old one', () => {
+    const id = get().add({ title: 'Pay rent', dueDate: '2026-10-19' });
+    get().reschedule(id, '2026-10-24');
+    expect(get().tasks[id].dueDate).toBe('2026-10-24');
+    expect(get().undo?.label).toMatch(/^Moved “Pay rent” to Sat, /);
+    get().undoLast();
+    expect(get().tasks[id].dueDate).toBe('2026-10-19');
+  });
+
+  it('reschedule to null clears the date and its repeat', () => {
+    const id = get().add({
+      title: 'Water',
+      dueDate: '2026-10-19',
+      repeat: { every: 'week', weekday: 1 },
+    });
+    get().reschedule(id, null);
+    expect(get().tasks[id]).toMatchObject({ dueDate: null, repeat: null });
+    expect(get().undo?.label).toBe('Removed date from “Water”');
+  });
+
+  it('rescheduling to the same date records nothing', () => {
+    const id = get().add({ title: 'Same', dueDate: '2026-10-24' });
+    get().reschedule(id, '2026-10-24');
+    expect(get().undo).toBeNull();
+  });
+
+  describe('moveOverdueToToday', () => {
+    it('moves every open overdue task in one undo entry, leaving the rest alone', () => {
+      const a = get().add({ title: 'A', dueDate: '2026-10-01' });
+      const b = get().add({ title: 'B', dueDate: '2026-10-19' });
+      const today = get().add({ title: 'Today', dueDate: '2026-10-20' });
+      const future = get().add({ title: 'Future', dueDate: '2026-10-30' });
+      const none = get().add({ title: 'None' });
+      const doneLate = get().add({ title: 'Done', dueDate: '2026-10-02' });
+      get().toggle(doneLate);
+
+      expect(get().moveOverdueToToday()).toBe(2);
+      expect(get().tasks[a].dueDate).toBe('2026-10-20');
+      expect(get().tasks[b].dueDate).toBe('2026-10-20');
+      expect(get().tasks[today].dueDate).toBe('2026-10-20');
+      expect(get().tasks[future].dueDate).toBe('2026-10-30');
+      expect(get().tasks[none].dueDate).toBeNull();
+      expect(get().tasks[doneLate].dueDate).toBe('2026-10-02');
+      expect(get().undo?.label).toBe('Moved 2 overdue tasks to today');
+
+      get().undoLast();
+      expect(get().tasks[a].dueDate).toBe('2026-10-01');
+      expect(get().tasks[b].dueDate).toBe('2026-10-19');
+    });
+
+    it('keeps the repeat rule of a recurring task', () => {
+      const repeat = { every: 'week', weekday: 1 } as const;
+      const id = get().add({ title: 'Water', dueDate: '2026-10-12', repeat });
+      get().moveOverdueToToday();
+      expect(get().tasks[id]).toMatchObject({ dueDate: '2026-10-20', repeat });
+    });
+
+    it('does nothing, and records no undo, when nothing is overdue', () => {
+      get().add({ title: 'Fine', dueDate: '2026-10-20' });
+      expect(get().moveOverdueToToday()).toBe(0);
+      expect(get().undo).toBeNull();
+    });
+
+    it('can be limited to a tag', () => {
+      const a = get().add({ title: 'A', dueDate: '2026-10-01', tags: ['home'] });
+      const b = get().add({ title: 'B', dueDate: '2026-10-01' });
+      expect(get().moveOverdueToToday('home')).toBe(1);
+      expect(get().tasks[a].dueDate).toBe('2026-10-20');
+      expect(get().tasks[b].dueDate).toBe('2026-10-01');
+    });
+  });
+});

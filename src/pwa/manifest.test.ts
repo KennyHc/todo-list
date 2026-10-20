@@ -41,6 +41,16 @@ describe('manifest.webmanifest', () => {
     ]);
   });
 
+  it('is a share target: a GET to / carrying the title, text and url', () => {
+    expect(manifest.share_target).toEqual({
+      action: '/',
+      method: 'GET',
+      params: { title: 'title', text: 'text', url: 'url' },
+    });
+    // The target must sit inside the app's scope, or Chrome will not offer it.
+    expect(manifest.share_target.action.startsWith(manifest.scope)).toBe(true);
+  });
+
   it('ships the iOS touch icon', () => {
     expect(exists('/icons/apple-touch-icon.png')).toBe(true);
   });

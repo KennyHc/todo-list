@@ -6,13 +6,13 @@
 
 .quick {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
 
 .pick {
   height: 28px;
-  padding: 0 6px;
+  padding: 0 4px;
   border: 1px solid var(--border-strong);
   border-radius: var(--r-sm);
   background: var(--surface-2);

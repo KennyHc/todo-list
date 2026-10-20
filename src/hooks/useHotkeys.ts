@@ -16,6 +16,7 @@ export type HotkeyAction =
   | { type: 'toggle' }
   | { type: 'edit' }
   | { type: 'delete' }
+  | { type: 'reschedule' }
   | { type: 'difficulty'; value: Difficulty }
   | { type: 'collapse'; collapsed: boolean }
   | { type: 'reorder'; step: 1 | -1 }
@@ -109,6 +110,8 @@ export function matchHotkey(e: HotkeyEvent, ctx: HotkeyContext): HotkeyAction | 
       return ctx.hasFocus ? { type: 'edit' } : null;
     case 'Enter':
       return ctx.hasFocus && !own ? { type: 'edit' } : null;
+    case 's':
+      return ctx.hasFocus ? { type: 'reschedule' } : null;
     case 'Backspace':
     case 'Delete':
       return ctx.hasFocus ? { type: 'delete' } : null;
@@ -207,6 +210,9 @@ export function useHotkeys(): void {
           break;
         case 'delete':
           if (focusedId) ui.requestDelete(focusedId);
+          break;
+        case 'reschedule':
+          if (focusedId) ui.requestReschedule(focusedId);
           break;
         case 'difficulty':
           if (focusedId && isLeaf(tasks, focusedId)) {
