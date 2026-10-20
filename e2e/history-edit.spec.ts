@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addTask, check, row, signIn, uniqueSub } from './helpers';
+import { addTask, check, row, signIn, swipe, uniqueSub } from './helpers';
 
 const entry = (page: Page, title: string) => page.locator('li', { hasText: title });
 const history = (page: Page) => page.getByRole('radio', { name: 'History' });
@@ -43,6 +43,48 @@ test('restoring from History returns the task to the Tree', async ({ page }, inf
   await expect(toast(page, 'Restored “Read a book”')).toBeVisible();
   await page.getByRole('radio', { name: 'Tree' }).click();
   await expect(check(page, 'Read a book')).toHaveAttribute('aria-checked', 'false');
+});
+
+test('the Restore button brings a task back, and edit mode hides it', async ({ page }, info) => {
+  await signIn(page, uniqueSub(info));
+  await addTask(page, 'Water the ferns');
+  await addTask(page, 'Stay put');
+  await check(page, 'Water the ferns').click();
+  await expect(check(page, 'Water the ferns')).toHaveCount(0);
+
+  await history(page).click();
+  const restore = page.getByRole('button', {
+    name: 'Restore \u201cWater the ferns\u201d to your list',
+  });
+  await expect(restore).toBeVisible();
+  await page.getByRole('button', { name: 'Edit' }).click();
+  await expect(restore).toHaveCount(0);
+  await page.getByRole('button', { name: 'Done' }).click();
+
+  await restore.click();
+  await expect(toast(page, 'Restored \u201cWater the ferns\u201d')).toBeVisible();
+  await expect(entry(page, 'Water the ferns')).toHaveCount(0);
+  await page.getByRole('radio', { name: 'Tree' }).click();
+  await expect(check(page, 'Water the ferns')).toHaveAttribute('aria-checked', 'false');
+});
+
+test('swiping a History row right restores it (touch only)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile-chromium', 'a touch gesture');
+  await signIn(page, uniqueSub(info));
+  await addTask(page, 'Swipe me back');
+  await check(page, 'Swipe me back').click();
+  await expect(check(page, 'Swipe me back')).toHaveCount(0);
+
+  await history(page).click();
+  const item = entry(page, 'Swipe me back');
+  // The button is always there on touch.
+  await expect(item.getByRole('button', { name: /^Restore/ })).toBeVisible();
+  // Swiping left does nothing outside edit mode.
+  await swipe(page, item, -200);
+  await expect(item).toBeVisible();
+  await swipe(page, item, 240);
+  await expect(toast(page, 'Restored \u201cSwipe me back\u201d')).toBeVisible();
+  await expect(item).toHaveCount(0);
 });
 
 test('Delete all removes every completed task after a confirmation', async ({ page }, info) => {

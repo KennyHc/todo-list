@@ -127,6 +127,14 @@ const CONTROLS =
   'button, a[href], summary, [role="button"], [role="checkbox"], [role="radio"], [role="menuitem"], [role="option"], [role="tab"]';
 const OVERLAYS = '[role="dialog"], [role="alertdialog"]';
 
+/** The visibleOrder options for what the UI currently shows. */
+const orderOf = (ui: ReturnType<typeof useUIStore.getState>) => ({
+  view: ui.view,
+  tag: ui.tagFilter,
+  completedCollapsed: ui.completedCollapsed,
+  completedShowAll: ui.completedShowAll,
+});
+
 const asElement = (target: EventTarget | null) => (target instanceof Element ? target : null);
 
 /** Global keyboard workflow: row focus, task shortcuts, views and the palette. Use once, in App. */
@@ -137,7 +145,7 @@ export function useHotkeys(): void {
       const el = asElement(e.target);
       const ui = useUIStore.getState();
       const tasks = useTaskStore.getState();
-      const order = visibleOrder(tasks, { view: ui.view, tag: ui.tagFilter });
+      const order = visibleOrder(tasks, orderOf(ui));
       const focusedId = ui.focusedId !== null && order.includes(ui.focusedId) ? ui.focusedId : null;
       const ctx: HotkeyContext = {
         typing: !!el?.closest(TEXT_ENTRY),
@@ -187,9 +195,7 @@ export function useHotkeys(): void {
           tasks.toggle(focusedId);
           // A completed row leaves the list (with its subtree, and maybe its parent), so focus
           // moves on to the next row that stays, and j/k keep working.
-          const stays = new Set(
-            visibleOrder(useTaskStore.getState(), { view: ui.view, tag: ui.tagFilter }),
-          );
+          const stays = new Set(visibleOrder(useTaskStore.getState(), orderOf(ui)));
           if (!stays.has(focusedId)) {
             const gone = new Set(order.filter((other) => !stays.has(other)));
             ui.setFocusedId(neighborAfterRemoval(order, focusedId, gone));

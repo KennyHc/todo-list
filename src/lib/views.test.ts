@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { TaskTree } from '../types';
 import { addTask, emptyTree, toggleDone, updateTask } from './tree';
 import {
+  COMPLETED_PREVIEW,
   allTags,
   deadlineList,
   dueStatus,
@@ -99,7 +100,7 @@ describe('visibleTreeIds', () => {
 });
 
 describe('deadlineList', () => {
-  it('orders dated asc, then undated by createdAt, and leaves done tasks out', () => {
+  it('orders dated asc, then undated by createdAt, then done by completedAt desc', () => {
     const b = build();
     const noDate1 = b.add('nd1');
     const late = b.add('late', { dueDate: '2026-03-01' });
@@ -109,7 +110,14 @@ describe('deadlineList', () => {
     const doneB = b.add('doneB');
     b.tree = toggleDone(b.tree, doneA, 5000);
     b.tree = toggleDone(b.tree, doneB, 6000);
-    expect(deadlineList(b.tree, { tag: null })).toEqual([early, late, noDate1, noDate2]);
+    expect(deadlineList(b.tree, { tag: null })).toEqual([
+      early,
+      late,
+      noDate1,
+      noDate2,
+      doneB,
+      doneA,
+    ]);
   });
 
   it('flattens subtasks and parents ignoring hierarchy', () => {
@@ -137,7 +145,7 @@ describe('deadlineList', () => {
     }
     expect(deadlineList(tree, { tag: null })).toEqual(ids);
     tree = toggleDone(toggleDone(tree, ids[0], 9), ids[1], 9);
-    expect(deadlineList(tree, { tag: null })).toEqual([ids[2]]);
+    expect(deadlineList(tree, { tag: null })).toEqual([ids[2], ids[0], ids[1]]);
   });
 
   it('filters by tag', () => {
@@ -149,15 +157,32 @@ describe('deadlineList', () => {
     expect(deadlineList(b.tree, { tag: 'none' })).toEqual([]);
   });
 
-  it('drops a task when it is completed, and a done parent hides its subtasks too', () => {
+  it('moves a task to the end when completed; a done parent takes its subtasks along', () => {
     const b = build();
     const a = b.add('a', { dueDate: '2026-05-01' });
     const c = b.add('c', { dueDate: '2026-06-01' });
     const kid = b.add('kid', { parentId: c, dueDate: '2026-07-01' });
     b.tree = toggleDone(b.tree, a, 100);
-    expect(deadlineList(b.tree, { tag: null })).toEqual([c, kid]);
+    expect(deadlineList(b.tree, { tag: null })).toEqual([c, kid, a]);
     b.tree = toggleDone(b.tree, c, 200);
-    expect(deadlineList(b.tree, { tag: null })).toEqual([]);
+    // Newest completion first; the parent and its subtask were completed together.
+    const list = deadlineList(b.tree, { tag: null });
+    expect(list.slice(0, 2).sort()).toEqual([c, kid].sort());
+    expect(list[2]).toBe(a);
+  });
+
+  it('puts done tasks last by completedAt desc, respecting the tag filter', () => {
+    const b = build();
+    const open = b.add('open', { tags: ['x'], dueDate: '2026-05-01' });
+    const old = b.add('old', { tags: ['x'] });
+    const recent = b.add('recent', { tags: ['x'] });
+    const other = b.add('other', { tags: ['y'] });
+    b.tree = toggleDone(b.tree, old, 100);
+    b.tree = toggleDone(b.tree, recent, 300);
+    b.tree = toggleDone(b.tree, other, 200);
+    expect(deadlineList(b.tree, { tag: null })).toEqual([open, recent, other, old]);
+    expect(deadlineList(b.tree, { tag: 'x' })).toEqual([open, recent, old]);
+    expect(deadlineList(b.tree, { tag: 'y' })).toEqual([other]);
   });
 });
 
@@ -233,6 +258,23 @@ describe('visibleOrder', () => {
     b.tree = updateTask(b.tree, a, { collapsed: true });
     expect(visibleOrder(b.tree, { view: 'deadline', tag: null })).toEqual([c, a, a1, a2, d]);
     expect(visibleOrder(b.tree, { view: 'deadline', tag: 'x' })).toEqual([a, a2]);
+  });
+
+  it('ends with the Completed rows, unless that section is collapsed or limited', () => {
+    const b = build();
+    const open = b.add('open', { dueDate: '2026-05-01' });
+    const done: string[] = [];
+    for (let i = 0; i < 12; i += 1) {
+      const id = b.add(`d${i}`);
+      b.tree = toggleDone(b.tree, id, 1000 + i);
+      done.push(id);
+    }
+    const newest = [...done].reverse();
+    const order = (extra: object) =>
+      visibleOrder(b.tree, { view: 'deadline', tag: null, ...extra });
+    expect(order({})).toEqual([open, ...newest.slice(0, COMPLETED_PREVIEW)]);
+    expect(order({ completedShowAll: true })).toEqual([open, ...newest]);
+    expect(order({ completedCollapsed: true, completedShowAll: true })).toEqual([open]);
   });
 
   it('is empty in the history view', () => {

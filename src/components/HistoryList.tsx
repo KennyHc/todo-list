@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'framer-motion';
-import { Check, History as HistoryIcon, Minus } from 'lucide-react';
+import { Check, History as HistoryIcon, Minus, RotateCcw } from 'lucide-react';
 import { normalizeTaskColor } from '../lib/colors';
 import { dayHeader, formatTime } from '../lib/dates';
 import type { HistoryEntry } from '../lib/history';
 import { todayISO } from '../lib/views';
+import { useIsTouch } from '../hooks/useIsTouch';
 import { useTaskStore } from '../store/tasks';
 import { useUIStore } from '../store/ui';
 import { MAX_DIFFICULTY, type Difficulty } from '../types';
@@ -12,6 +13,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { DIFFICULTY_NAMES, difficultyAria } from '../lib/difficulty';
 import { DifficultyGlyph } from './DifficultyGlyph';
 import { DuePill } from './DuePill';
+import { SwipeRow } from './SwipeRow';
 import { TagChip } from './TagChip';
 import styles from './HistoryList.module.css';
 import { dur, ease, spring } from '../styles/motion';
@@ -39,7 +41,7 @@ const DELETE_EXIT = {
 };
 const RESTORE_EXIT = {
   opacity: 0,
-  x: 10,
+  x: 12,
   height: 0,
   overflow: 'hidden',
   transition: { duration: dur.base, ease: ease.out },
@@ -57,6 +59,7 @@ function Entry({
   editing: boolean;
 }) {
   const reduced = useReducedMotion();
+  const touch = useIsTouch();
   const setTagFilter = useUIStore((s) => s.setTagFilter);
   const restore = useTaskStore((s) => s.restoreFromHistory);
   const deleteCompleted = useTaskStore((s) => s.deleteCompleted);
@@ -67,18 +70,24 @@ function Entry({
   const late = entry.dueDate !== null && todayISO(new Date(entry.completedAt)) > entry.dueDate;
   const level = Math.min(MAX_DIFFICULTY, Math.max(1, Math.round(entry.difficulty))) as Difficulty;
   const canRestore = taskDone === true;
+  const gone = taskDone === undefined;
   const reason =
     taskDone === undefined
       ? 'This task was deleted'
       : taskDone
         ? undefined
         : 'Already in your list';
+  const restoreEntry = () => {
+    leaving.set(entry.id, 'restore');
+    restore(entry.id);
+  };
   return (
     <motion.li
-      className={styles.entry}
+      className={styles.item}
       data-row-color={edge ?? undefined}
       data-done=""
       data-editing={editing || undefined}
+      data-gone={gone || undefined}
       style={edge ? ({ '--row-color': edge } as CSSProperties) : undefined}
       layout="position"
       initial={{ opacity: 0, y: -4 }}
@@ -89,98 +98,124 @@ function Entry({
       exit="exit"
       transition={spring.snappy}
     >
-      <button
-        type="button"
-        role="checkbox"
-        aria-checked="true"
-        aria-label={`Done: ${entry.title}`}
-        data-press="off"
-        className={styles.check}
-        disabled={!canRestore}
-        title={reason ?? 'Restore to your list'}
-        onClick={() => {
-          leaving.set(entry.id, 'restore');
-          restore(entry.id);
-        }}
+      <SwipeRow
+        enabled={touch && !editing && canRestore}
+        color="var(--accent)"
+        done
+        deleteKind="confirm"
+        allowDelete={false}
+        completeLabel="Restore"
+        onComplete={restoreEntry}
+        onDelete={noop}
       >
-        <span className={styles.checkDot} aria-hidden="true">
-          <Check size={12} strokeWidth={3} />
-        </span>
-      </button>
-      <motion.div className={styles.body} layout="position">
-        <div className={styles.titleLine}>
-          <span className={styles.title}>{entry.title}</span>
-          {entry.auto && (
-            <span className={styles.auto} title="Completed automatically with its subtasks">
-              auto
-            </span>
-          )}
-        </div>
-        <div className={styles.meta}>
-          {entry.path.length > 0 && <span className={styles.crumb}>{entry.path.join(' › ')}</span>}
-          {entry.isParent ? (
-            <span
-              className={styles.badge}
-              title={`${entry.subtaskCount} subtask${entry.subtaskCount === 1 ? '' : 's'}, difficulty ${entry.difficulty} in total`}
-            >
-              Σ {entry.difficulty}
-            </span>
-          ) : (
-            <span
-              className={styles.glyph}
-              role="img"
-              aria-label={difficultyAria(level)}
-              title={DIFFICULTY_NAMES[level]}
-            >
-              <DifficultyGlyph value={level} />
-            </span>
-          )}
-          {entry.tags.map((tag) => (
-            <TagChip key={tag} tag={tag} onClick={() => setTagFilter(tag)} />
-          ))}
-          {entry.dueDate !== null && (
-            <span className={styles.due}>
-              <DuePill dueDate={entry.dueDate} done />
-              {late && <span className={styles.late}>late</span>}
-            </span>
-          )}
-        </div>
-      </motion.div>
-      <motion.time
-        className={styles.time}
-        layout="position"
-        dateTime={new Date(entry.completedAt).toISOString()}
-      >
-        {formatTime(entry.completedAt)}
-      </motion.time>
-      <AnimatePresence initial={false}>
-        {editing && (
-          <motion.button
-            key="delete"
+        <div className={styles.entry}>
+          <button
             type="button"
+            role="checkbox"
+            aria-checked="true"
+            aria-label={`Done: ${entry.title}`}
             data-press="off"
-            className={styles.minus}
-            aria-label={`Delete "${entry.title}" permanently`}
-            initial={reduced ? { opacity: 0 } : { opacity: 0, x: 12 }}
-            animate={reduced ? { opacity: 1 } : { opacity: 1, x: 0 }}
-            exit={reduced ? { opacity: 0 } : { opacity: 0, x: 12 }}
-            transition={
-              reduced ? { duration: dur.fast } : { ...spring.snappy, delay: index * STAGGER_S }
-            }
-            onClick={() => {
-              leaving.set(entry.id, 'delete');
-              deleteCompleted(entry.id);
-            }}
+            className={styles.check}
+            disabled={!canRestore}
+            title={reason ?? 'Restore to list'}
+            onClick={restoreEntry}
           >
-            <span className={styles.minusDot} aria-hidden="true">
-              <Minus size={14} strokeWidth={3} />
+            <span className={styles.checkDot} aria-hidden="true">
+              <Check size={12} strokeWidth={3} />
             </span>
-          </motion.button>
-        )}
-      </AnimatePresence>
+          </button>
+          <motion.div className={styles.body} layout="position">
+            <div className={styles.titleLine}>
+              <span className={styles.title}>{entry.title}</span>
+              {entry.auto && (
+                <span className={styles.auto} title="Completed automatically with its subtasks">
+                  auto
+                </span>
+              )}
+            </div>
+            <div className={styles.meta}>
+              {entry.path.length > 0 && (
+                <span className={styles.crumb}>{entry.path.join(' › ')}</span>
+              )}
+              {entry.isParent ? (
+                <span
+                  className={styles.badge}
+                  title={`${entry.subtaskCount} subtask${entry.subtaskCount === 1 ? '' : 's'}, difficulty ${entry.difficulty} in total`}
+                >
+                  Σ {entry.difficulty}
+                </span>
+              ) : (
+                <span
+                  className={styles.glyph}
+                  role="img"
+                  aria-label={difficultyAria(level)}
+                  title={DIFFICULTY_NAMES[level]}
+                >
+                  <DifficultyGlyph value={level} />
+                </span>
+              )}
+              {entry.tags.map((tag) => (
+                <TagChip key={tag} tag={tag} onClick={() => setTagFilter(tag)} />
+              ))}
+              {entry.dueDate !== null && (
+                <span className={styles.due}>
+                  <DuePill dueDate={entry.dueDate} done />
+                  {late && <span className={styles.late}>late</span>}
+                </span>
+              )}
+            </div>
+          </motion.div>
+          {canRestore && !editing && (
+            <button
+              type="button"
+              data-press="off"
+              className={styles.restore}
+              aria-label={`Restore \u201c${entry.title}\u201d to your list`}
+              onClick={restoreEntry}
+            >
+              <RotateCcw size={15} strokeWidth={1.75} aria-hidden="true" />
+              <span className={styles.restoreLabel}>Restore</span>
+            </button>
+          )}
+          <motion.time
+            className={styles.time}
+            layout="position"
+            dateTime={new Date(entry.completedAt).toISOString()}
+          >
+            {formatTime(entry.completedAt)}
+          </motion.time>
+          <AnimatePresence initial={false}>
+            {editing && (
+              <motion.button
+                key="delete"
+                type="button"
+                data-press="off"
+                className={styles.minus}
+                aria-label={`Delete "${entry.title}" permanently`}
+                initial={reduced ? { opacity: 0 } : { opacity: 0, x: 12 }}
+                animate={reduced ? { opacity: 1 } : { opacity: 1, x: 0 }}
+                exit={reduced ? { opacity: 0 } : { opacity: 0, x: 12 }}
+                transition={
+                  reduced ? { duration: dur.fast } : { ...spring.snappy, delay: index * STAGGER_S }
+                }
+                onClick={() => {
+                  leaving.set(entry.id, 'delete');
+                  deleteCompleted(entry.id);
+                }}
+              >
+                <span className={styles.minusDot} aria-hidden="true">
+                  <Minus size={14} strokeWidth={3} />
+                </span>
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
+      </SwipeRow>
     </motion.li>
   );
 }
+
+const noop = () => {};
 
 export function HistoryList() {
   const history = useTaskStore((s) => s.history);

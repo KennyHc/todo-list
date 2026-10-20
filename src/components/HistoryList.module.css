@@ -32,6 +32,11 @@
   list-style: none;
 }
 
+.item {
+  border-radius: var(--r-md);
+  list-style: none;
+}
+
 .entry {
   display: flex;
   align-items: flex-start;
@@ -47,6 +52,12 @@
 .entry:hover,
 .entry:has(:focus-visible) {
   background: var(--surface-2);
+}
+
+/* The task no longer exists: nothing to restore, so the row recedes a little. */
+.item[data-gone] .body,
+.item[data-gone] .time {
+  opacity: 0.7;
 }
 
 /* The round check restores the task. A 44px hit area that doesn't grow the row. */
@@ -212,6 +223,59 @@
   line-height: 16px;
 }
 
+/* A compact ghost button before the time. On hover devices it appears with the row. */
+.restore {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 28px;
+  margin: -4px 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 16px;
+  opacity: 0;
+  cursor: pointer;
+  transition:
+    opacity 120ms var(--ease-out),
+    background-color var(--t-fast),
+    color var(--t-fast),
+    var(--t-press);
+}
+
+.entry:hover .restore,
+.entry:focus-within .restore,
+.restore:focus-visible {
+  opacity: 1;
+}
+
+.restore:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.restore:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+/* Touch has no hover: always there, quiet, with a 44px hit area that doesn't grow the row. */
+@media (hover: none) and (pointer: coarse) {
+  .restore {
+    min-width: 44px;
+    height: 44px;
+    margin: -12px -4px -12px 0;
+    color: var(--muted);
+    opacity: 1;
+  }
+}
+
 .empty {
   display: flex;
   flex-direction: column;
@@ -319,5 +383,10 @@
 
   .minus {
     margin-right: -10px;
+  }
+
+  /* Phones: the icon alone (the button keeps its accessible name). */
+  .restoreLabel {
+    display: none;
   }
 }

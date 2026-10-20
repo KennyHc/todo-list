@@ -11,6 +11,10 @@ type Props = {
   done: boolean;
   /** Leaf rows slide off before deleting; parents spring back and ask first. */
   deleteKind: 'slide' | 'confirm';
+  /** Default true. False: no left (delete) swipe, as in History. */
+  allowDelete?: boolean;
+  /** The right action's label; defaults to Done / Reopen. */
+  completeLabel?: string;
   onComplete: () => void;
   onDelete: () => void;
   children: ReactNode;
@@ -24,6 +28,8 @@ export function SwipeRow({
   color,
   done,
   deleteKind,
+  allowDelete = true,
+  completeLabel,
   onComplete,
   onDelete,
   children,
@@ -31,6 +37,7 @@ export function SwipeRow({
   const { x, swiping, armed, handlers } = useSwipeRow({
     enabled,
     deleteKind,
+    allowDelete,
     onComplete,
     onDelete,
   });
@@ -74,29 +81,31 @@ export function SwipeRow({
               >
                 <Icon size={18} strokeWidth={2} />
               </motion.span>
-              {done ? 'Reopen' : 'Done'}
+              {completeLabel ?? (done ? 'Reopen' : 'Done')}
             </motion.span>
           </motion.div>
-          <motion.div
-            className={`${styles.layer} ${styles.remove}`}
-            style={{ opacity: leftOpacity }}
-            data-armed={armed === 'left' || undefined}
-            aria-hidden="true"
-          >
-            <motion.span
-              className={styles.action}
-              style={{ scale: leftScale, opacity: leftIconOpacity }}
+          {allowDelete && (
+            <motion.div
+              className={`${styles.layer} ${styles.remove}`}
+              style={{ opacity: leftOpacity }}
+              data-armed={armed === 'left' || undefined}
+              aria-hidden="true"
             >
               <motion.span
-                className={styles.pop}
-                animate={{ scale: armed === 'left' ? [1, 1.3, 1] : 1 }}
-                transition={POP}
+                className={styles.action}
+                style={{ scale: leftScale, opacity: leftIconOpacity }}
               >
-                <Trash2 size={18} strokeWidth={2} />
+                <motion.span
+                  className={styles.pop}
+                  animate={{ scale: armed === 'left' ? [1, 1.3, 1] : 1 }}
+                  transition={POP}
+                >
+                  <Trash2 size={18} strokeWidth={2} />
+                </motion.span>
+                Delete
               </motion.span>
-              Delete
-            </motion.span>
-          </motion.div>
+            </motion.div>
+          )}
         </>
       )}
       <motion.div className={styles.surface} style={{ x }} {...handlers}>

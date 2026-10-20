@@ -34,6 +34,58 @@
   padding-top: var(--space-2);
 }
 
+/* The Completed header is a disclosure button that looks like the other headers. */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  transition: background-color var(--t-fast);
+}
+
+.toggle:hover {
+  background: var(--surface-2);
+}
+
+.chevron {
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.chevron[data-collapsed] {
+  transform: rotate(-90deg);
+}
+
+.more {
+  padding: var(--space-1) var(--space-2) var(--space-2);
+  list-style: none;
+}
+
+.moreBtn {
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--accent-ink);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--t-fast);
+}
+
+.moreBtn:hover {
+  background: var(--surface-2);
+}
+
 @media (max-width: 480px) {
   .list {
     margin-top: var(--space-4);

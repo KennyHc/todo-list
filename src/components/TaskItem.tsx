@@ -64,6 +64,13 @@ type Props = {
   guides?: string;
   /** Sortable bindings for the drag handle; absent where rows aren't draggable. */
   drag?: RowDrag;
+  /**
+   * How a done row leaves the list. 'pop' (Tree): strike, shrink, pop, collapse, because a
+   * completed task is filed away. 'move' (By deadline): a done row is only reordered into the
+   * Completed section, so if it does leave (that section is collapsed, or past its preview) it
+   * just fades out.
+   */
+  exitStyle?: 'pop' | 'move';
 };
 
 export type RowDrag = Pick<
@@ -102,6 +109,13 @@ const DELETE_EXIT: TargetAndTransition = {
   transition: { duration: dur.base },
 };
 
+const MOVE_EXIT: TargetAndTransition = {
+  opacity: 0,
+  height: 0,
+  overflow: 'hidden',
+  transition: { duration: dur.base, ease: ease.out },
+};
+
 /** A row leaves because it was completed (it still exists, done) or because it was deleted. */
 const isCompleted = (id: string) => useTaskStore.getState().tasks[id]?.done === true;
 
@@ -110,16 +124,25 @@ const isCompleted = (id: string) => useTaskStore.getState().tasks[id]?.done === 
  * turn in the cascade (`popDelays`), lets its content shrink and pop (see `contentExit`), then
  * collapses so the rows below glide up. Reduced motion is a short plain fade.
  */
-function rowExit(id: string, reduced: boolean | null): TargetAndTransition {
+function rowExit(
+  id: string,
+  reduced: boolean | null,
+  exitStyle: 'pop' | 'move',
+): TargetAndTransition {
   if (!isCompleted(id)) return DELETE_EXIT;
+  if (exitStyle === 'move') return MOVE_EXIT;
   if (reduced) return { opacity: 0, height: 0, transition: { duration: 0.15 } };
   const wait = (popDelays.get(id) ?? 0) + SHRINK_S + POP_S;
   return { height: 0, transition: { duration: COLLAPSE_S, delay: wait, ease: SHRINK_EASE } };
 }
 
 /** Beats 2 and 3 on the inner content: scale 1 -> 0.94 -> 1.03 while it fades out. */
-function contentExit(id: string, reduced: boolean | null): TargetAndTransition {
-  if (!isCompleted(id) || reduced) return {};
+function contentExit(
+  id: string,
+  reduced: boolean | null,
+  exitStyle: 'pop' | 'move',
+): TargetAndTransition {
+  if (!isCompleted(id) || reduced || exitStyle === 'move') return {};
   return {
     scale: [1, 0.94, 1.03],
     opacity: [1, 0.85, 0],
@@ -134,7 +157,7 @@ function contentExit(id: string, reduced: boolean | null): TargetAndTransition {
 
 const ENTER = { ...spring.snappy, layout: spring.layout } as const;
 
-function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
+function TaskItemInner({ id, depth, flat = false, guides = '', drag, exitStyle = 'pop' }: Props) {
   const liveTask = useTask(id);
   const liveLeaf = useIsLeaf(id);
   const liveSum = useEffectiveDifficulty(id);
@@ -174,7 +197,7 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
   const present = useIsPresent();
   const [burst, setBurst] = useState<{ x: number; y: number } | null>(null);
   // Leaving because it was completed (not deleted): the content pops and sparks fly.
-  const completing = !present && liveTask?.done === true;
+  const completing = !present && liveTask?.done === true && exitStyle === 'pop';
 
   // A deleted row stays mounted while AnimatePresence plays its exit, so keep showing its last state.
   const view = {
@@ -244,7 +267,12 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
         const ui = useUIStore.getState();
         if (ui.focusedId === id) {
           const tasks = useTaskStore.getState();
-          const order = visibleOrder(tasks, { view: ui.view, tag: ui.tagFilter });
+          const order = visibleOrder(tasks, {
+            view: ui.view,
+            tag: ui.tagFilter,
+            completedCollapsed: ui.completedCollapsed,
+            completedShowAll: ui.completedShowAll,
+          });
           ui.setFocusedId(
             neighborAfterRemoval(order, id, new Set([id, ...getDescendants(tasks, id)])),
           );
@@ -340,14 +368,14 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
       layout="position"
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
-      variants={{ exit: () => rowExit(id, reduced) }}
+      variants={{ exit: () => rowExit(id, reduced, exitStyle) }}
       exit="exit"
       // While dragging, row moves are the sortable's job: layout animations would fight it.
       transition={layoutOff ? { ...ENTER, layout: { duration: 0 } } : ENTER}
     >
       <motion.div
         className={styles.pop}
-        variants={{ exit: () => contentExit(id, reduced) }}
+        variants={{ exit: () => contentExit(id, reduced, exitStyle) }}
         exit="exit"
       >
         <div
@@ -584,7 +612,7 @@ export const TaskItem = memo(TaskItemInner);
 
 const SHIFT = { duration: dur.base * 1000, easing: `cubic-bezier(${ease.out.join(', ')})` };
 
-type SortableProps = Omit<Props, 'drag' | 'flat'> & { dragEnabled: boolean };
+type SortableProps = Omit<Props, 'drag' | 'flat' | 'exitStyle'> & { dragEnabled: boolean };
 
 function SortableTaskItemInner({ dragEnabled, ...props }: SortableProps) {
   const reduced = useReducedMotion();

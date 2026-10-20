@@ -41,10 +41,10 @@ export function visibleTreeIds(tree: TaskTree, tag: string | null): Set<string> 
 }
 
 /**
- * Every open task (parents and subtasks alike, hierarchy ignored), optionally filtered by tag:
- * with a due date (soonest first), then without one (oldest first). Done tasks live in History
- * and are left out; a task under a done parent is itself done, so it never shows either. Ties
- * keep the tree's insertion order.
+ * Every task (parents and subtasks alike, hierarchy ignored), optionally filtered by tag: the
+ * open ones with a due date (soonest first), then the open ones without (oldest first), then
+ * the done ones, most recently completed first (the Completed section). Ties keep the tree's
+ * insertion order.
  */
 export function deadlineList(tree: TaskTree, { tag }: { tag: string | null }): string[] {
   const tasks = Object.values(tree.tasks).filter((task) => tag === null || task.tags.includes(tag));
@@ -52,7 +52,19 @@ export function deadlineList(tree: TaskTree, { tag }: { tag: string | null }): s
     .filter((t) => !t.done && t.dueDate !== null)
     .sort((a, b) => (a.dueDate! < b.dueDate! ? -1 : a.dueDate! > b.dueDate! ? 1 : 0));
   const undated = tasks.filter((t) => !t.done && t.dueDate === null).sort(byCreated);
-  return [...dated, ...undated].map((t) => t.id);
+  const done = tasks
+    .filter((t) => t.done)
+    .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
+  return [...dated, ...undated, ...done].map((t) => t.id);
+}
+
+/** The Completed section shows this many rows until "Show all" is pressed. */
+export const COMPLETED_PREVIEW = 10;
+
+/** The part of the Completed section that is on screen, given its collapse / show-all state. */
+export function completedShown<T>(completed: T[], collapsed: boolean, showAll: boolean): T[] {
+  if (collapsed) return [];
+  return showAll ? completed : completed.slice(0, COMPLETED_PREVIEW);
 }
 
 const byCreated = (a: { createdAt: number }, b: { createdAt: number }) => a.createdAt - b.createdAt;
@@ -108,15 +120,31 @@ export function treeRows(tree: TaskTree, tag: string | null): string[] {
 
 /**
  * Ids of the rows currently on screen, in display order: tree order (open tasks only,
- * skipping collapsed subtrees and anything the tag filter hides) or deadline order. History
- * rows aren't tasks, so that view has no keyboard order.
+ * skipping collapsed subtrees and anything the tag filter hides) or deadline order, which
+ * ends with the Completed rows unless that section is collapsed (or limited to its preview).
+ * History rows aren't tasks, so that view has no keyboard order.
  */
 export function visibleOrder(
   tree: TaskTree,
-  { view, tag }: { view: 'tree' | 'deadline' | 'history'; tag: string | null },
+  {
+    view,
+    tag,
+    completedCollapsed = false,
+    completedShowAll = false,
+  }: {
+    view: 'tree' | 'deadline' | 'history';
+    tag: string | null;
+    completedCollapsed?: boolean;
+    completedShowAll?: boolean;
+  },
 ): string[] {
   if (view === 'history') return [];
-  if (view === 'deadline') return deadlineList(tree, { tag });
+  if (view === 'deadline') {
+    const all = deadlineList(tree, { tag });
+    const open = all.filter((id) => !tree.tasks[id].done);
+    const done = all.filter((id) => tree.tasks[id].done);
+    return [...open, ...completedShown(done, completedCollapsed, completedShowAll)];
+  }
   return treeRows(tree, tag);
 }
 

@@ -17,6 +17,10 @@ type UIState = {
   view: View;
   /** Normalized tag the lists are filtered by, or null for everything. */
   tagFilter: string | null;
+  /** The By deadline view's Completed section is collapsed. Persisted. */
+  completedCollapsed: boolean;
+  /** Its "Show all" is pressed (otherwise only the first few rows show). Not persisted. */
+  completedShowAll: boolean;
   /** The row the keyboard acts on. Not persisted. */
   focusedId: string | null;
   /** Whether the tag filter popover is open, so a hotkey can open it. Not persisted. */
@@ -37,6 +41,8 @@ type UIState = {
   revealFlash: { id: string; n: number } | null;
   setView: (view: View) => void;
   setTagFilter: (tag: string | null) => void;
+  setCompletedCollapsed: (collapsed: boolean) => void;
+  setCompletedShowAll: (showAll: boolean) => void;
   setFocusedId: (id: string | null) => void;
   setFilterOpen: (open: boolean) => void;
   setPaletteOpen: (open: boolean) => void;
@@ -56,6 +62,8 @@ export const useUIStore = create<UIState>()(
     (set) => ({
       view: 'tree',
       tagFilter: null,
+      completedCollapsed: false,
+      completedShowAll: false,
       focusedId: null,
       filterOpen: false,
       paletteOpen: false,
@@ -68,6 +76,8 @@ export const useUIStore = create<UIState>()(
       revealFlash: null,
       setView: (view) => set({ view }),
       setTagFilter: (tagFilter) => set({ tagFilter }),
+      setCompletedCollapsed: (completedCollapsed) => set({ completedCollapsed }),
+      setCompletedShowAll: (completedShowAll) => set({ completedShowAll }),
       setFocusedId: (focusedId) => set({ focusedId }),
       setFilterOpen: (filterOpen) => set({ filterOpen }),
       setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
@@ -85,8 +95,12 @@ export const useUIStore = create<UIState>()(
     {
       name: 'ui-v1',
       version: 1,
-      storage: taskStorage<Pick<UIState, 'view' | 'tagFilter'>>(),
-      partialize: ({ view, tagFilter }) => ({ view, tagFilter }),
+      storage: taskStorage<Pick<UIState, 'view' | 'tagFilter' | 'completedCollapsed'>>(),
+      partialize: ({ view, tagFilter, completedCollapsed }) => ({
+        view,
+        tagFilter,
+        completedCollapsed,
+      }),
     },
   ),
 );

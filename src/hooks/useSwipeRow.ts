@@ -22,6 +22,8 @@ type Options = {
   enabled: boolean;
   /** Leaf: slide the row off, then delete. Parent: spring back and let `onDelete` ask. */
   deleteKind: 'slide' | 'confirm';
+  /** False: only the right swipe exists; dragging left does nothing. */
+  allowDelete?: boolean;
   onComplete: () => void;
   onDelete: () => void;
 };
@@ -32,7 +34,13 @@ const SLIDE_SECONDS = 0.18;
 const INTERACTIVE =
   'button, input, textarea, select, a, [role="checkbox"], [role="radio"], [data-no-swipe]';
 
-export function useSwipeRow({ enabled, deleteKind, onComplete, onDelete }: Options) {
+export function useSwipeRow({
+  enabled,
+  deleteKind,
+  allowDelete = true,
+  onComplete,
+  onDelete,
+}: Options) {
   const reduced = useReducedMotion();
   const x = useMotionValue(0);
   const [swiping, setSwiping] = useState(false);
@@ -42,8 +50,8 @@ export function useSwipeRow({ enabled, deleteKind, onComplete, onDelete }: Optio
   const engaged = useRef(false);
   const armedRef = useRef<SwipeSide | null>(null);
   const justSwiped = useRef(false);
-  const latest = useRef({ onComplete, onDelete, deleteKind, reduced });
-  latest.current = { onComplete, onDelete, deleteKind, reduced };
+  const latest = useRef({ onComplete, onDelete, deleteKind, allowDelete, reduced });
+  latest.current = { onComplete, onDelete, deleteKind, allowDelete, reduced };
 
   const setArmedSide = useCallback((side: SwipeSide | null) => {
     if (armedRef.current === side) return;
@@ -69,8 +77,9 @@ export function useSwipeRow({ enabled, deleteKind, onComplete, onDelete }: Optio
   /** Release handler: `dx` is finger travel, `rowWidth` the row's width. Returns what ran. */
   const onSwipeEnd = useCallback(
     (dx: number, rowWidth: number): SwipeAction => {
-      const action = swipeAction(dx, swipeThreshold(rowWidth));
-      const { onComplete, onDelete, deleteKind, reduced } = latest.current;
+      const { onComplete, onDelete, deleteKind, allowDelete, reduced } = latest.current;
+      const swiped = swipeAction(dx, swipeThreshold(rowWidth));
+      const action = swiped === 'delete' && !allowDelete ? null : swiped;
       if (action === 'delete' && deleteKind === 'slide') {
         const slide = animate(x, -Math.max(rowWidth, 1), {
           duration: reduced ? 0 : SLIDE_SECONDS,
@@ -112,7 +121,7 @@ export function useSwipeRow({ enabled, deleteKind, onComplete, onDelete }: Optio
       setSwiping(true);
     }
     const threshold = swipeThreshold(width.current);
-    const dx = info.offset.x;
+    const dx = latest.current.allowDelete ? info.offset.x : Math.max(0, info.offset.x);
     x.set(rubberBand(dx, threshold, width.current * MAX_TRAVEL_RATIO));
     setArmedSide(dx >= threshold ? 'right' : dx <= -threshold ? 'left' : null);
   };

@@ -70,7 +70,7 @@ export function dayHeader(timestamp: number, now: Date = new Date()): string {
 
 export const formatTime = (timestamp: number): string => timeFormat.format(new Date(timestamp));
 
-export type DeadlineBucket = 'overdue' | 'today' | 'tomorrow' | 'week' | 'later' | 'none';
+export type DeadlineBucket = 'overdue' | 'today' | 'tomorrow' | 'week' | 'later' | 'none' | 'done';
 
 export const BUCKET_LABELS: Record<DeadlineBucket, string> = {
   overdue: 'Overdue',
@@ -79,12 +79,14 @@ export const BUCKET_LABELS: Record<DeadlineBucket, string> = {
   week: 'This week',
   later: 'Later',
   none: 'No deadline',
+  done: 'Completed',
 };
 
 export function deadlineBucket(
-  task: Pick<Task, 'dueDate'>,
+  task: Pick<Task, 'done' | 'dueDate'>,
   today: string = todayISO(),
 ): DeadlineBucket {
+  if (task.done) return 'done';
   if (task.dueDate === null) return 'none';
   const days = daysBetween(today, task.dueDate);
   if (days < 0) return 'overdue';

@@ -1,4 +1,4 @@
-import { expect, type Page, type TestInfo } from '@playwright/test';
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 
 /** A fresh Firebase user id per test, so tests never see each other's data. */
 export const uniqueSub = (info: TestInfo) =>
@@ -46,4 +46,24 @@ export async function openMenu(page: Page, title: string) {
   const menu = page.getByRole('dialog', { name: 'Task options' });
   await expect(menu).toBeVisible();
   return menu;
+}
+
+/** A horizontal one-finger swipe across `target`, sent as real touch events through CDP. */
+export async function swipe(page: Page, target: Locator, dx: number): Promise<void> {
+  const box = await target.boundingBox();
+  if (!box) throw new Error('nothing to swipe');
+  const y = box.y + box.height / 2;
+  // Start well inside the row, clear of the check on the left and the buttons on the right.
+  const startX = box.x + box.width * (dx > 0 ? 0.4 : 0.6);
+  const cdp = await page.context().newCDPSession(page);
+  const send = (type: string, x: number) =>
+    cdp.send('Input.dispatchTouchEvent', {
+      type,
+      touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
+    });
+  await send('touchStart', startX);
+  const steps = 10;
+  for (let i = 1; i <= steps; i += 1) await send('touchMove', startX + (dx * i) / steps);
+  await send('touchEnd', startX + dx);
+  await cdp.detach();
 }
