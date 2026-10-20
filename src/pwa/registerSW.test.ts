@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const updateSW = vi.fn().mockResolvedValue(undefined);
-let options: { onNeedRefresh?: () => void; onOfflineReady?: () => void } = {};
+let options: {
+  onNeedRefresh?: () => void;
+  onOfflineReady?: () => void;
+  onRegisteredSW?: (url: string, r: ServiceWorkerRegistration | undefined) => void;
+} = {};
 
 vi.mock('virtual:pwa-register', () => ({
   registerSW: (o: typeof options) => {
@@ -11,18 +15,29 @@ vi.mock('virtual:pwa-register', () => ({
 }));
 
 import { useUIStore } from '../store/ui';
-import { registerServiceWorker } from './registerSW';
+import { registerServiceWorker, resetInteractionForTests } from './registerSW';
 
 beforeEach(() => {
   localStorage.clear();
   updateSW.mockClear();
   useUIStore.setState({ notice: null });
+  resetInteractionForTests();
   registerServiceWorker();
 });
 
+const interact = () => window.dispatchEvent(new Event('pointerdown'));
+
 describe('registerServiceWorker', () => {
-  it('shows a persistent "New version ready" notice whose action reloads via updateSW(true)', () => {
+  it('applies an update straight away when the page has not been used yet', () => {
     options.onNeedRefresh?.();
+    expect(updateSW).toHaveBeenCalledWith(true);
+    expect(useUIStore.getState().notice).toBeNull();
+  });
+
+  it('shows a persistent "New version ready" notice once the person is using the page', () => {
+    interact();
+    options.onNeedRefresh?.();
+    expect(updateSW).not.toHaveBeenCalled();
     const notice = useUIStore.getState().notice;
     expect(notice).toMatchObject({ text: 'New version ready', persistent: true });
     expect(notice?.action?.label).toBe('Reload');
@@ -39,5 +54,37 @@ describe('registerServiceWorker', () => {
     useUIStore.setState({ notice: null });
     options.onOfflineReady?.();
     expect(useUIStore.getState().notice).toBeNull();
+  });
+});
+
+describe('update checks', () => {
+  it('checks for a new version when the tab becomes visible again', () => {
+    const update = vi.fn().mockResolvedValue(undefined);
+    options.onRegisteredSW?.('/sw.js', { update } as unknown as ServiceWorkerRegistration);
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(update).toHaveBeenCalled();
+  });
+});
+
+describe('stale chunks after a deploy', () => {
+  it('reloads once when a lazy chunk fails to load, and not in a loop', () => {
+    const reload = vi.fn();
+    const original = window.location;
+    Object.defineProperty(window, 'location', {
+      value: { ...original, reload },
+      configurable: true,
+    });
+    sessionStorage.clear();
+
+    const first = new Event('vite:preloadError', { cancelable: true });
+    window.dispatchEvent(first);
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(first.defaultPrevented).toBe(true);
+
+    window.dispatchEvent(new Event('vite:preloadError', { cancelable: true }));
+    expect(reload).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(window, 'location', { value: original, configurable: true });
   });
 });
