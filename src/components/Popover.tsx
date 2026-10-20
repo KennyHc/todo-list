@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useIsPhone } from '../hooks/useMediaQuery';
 import styles from './Popover.module.css';
+import { dur, ease, spring } from '../styles/motion';
 
 type Props = {
   open: boolean;
@@ -121,9 +122,7 @@ function PopoverPanel({
   }, [anchorRef, onClose]);
 
   if (sheet) {
-    const spring = reduced
-      ? { duration: 0.01 }
-      : ({ type: 'spring', stiffness: 420, damping: 38, mass: 0.9 } as const);
+    const sheetSpring = reduced ? { duration: 0.01 } : spring.layout;
     return (
       <>
         <motion.div
@@ -132,7 +131,7 @@ function PopoverPanel({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: reduced ? 0.01 : 0.18 }}
+          transition={{ duration: reduced ? 0.01 : dur.base }}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={onClose}
         />
@@ -146,7 +145,7 @@ function PopoverPanel({
           initial={{ y: '100%' }}
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
-          transition={spring}
+          transition={sheetSpring}
         >
           <div ref={dragRef} className={styles.sheetInner}>
             <div
@@ -172,7 +171,7 @@ function PopoverPanel({
                 // Past 80px or flicked downwards: dismiss. Otherwise settle back.
                 if (e.clientY - d.startY > 80 || d.v > 0.5) onClose();
                 else {
-                  dragRef.current.style.transition = 'transform 160ms var(--ease-out)';
+                  dragRef.current.style.transition = 'transform var(--dur-base) var(--ease-out)';
                   dragRef.current.style.transform = '';
                 }
               }}
@@ -208,7 +207,7 @@ function PopoverPanel({
       initial={{ opacity: 0, scale: 0.96, y: pos.flipped ? 4 : -4 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.96, y: pos.flipped ? 4 : -4 }}
-      transition={{ duration: 0.14, ease: [0.2, 0.8, 0.2, 1] }}
+      transition={{ duration: dur.fast, ease: ease.out }}
     >
       {children}
     </motion.div>

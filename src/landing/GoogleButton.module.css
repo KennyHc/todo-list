@@ -4,7 +4,7 @@
   justify-content: center;
   gap: 10px;
   height: 44px;
-  padding: 0 20px;
+  padding: 0 var(--space-5);
   border: 1px solid #dadce0;
   border-radius: 999px;
   background: #ffffff;
@@ -16,7 +16,7 @@
   transition:
     box-shadow var(--t-fast),
     background-color var(--t-fast),
-    transform var(--t-fast);
+    var(--t-press);
 }
 
 :global([data-theme='dark']) .btn {
@@ -34,10 +34,6 @@
 :global([data-theme='dark']) .btn:hover:not(:disabled) {
   box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.7);
   background: #1b1b1d;
-}
-
-.btn:active:not(:disabled) {
-  transform: scale(0.985);
 }
 
 .btn:focus-visible {

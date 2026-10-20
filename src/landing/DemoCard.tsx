@@ -10,6 +10,7 @@ import { effectiveDifficulty, progress } from '../lib/tree';
 import type { TaskTree } from '../types';
 import { buildDemoTree, useDemo } from './useDemo';
 import styles from './DemoCard.module.css';
+import { dur, ease } from '../styles/motion';
 
 const NO_TAG_COLORS: Record<string, string> = {};
 
@@ -66,7 +67,7 @@ export function DemoCard({ autoplay = true }: { autoplay?: boolean }) {
         <motion.ul
           className={styles.list}
           animate={{ opacity: demo.fading ? 0 : 1 }}
-          transition={{ duration: 0.45, ease: 'easeInOut' }}
+          transition={{ duration: 0.45, ease: ease.inOut }}
         >
           <AnimatePresence initial={false}>
             {tree.rootIds.map((id) => (
@@ -101,8 +102,8 @@ function Row({ tree, id, depth, demo, reduced }: RowProps) {
       className={styles.item}
       initial={reduced ? false : { opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, transition: { duration: 0.15 } }}
-      transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
+      exit={{ opacity: 0, transition: { duration: dur.fast } }}
+      transition={{ duration: dur.slow, ease: ease.out }}
     >
       <div
         className={styles.row}

@@ -11,7 +11,8 @@
 
   --text: #0f172a;
   --text-2: #475569;
-  --muted: #94a3b8;
+  /* 4.5:1 on white cards (AA for small text), still clearly lighter than --text-2. */
+  --muted: #6b778a;
 
   --accent: #7c9cf0;
   --accent-soft: rgba(124, 156, 240, 0.14);
@@ -25,16 +26,37 @@
   --danger-soft: rgba(229, 72, 77, 0.1);
 
   --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.08);
-  --shadow-pop: 0 12px 32px -8px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.06);
+  --shadow-lift: 0 2px 4px rgba(15, 23, 42, 0.05), 0 14px 28px -12px rgba(15, 23, 42, 0.16);
+  --shadow-pop: 0 16px 40px -8px rgba(15, 23, 42, 0.22), 0 2px 8px rgba(15, 23, 42, 0.08);
   --shadow-thumb: 0 1px 2px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(15, 23, 42, 0.04);
 
   --r-sm: 6px;
   --r-md: 10px;
   --r-lg: 16px;
 
+  /* Motion tokens; the TS twins live in motion.ts. */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --t-fast: 120ms var(--ease-out);
-  --t-theme: 200ms ease;
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-instant: 80ms;
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+  --t-fast: var(--dur-fast) var(--ease-out);
+  --t-theme: var(--dur-base) var(--ease-in-out);
+  /* The pressed state of buttons, chips, segmented controls and menu items (see :active below). */
+  --press-scale: 0.97;
+  --t-press: scale var(--dur-fast) var(--ease-out);
+
+  /* A 4px rhythm: use these for padding, gaps and margins. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
 
   --font: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
@@ -45,14 +67,19 @@
   --bg: #0b0d12;
   --surface: #111419;
   --surface-2: #171b22;
-  --elevated: #1a1e26;
+  /* Popovers, sheets and dialogs sit a clear step above cards (surface), which sit above the page. */
+  --elevated: #1f242d;
 
-  --border: rgba(255, 255, 255, 0.06);
-  --border-strong: rgba(255, 255, 255, 0.1);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  /* Top of the page glow: a touch lighter than --bg, fading out by 40vh. */
+  --bg-top: color-mix(in srgb, var(--bg) 97%, white);
 
   --text: #e7eaf0;
   --text-2: #a3acbc;
-  --muted: #626c7e;
+  /* 4.8:1 or better on every dark surface, so meta text stays readable. */
+  --muted: #8590a3;
 
   --accent: #8faef5;
   --accent-soft: rgba(143, 174, 245, 0.14);
@@ -67,9 +94,12 @@
   --shadow-card:
     inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.4),
     0 12px 28px -14px rgba(0, 0, 0, 0.6);
+  --shadow-lift:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 4px rgba(0, 0, 0, 0.4),
+    0 16px 32px -12px rgba(0, 0, 0, 0.7);
   --shadow-pop:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 16px 40px -8px rgba(0, 0, 0, 0.7),
-    0 2px 6px rgba(0, 0, 0, 0.4);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 24px 56px -12px rgba(0, 0, 0, 0.85),
+    0 4px 12px rgba(0, 0, 0, 0.5);
   --shadow-thumb: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
@@ -85,7 +115,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--bg);
+  background-color: var(--bg);
   color: var(--text);
   font-family: var(--font);
   font-size: 14.5px;
@@ -97,6 +127,25 @@ body {
   transition:
     background-color var(--t-theme),
     color var(--t-theme);
+}
+
+/* Dark only: a faint lift at the top of the page so the layers read. Fixed, so it never scrolls. */
+:root[data-theme='dark'] body {
+  background-image: linear-gradient(to bottom, var(--bg-top), var(--bg) 40vh);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+/*
+ * Pressed state, one for every control: buttons, chips, segmented options and menu items dip to
+ * 97%. It uses the individual `scale` property so it composes with the transforms components set
+ * (positioning, Framer Motion). Components add --t-press to their own transition lists.
+ * Opt out with data-press="off" (controls with their own press, e.g. the checkbox).
+ */
+:where(button, [role='button'], [role='radio'], [role='menuitem'], [role='option']):where(
+  :not(:disabled, [aria-disabled='true'], [data-press='off']):active
+) {
+  scale: var(--press-scale);
 }
 
 button,
@@ -118,8 +167,9 @@ input {
 .app {
   max-width: 680px;
   margin: 0 auto;
-  padding: max(40px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
-    max(56px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  padding: max(var(--space-8), env(safe-area-inset-top))
+    max(var(--space-4), env(safe-area-inset-right)) max(56px, env(safe-area-inset-bottom))
+    max(var(--space-4), env(safe-area-inset-left));
 }
 
 * {
@@ -145,10 +195,10 @@ input {
 
 @media (max-width: 480px) {
   .app {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 20px);
-    padding-right: max(12px, env(safe-area-inset-right));
-    padding-bottom: max(40px, env(safe-area-inset-bottom));
-    padding-left: max(12px, env(safe-area-inset-left));
+    padding-top: calc(env(safe-area-inset-top, 0px) + var(--space-5));
+    padding-right: max(var(--space-3), env(safe-area-inset-right));
+    padding-bottom: max(var(--space-8), env(safe-area-inset-bottom));
+    padding-left: max(var(--space-3), env(safe-area-inset-left));
   }
 }
 

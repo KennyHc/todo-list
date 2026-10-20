@@ -53,6 +53,7 @@ import { StrikeText } from './StrikeText';
 import { SwipeRow } from './SwipeRow';
 import styles from './TaskItem.module.css';
 import { TitleEditor } from './TitleEditor';
+import { dur, ease, spring } from '../styles/motion';
 
 type Props = {
   id: string;
@@ -84,21 +85,21 @@ const SHAKE_SECONDS = 0.38;
 const iconMotion: MotionProps = {
   whileHover: { scale: 1.08 },
   whileTap: { scale: 0.9 },
-  transition: { type: 'spring', stiffness: 500, damping: 25 },
+  transition: spring.pop,
 };
 
 /** Beats of a completed row's exit, in seconds: shrink, then pop, then the height collapse. */
 export const SHRINK_S = 0.22;
 export const POP_S = 0.14;
-export const COLLAPSE_S = 0.2;
-const SHRINK_EASE = [0.4, 0, 0.2, 1] as const;
+export const COLLAPSE_S = dur.base;
+const SHRINK_EASE = ease.inOut;
 
 const DELETE_EXIT: TargetAndTransition = {
   opacity: 0,
   x: -12,
   height: 0,
   overflow: 'hidden',
-  transition: { duration: 0.2 },
+  transition: { duration: dur.base },
 };
 
 /** A row leaves because it was completed (it still exists, done) or because it was deleted. */
@@ -126,17 +127,12 @@ function contentExit(id: string, reduced: boolean | null): TargetAndTransition {
       duration: SHRINK_S + POP_S,
       delay: popDelays.get(id) ?? 0,
       times: [0, SHRINK_S / (SHRINK_S + POP_S), 1],
-      ease: [SHRINK_EASE, [0.2, 0.8, 0.2, 1]],
+      ease: [SHRINK_EASE, ease.out],
     },
   };
 }
 
-const ENTER = {
-  type: 'spring',
-  stiffness: 500,
-  damping: 35,
-  layout: { type: 'spring', stiffness: 380, damping: 34 },
-} as const;
+const ENTER = { ...spring.snappy, layout: spring.layout } as const;
 
 function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
   const liveTask = useTask(id);
@@ -314,6 +310,7 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
   const chevron = (
     <motion.button
       type="button"
+      data-press="off"
       className={`${styles.iconBtn} ${styles.chevron}`}
       aria-label={task.collapsed ? 'Expand' : 'Collapse'}
       aria-expanded={!task.collapsed}
@@ -322,7 +319,7 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
       animate={{ rotate: task.collapsed ? 0 : 90 }}
       whileHover={{ scale: 1.08 }}
       whileTap={{ scale: 0.9 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 26 }}
+      transition={spring.snappy}
     >
       <ChevronRight size={15} strokeWidth={1.75} aria-hidden="true" />
     </motion.button>
@@ -529,6 +526,7 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
                       <motion.button
                         {...iconMotion}
                         type="button"
+                        data-press="off"
                         className={styles.iconBtn}
                         aria-label="Add subtask"
                         onClick={addChild}
@@ -538,6 +536,7 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
                       <motion.button
                         {...iconMotion}
                         type="button"
+                        data-press="off"
                         className={`${styles.iconBtn} ${styles.deleteBtn}`}
                         aria-label="Delete task"
                         onClick={requestDelete}
@@ -583,7 +582,7 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
 
 export const TaskItem = memo(TaskItemInner);
 
-const SHIFT = { duration: 180, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' };
+const SHIFT = { duration: dur.base * 1000, easing: `cubic-bezier(${ease.out.join(', ')})` };
 
 type SortableProps = Omit<Props, 'drag' | 'flat'> & { dragEnabled: boolean };
 

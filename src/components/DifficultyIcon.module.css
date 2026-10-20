@@ -13,7 +13,8 @@
   cursor: pointer;
   transition:
     background-color var(--t-fast),
-    opacity var(--t-fast);
+    opacity var(--t-fast),
+    var(--t-press);
 }
 
 .button:hover,

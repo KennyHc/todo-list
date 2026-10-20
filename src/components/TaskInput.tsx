@@ -27,14 +27,16 @@ import { QuickChip } from './QuickChip';
 import { TagChip } from './TagChip';
 import { TagEditor } from './TagEditor';
 import styles from './TaskInput.module.css';
+import { dur, ease, spring } from '../styles/motion';
 
 type Panel = 'tag' | 'date' | null;
 
 /** A `#prefix` being typed right before the caret. */
 const OPEN_TOKEN = /(^|\s)#([\p{L}\p{N}_-]+)$/u;
 const MAX_SUGGESTIONS = 5;
-const SLIDE = { type: 'spring', stiffness: 420, damping: 38 } as const;
-const CHIP_FADE = { duration: 0.14, ease: 'easeOut' } as const;
+/** The chip row and toolbar open and close with a height spring, so the list below glides. */
+const SLIDE = spring.gentle;
+const CHIP_FADE = { duration: dur.fast, ease: ease.out } as const;
 const CHIP_HIDDEN = { opacity: 0, scale: 0.96 };
 const CHIP_SHOWN = { opacity: 1, scale: 1 };
 

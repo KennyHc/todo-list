@@ -25,12 +25,12 @@
 @media (prefers-reduced-motion: no-preference) {
   /* The list card fades in just ahead of its tasks, so an empty card never pops in first. */
   .intro > :nth-child(4) {
-    animation: intro-fade 600ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
+    animation: intro-fade 600ms var(--ease-expo) 120ms both;
   }
 
   .intro > :nth-child(-n + 3),
   .intro ul > li {
-    animation: intro-rise 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: intro-rise 900ms var(--ease-expo) both;
   }
 
   .intro > :nth-child(2) {

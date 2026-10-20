@@ -7,10 +7,14 @@ import type { HistoryEntry } from '../lib/history';
 import { todayISO } from '../lib/views';
 import { useTaskStore } from '../store/tasks';
 import { useUIStore } from '../store/ui';
+import { MAX_DIFFICULTY, type Difficulty } from '../types';
 import { ConfirmDialog } from './ConfirmDialog';
+import { DIFFICULTY_NAMES, difficultyAria } from '../lib/difficulty';
+import { DifficultyGlyph } from './DifficultyGlyph';
 import { DuePill } from './DuePill';
 import { TagChip } from './TagChip';
 import styles from './HistoryList.module.css';
+import { dur, ease, spring } from '../styles/motion';
 
 function groupByDay(entries: HistoryEntry[]): { label: string; entries: HistoryEntry[] }[] {
   const groups: { label: string; entries: HistoryEntry[] }[] = [];
@@ -31,17 +35,16 @@ const DELETE_EXIT = {
   x: -12,
   height: 0,
   overflow: 'hidden',
-  transition: { duration: 0.2 },
+  transition: { duration: dur.base, ease: ease.out },
 };
 const RESTORE_EXIT = {
   opacity: 0,
   x: 10,
   height: 0,
   overflow: 'hidden',
-  transition: { duration: 0.22 },
+  transition: { duration: dur.base, ease: ease.out },
 };
 
-const BUTTON_SPRING = { type: 'spring', stiffness: 520, damping: 30 } as const;
 const STAGGER_S = 0.025;
 
 function Entry({
@@ -62,6 +65,7 @@ function Entry({
   // Entries from before tag colours snapshot the old default blue, which meant "no colour".
   const edge = normalizeTaskColor(entry.color);
   const late = entry.dueDate !== null && todayISO(new Date(entry.completedAt)) > entry.dueDate;
+  const level = Math.min(MAX_DIFFICULTY, Math.max(1, Math.round(entry.difficulty))) as Difficulty;
   const canRestore = taskDone === true;
   const reason =
     taskDone === undefined
@@ -83,13 +87,14 @@ function Entry({
         exit: () => (leaving.get(entry.id) === 'restore' ? RESTORE_EXIT : DELETE_EXIT),
       }}
       exit="exit"
-      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+      transition={spring.snappy}
     >
       <button
         type="button"
         role="checkbox"
         aria-checked="true"
         aria-label={`Done: ${entry.title}`}
+        data-press="off"
         className={styles.check}
         disabled={!canRestore}
         title={reason ?? 'Restore to your list'}
@@ -113,11 +118,23 @@ function Entry({
         </div>
         <div className={styles.meta}>
           {entry.path.length > 0 && <span className={styles.crumb}>{entry.path.join(' › ')}</span>}
-          <span className={styles.badge}>
-            {entry.isParent
-              ? `Σ ${entry.difficulty} · ${entry.subtaskCount} subtask${entry.subtaskCount === 1 ? '' : 's'}`
-              : `Difficulty ${entry.difficulty}`}
-          </span>
+          {entry.isParent ? (
+            <span
+              className={styles.badge}
+              title={`${entry.subtaskCount} subtask${entry.subtaskCount === 1 ? '' : 's'}, difficulty ${entry.difficulty} in total`}
+            >
+              Σ {entry.difficulty}
+            </span>
+          ) : (
+            <span
+              className={styles.glyph}
+              role="img"
+              aria-label={difficultyAria(level)}
+              title={DIFFICULTY_NAMES[level]}
+            >
+              <DifficultyGlyph value={level} />
+            </span>
+          )}
           {entry.tags.map((tag) => (
             <TagChip key={tag} tag={tag} onClick={() => setTagFilter(tag)} />
           ))}
@@ -141,13 +158,14 @@ function Entry({
           <motion.button
             key="delete"
             type="button"
+            data-press="off"
             className={styles.minus}
             aria-label={`Delete "${entry.title}" permanently`}
             initial={reduced ? { opacity: 0 } : { opacity: 0, x: 12 }}
             animate={reduced ? { opacity: 1 } : { opacity: 1, x: 0 }}
             exit={reduced ? { opacity: 0 } : { opacity: 0, x: 12 }}
             transition={
-              reduced ? { duration: 0.12 } : { ...BUTTON_SPRING, delay: index * STAGGER_S }
+              reduced ? { duration: dur.fast } : { ...spring.snappy, delay: index * STAGGER_S }
             }
             onClick={() => {
               leaving.set(entry.id, 'delete');
@@ -205,7 +223,7 @@ export function HistoryList() {
                 initial={{ opacity: 0, x: 8 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 8 }}
-                transition={{ duration: 0.15 }}
+                transition={{ duration: dur.fast, ease: ease.out }}
                 onClick={() => setConfirming(true)}
               >
                 Delete all

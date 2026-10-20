@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 import styles from './UndoToast.module.css';
+import { dur, ease, spring } from '../styles/motion';
 
 /** A one-shot info toast (no undo) that dismisses itself via the CSS timer bar. */
 export function InfoToast({
@@ -32,10 +33,8 @@ export function InfoToast({
             aria-live="polite"
             initial={reduced ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
             animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.15 } }}
-            transition={
-              reduced ? { duration: 0.15 } : { type: 'spring', stiffness: 520, damping: 34 }
-            }
+            exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
+            transition={reduced ? { duration: dur.fast } : spring.snappy}
           >
             <span className={styles.label} style={{ whiteSpace: 'normal' }}>
               {message}

@@ -24,7 +24,8 @@
   transition:
     background-color var(--t-fast),
     color var(--t-fast),
-    box-shadow var(--t-fast);
+    box-shadow var(--t-fast),
+    var(--t-press);
 }
 
 .seg:hover {

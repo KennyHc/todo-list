@@ -7,8 +7,10 @@ import { useTaskStore, type TaskStore } from '../store/tasks';
 import { useShallow } from 'zustand/react/shallow';
 import { useUIStore } from '../store/ui';
 import { EmptyState } from './EmptyState';
+import { useSessionStore } from '../store/session';
 import { TaskItem } from './TaskItem';
 import styles from './DeadlineList.module.css';
+import { dur, ease } from '../styles/motion';
 
 const HEADER = 'section:';
 const isHeader = (key: string) => key.startsWith(HEADER);
@@ -37,6 +39,7 @@ function headerBefore(keys: string[], id: string): string[] {
 
 export function DeadlineList() {
   const tag = useUIStore((s) => s.tagFilter);
+  const celebrate = useSessionStore((s) => s.completedSomething);
   // Headers and ids settle as one list. A just-completed task (filed in History, so no longer
   // in it) is held, with its section header if it was the last one there, until the strike
   // animation has played.
@@ -58,7 +61,7 @@ export function DeadlineList() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.16 }}
+                transition={{ duration: dur.base, ease: ease.out }}
               >
                 {BUCKET_LABELS[key.slice(HEADER.length) as DeadlineBucket]}
               </motion.li>
@@ -70,7 +73,7 @@ export function DeadlineList() {
       </ul>
       {shown.length === 0 && tag === null && (
         <div className={styles.allClear}>
-          <EmptyState />
+          <EmptyState celebrate={celebrate} />
         </div>
       )}
     </LayoutGroup>

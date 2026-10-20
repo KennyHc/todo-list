@@ -19,23 +19,41 @@
 
 .item[data-completing] .row {
   background: var(--surface-2);
-  transition: background-color 220ms cubic-bezier(0.4, 0, 0.2, 1) var(--pop-delay, 0s);
+  transition: background-color 220ms var(--ease-in-out) var(--pop-delay, 0s);
 }
 
 .row {
+  /*
+   * Every row is a first-line band: the checkbox, title, difficulty glyph / Σ badge and the ⋯ button
+   * all centre on the first line (40px tall on desktop, 48px on phones), so a title that wraps or
+   * grows a chips line never drags them away from it. Rows are top-aligned to make that so.
+   */
+  --band: 40px;
+  /* 6 + a 28px control + 6 fills the 40px band exactly. */
+  --pad-y: 6px;
+  /* Pulls a 28px control up/down so its centre sits on the band's centre. */
+  --nudge: calc(var(--band) / 2 - 14px - var(--pad-y));
   position: relative;
   display: flex;
-  align-items: center;
-  gap: 0 8px;
+  align-items: flex-start;
+  gap: 0 var(--space-2);
   min-width: 0;
-  min-height: 40px;
-  padding: 0 6px 0 8px;
+  min-height: var(--band);
+  padding: var(--pad-y) var(--space-2);
   border-radius: var(--r-md);
   isolation: isolate;
   transition:
     background-color var(--t-fast),
-    box-shadow 200ms ease,
+    box-shadow var(--dur-base) var(--ease-in-out),
     opacity var(--t-fast);
+}
+
+/* Touch has no hover, so a finger on a row tints it instead of scaling it (a scale would fight
+   the swipe and the long-press drag). */
+@media (hover: none) {
+  .row:active {
+    background: var(--surface-2);
+  }
 }
 
 /* Context-only ancestors under a tag filter. On the row, not the item, so children don't compound. */
@@ -117,6 +135,18 @@
   width: 20px;
 }
 
+/* The 44px checkbox hit area is centred on the first-line band without growing the row. */
+.row > [role='checkbox'] {
+  margin-top: calc(var(--band) / 2 - 22px - var(--pad-y));
+  margin-bottom: -24px;
+}
+
+.row > .chevron,
+.row > .meta,
+.row > .actions {
+  margin-top: var(--nudge);
+}
+
 .iconBtn {
   position: relative;
   display: inline-flex;
@@ -195,6 +225,8 @@
 .title {
   flex: 1 1 0;
   min-width: 0;
+  /* Band centre (20) minus the row padding (6) minus half the 20px line. */
+  padding-top: 4px;
   font-size: 14.5px;
   font-weight: 450;
   letter-spacing: -0.005em;
@@ -205,7 +237,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 4px 8px;
+  gap: var(--space-1) var(--space-2);
   min-width: 0;
   cursor: text;
 }
@@ -250,6 +282,7 @@
   display: flex;
   flex: none;
   align-items: center;
+  min-height: 28px;
 }
 
 .summary {
@@ -284,14 +317,17 @@
   display: flex;
   flex: none;
   align-items: center;
+  min-height: 28px;
   opacity: 0;
-  transition: opacity var(--t-fast);
+  /* Hover reveals fade out quicker than they fade in. */
+  transition: opacity var(--dur-instant) var(--ease-out);
 }
 
 .row:hover .actions,
 .row:has(:focus-visible) .actions,
 .actions:has([aria-expanded='true']) {
   opacity: 1;
+  transition-duration: var(--dur-fast);
 }
 
 @media (hover: none) {
@@ -340,7 +376,7 @@
 /* Drag handle in the left gutter, before the chevron. */
 .grip {
   position: absolute;
-  top: 50%;
+  top: calc(var(--band) / 2);
   left: -6px;
   z-index: 1;
   display: inline-flex;
@@ -359,7 +395,7 @@
   touch-action: manipulation;
   user-select: none;
   transition:
-    opacity var(--t-fast),
+    opacity var(--dur-instant) var(--ease-out),
     color var(--t-fast);
 }
 
@@ -375,6 +411,7 @@
 .row:has(:focus-visible) .grip,
 .grip:focus-visible {
   opacity: 1;
+  transition-duration: var(--dur-fast);
 }
 
 @media (hover: none) {
@@ -402,19 +439,15 @@
    * two lines or a second line of chips keeps its checkbox and trailing cluster on line 1.
    */
   .row {
-    align-items: flex-start;
-    gap: 0 8px;
-    min-height: 48px;
-    padding: 10px 6px 10px 12px;
+    --band: 48px;
+    --pad-y: 10px;
+    gap: 0 var(--space-2);
+    padding: var(--pad-y) 6px var(--pad-y) var(--space-3);
     -webkit-touch-callout: none;
   }
 
   .chevron {
     height: 28px;
-  }
-
-  .row > [role='checkbox'] {
-    margin-top: -8px;
   }
 
   .title {
@@ -424,7 +457,7 @@
   }
 
   .titleLine {
-    gap: 4px 6px;
+    gap: var(--space-1) 6px;
   }
 
   /* Line 2: chips, due date and (in the deadline view) the breadcrumb, under the title. */
@@ -488,7 +521,6 @@
     left: 0;
     width: 14px;
     height: 28px;
-    top: 24px;
     opacity: 0.5;
   }
 

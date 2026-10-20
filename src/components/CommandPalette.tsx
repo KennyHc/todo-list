@@ -44,6 +44,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { DuePill } from './DuePill';
 import { Keys } from './Kbd';
 import styles from './CommandPalette.module.css';
+import { dur, ease } from '../styles/motion';
 
 const MAX_TASKS = 8;
 const MAX_RECENT = 5;
@@ -323,7 +324,7 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.16 }}
+      transition={{ duration: dur.base, ease: ease.out }}
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -337,7 +338,7 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
         initial={{ opacity: 0, scale: 0.98, y: -6 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.98, y: -6 }}
-        transition={{ type: 'spring', duration: 0.16, bounce: 0 }}
+        transition={{ duration: dur.base, ease: ease.out }}
         onKeyDown={onKeyDown}
       >
         <div className={styles.field}>

@@ -46,7 +46,9 @@
   border: 0;
   background: transparent;
   cursor: pointer;
-  transition: background-color var(--t-fast);
+  transition:
+    background-color var(--t-fast),
+    var(--t-press);
 }
 
 .undo {

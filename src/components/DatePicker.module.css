@@ -24,7 +24,8 @@
   transition:
     background-color var(--t-fast),
     border-color var(--t-fast),
-    color var(--t-fast);
+    color var(--t-fast),
+    var(--t-press);
 }
 
 .pick:hover {
@@ -68,7 +69,9 @@
   color: var(--muted);
   font-size: 12px;
   cursor: pointer;
-  transition: color var(--t-fast);
+  transition:
+    color var(--t-fast),
+    var(--t-press);
 }
 
 .clear:hover {

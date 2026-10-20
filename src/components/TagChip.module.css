@@ -69,6 +69,7 @@
 
 .clickable {
   cursor: pointer;
+  transition: var(--t-press);
 }
 
 .clickable:hover {

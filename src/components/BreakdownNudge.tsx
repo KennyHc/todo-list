@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
 import styles from './BreakdownNudge.module.css';
+import { spring } from '../styles/motion';
 
 type Props = { onBreakdown: () => void; flat?: boolean };
 
@@ -10,7 +11,7 @@ export function BreakdownNudge({ onBreakdown, flat }: Props) {
       initial={{ height: 0, opacity: 0 }}
       animate={{ height: 'auto', opacity: 1 }}
       exit={{ height: 0, opacity: 0 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 36 }}
+      transition={spring.layout}
       style={{ overflow: 'hidden' }}
     >
       <div className={`${styles.nudge} ${flat ? styles.flat : ''}`}>

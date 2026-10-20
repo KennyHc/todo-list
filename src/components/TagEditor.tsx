@@ -5,6 +5,7 @@ import { useAllTags, useTagColors, useTaskStore } from '../store/tasks';
 import { ColorPicker } from './ColorPicker';
 import { TagChip } from './TagChip';
 import styles from './TagEditor.module.css';
+import { spring } from '../styles/motion';
 
 type Props = {
   tags: string[];
@@ -78,7 +79,7 @@ export function TagEditor({ tags, onChange, autoFocus, compact, colorEdit }: Pro
                 initial={{ opacity: 0, scale: 0.85 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.85 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 32 }}
+                transition={spring.snappy}
               >
                 <TagChip
                   tag={tag}

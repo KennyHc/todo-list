@@ -15,7 +15,8 @@
   transition:
     background-color var(--t-fast),
     border-color var(--t-fast),
-    color var(--t-fast);
+    color var(--t-fast),
+    var(--t-press);
 }
 
 .button:hover {

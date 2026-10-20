@@ -21,6 +21,7 @@ import { useUIStore } from './store/ui';
 import { useTaskStore, useTotals } from './store/tasks';
 import styles from './App.module.css';
 import { useIntro } from './hooks/useIntro';
+import { dur, ease } from './styles/motion';
 
 const dateFormat = new Intl.DateTimeFormat(undefined, {
   weekday: 'long',
@@ -73,8 +74,8 @@ function App() {
                 key={view}
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 4 }}
-                transition={{ duration: 0.16 }}
+                exit={{ opacity: 0, y: 4, transition: { duration: dur.fast, ease: ease.out } }}
+                transition={{ duration: dur.base, ease: ease.out }}
               >
                 {view === 'history' ? (
                   <HistoryList />

@@ -11,7 +11,7 @@
   width: 100%;
   max-width: 1080px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 var(--space-6);
 }
 
 /* ---- nav ---- */
@@ -37,7 +37,7 @@
   max-width: 1080px;
   height: 64px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 var(--space-6);
 }
 
 .brand {
@@ -61,7 +61,7 @@
 
 .ghost {
   height: 34px;
-  padding: 0 12px;
+  padding: 0 var(--space-3);
   border: 0;
   border-radius: var(--r-md);
   background: none;
@@ -71,7 +71,8 @@
   cursor: pointer;
   transition:
     background-color var(--t-fast),
-    color var(--t-fast);
+    color var(--t-fast),
+    var(--t-press);
 }
 
 .ghost:hover:not(:disabled) {
@@ -137,7 +138,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: 32px;
+  margin-top: var(--space-7);
 }
 
 .fine {
@@ -148,8 +149,8 @@
 
 .notice {
   max-width: 420px;
-  margin: 12px 0 0;
-  padding: 8px 14px;
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) 14px;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   background: var(--surface-2);
@@ -160,7 +161,7 @@
 
 .error {
   max-width: 420px;
-  margin: 12px 0 0;
+  margin: var(--space-3) 0 0;
   color: var(--danger);
   font-size: 13px;
   line-height: 1.45;
@@ -175,7 +176,7 @@
 .features {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 40px;
+  gap: var(--space-8);
   padding-top: 112px;
 }
 
@@ -195,7 +196,7 @@
 }
 
 .featureTitle {
-  margin: 16px 0 6px;
+  margin: var(--space-4) 0 6px;
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -218,7 +219,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: var(--space-4);
   color: var(--landing-quiet);
   font-size: 13px;
 }
@@ -282,7 +283,7 @@
 
 .links {
   display: flex;
-  gap: 20px;
+  gap: var(--space-5);
 }
 
 .links a {
@@ -317,7 +318,7 @@
 @media (max-width: 520px) {
   .wrap,
   .navInner {
-    padding-inline: 16px;
+    padding-inline: var(--space-4);
   }
 
   .hero {

@@ -6,6 +6,7 @@ import { SHORTCUT_GROUPS } from '../lib/shortcuts';
 import { useUIStore } from '../store/ui';
 import { Keys } from './Kbd';
 import styles from './ShortcutsSheet.module.css';
+import { dur, ease } from '../styles/motion';
 
 function Sheet({ onClose }: { onClose: () => void }) {
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -33,7 +34,7 @@ function Sheet({ onClose }: { onClose: () => void }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.16 }}
+      transition={{ duration: dur.base, ease: ease.out }}
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -46,7 +47,7 @@ function Sheet({ onClose }: { onClose: () => void }) {
         initial={{ opacity: 0, scale: 0.98, y: -6 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.98, y: -6 }}
-        transition={{ type: 'spring', duration: 0.16, bounce: 0 }}
+        transition={{ duration: dur.base, ease: ease.out }}
         onKeyDown={onKeyDown}
       >
         <header className={styles.header}>

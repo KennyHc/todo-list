@@ -4,6 +4,7 @@ import { CalendarClock, ListTree, ShieldCheck, type LucideIcon } from 'lucide-re
 import { DemoCard } from './DemoCard';
 import { GoogleButton } from './GoogleButton';
 import styles from './LandingPage.module.css';
+import { ease } from '../styles/motion';
 
 type Props = {
   onSignIn: () => void;
@@ -12,8 +13,6 @@ type Props = {
   /** A neutral one-off message, e.g. confirmation that the account was deleted. */
   notice?: string | null;
 };
-
-const EASE = [0.2, 0.8, 0.2, 1] as const;
 
 const FEATURES: { icon: LucideIcon; title: string; text: string }[] = [
   {
@@ -84,7 +83,7 @@ function Item({ children, className }: { children: ReactNode; className?: string
     ? { hidden: { opacity: 1 }, show: { opacity: 1 } }
     : {
         hidden: { opacity: 0, y: 12 },
-        show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } },
+        show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: ease.out } },
       };
   return (
     <motion.div className={className} variants={variants}>

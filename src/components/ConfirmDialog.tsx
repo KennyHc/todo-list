@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 're
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import styles from './ConfirmDialog.module.css';
+import { dur, ease, spring } from '../styles/motion';
 
 type Props = {
   open: boolean;
@@ -56,7 +57,7 @@ function Dialog({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.16 }}
+      transition={{ duration: dur.base, ease: ease.out }}
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
@@ -70,7 +71,7 @@ function Dialog({
         initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 8 }}
-        transition={{ type: 'spring', stiffness: 520, damping: 34 }}
+        transition={spring.snappy}
         onKeyDown={onKeyDown}
       >
         <h2 id={titleId} className={styles.title}>

@@ -22,7 +22,8 @@
   cursor: pointer;
   transition:
     color var(--t-fast),
-    background-color var(--t-fast);
+    background-color var(--t-fast),
+    var(--t-press);
 }
 
 .step:hover {

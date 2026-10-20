@@ -24,7 +24,9 @@
   background: none;
   color: var(--muted);
   cursor: pointer;
-  transition: color var(--t-fast);
+  transition:
+    color var(--t-fast),
+    var(--t-press);
 }
 
 .option:hover {

@@ -27,7 +27,9 @@
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
-  transition: color var(--t-fast);
+  transition:
+    color var(--t-fast),
+    var(--t-press);
 }
 
 .option:hover {

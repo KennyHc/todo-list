@@ -2,8 +2,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
 }
 
 .heading {
@@ -31,13 +31,13 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .stats {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .count {
@@ -66,8 +66,8 @@
 /* Phone: one calm row, the title and date on the left, progress and avatar on the right. */
 @media (max-width: 480px) {
   .header {
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
     padding: 0 4px;
   }
 
@@ -81,7 +81,7 @@
   }
 
   .controls {
-    gap: 12px;
+    gap: var(--space-3);
   }
 
   .stats {

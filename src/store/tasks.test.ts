@@ -758,3 +758,29 @@ describe('completed tasks: delete, restore, repair', () => {
     expect(get().history.map((e) => e.taskId)).toEqual(['x']);
   });
 });
+
+describe('removing an abandoned draft', () => {
+  beforeEach(() => resetTaskStore());
+
+  it('does not create an undo entry for an empty, childless task', () => {
+    const s = useTaskStore.getState();
+    const kept = s.add({ title: 'Real task' });
+    s.remove(kept);
+    const realUndo = useTaskStore.getState().undo;
+    expect(realUndo?.label).toBe('Deleted “Real task”');
+
+    const draft = useTaskStore.getState().add({ title: '' });
+    useTaskStore.getState().remove(draft);
+
+    expect(useTaskStore.getState().tasks[draft]).toBeUndefined();
+    expect(useTaskStore.getState().undo).toBe(realUndo);
+  });
+
+  it('still offers undo for an untitled task that has subtasks', () => {
+    const s = useTaskStore.getState();
+    const parent = s.add({ title: '' });
+    s.add({ title: 'Child', parentId: parent });
+    useTaskStore.getState().remove(parent);
+    expect(useTaskStore.getState().undo?.label).toMatch(/and 1 subtask/);
+  });
+});

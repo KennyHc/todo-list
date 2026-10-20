@@ -14,6 +14,7 @@ import {
   swipeThreshold,
   type SwipeAction,
 } from '../lib/swipe';
+import { dur, ease, spring } from '../styles/motion';
 
 export type SwipeSide = 'right' | 'left';
 
@@ -25,7 +26,7 @@ type Options = {
   onDelete: () => void;
 };
 
-const SPRING = { type: 'spring', stiffness: 500, damping: 38 } as const;
+const SPRING = spring.snappy;
 const SLIDE_SECONDS = 0.18;
 /** Controls the gesture never starts on. Elements opt back in with data-swipe-through. */
 const INTERACTIVE =
@@ -52,9 +53,9 @@ export function useSwipeRow({ enabled, deleteKind, onComplete, onDelete }: Optio
   }, []);
 
   const springBack = useCallback(() => {
-    const spring = latest.current.reduced ? { duration: 0.12, ease: 'easeOut' as const } : SPRING;
+    const back = latest.current.reduced ? { duration: dur.fast, ease: ease.out } : SPRING;
     // `swiping` stays on until the row is home, so the clip and opaque backing hold meanwhile.
-    void animate(x, 0, spring).then(() => {
+    void animate(x, 0, back).then(() => {
       if (!engaged.current) setSwiping(false);
     });
   }, [x]);

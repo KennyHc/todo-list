@@ -51,7 +51,9 @@
   font-size: 13px;
   text-align: left;
   cursor: pointer;
-  transition: background-color var(--t-fast);
+  transition:
+    background-color var(--t-fast),
+    var(--t-press);
 }
 
 .item svg {

@@ -43,6 +43,7 @@ import { useTaskStore } from '../store/tasks';
 import { useUIStore } from '../store/ui';
 import { DragPreview } from './DragPreview';
 import { EmptyState } from './EmptyState';
+import { useSessionStore } from '../store/session';
 import { SortableTaskItem } from './TaskItem';
 import styles from './TaskList.module.css';
 
@@ -90,6 +91,7 @@ const structureKey = (s: { tasks: Record<string, { childIds: string[] }>; rootId
 
 export function TaskList() {
   const tag = useUIStore((s) => s.tagFilter);
+  const celebrate = useSessionStore((s) => s.completedSomething);
   const reduced = useReducedMotion();
   const activeId = useDragStore((s) => s.activeId);
   const liveIds = useTaskStore(useShallow((s) => flattenTree(s, { tag })));
@@ -335,7 +337,7 @@ export function TaskList() {
       {ids.length === 0 && tag === null && (
         // Everything is done: once the last rows have popped away, say so.
         <div className={styles.allClear}>
-          <EmptyState />
+          <EmptyState celebrate={celebrate} />
         </div>
       )}
       <div className={styles.srOnly} aria-live="polite">

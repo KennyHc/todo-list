@@ -13,7 +13,8 @@
   color: var(--muted);
   transition:
     background-color var(--t-fast),
-    color var(--t-fast);
+    color var(--t-fast),
+    var(--t-press);
 }
 
 .button:hover {
@@ -58,7 +59,8 @@
   cursor: pointer;
   transition:
     background-color var(--t-fast),
-    color var(--t-fast);
+    color var(--t-fast),
+    var(--t-press);
 }
 
 .item:hover {

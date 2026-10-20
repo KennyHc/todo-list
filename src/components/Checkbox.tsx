@@ -27,6 +27,7 @@ export function Checkbox({ checked, onToggle, label = 'Done', delay = 0 }: Props
       role="checkbox"
       aria-checked={checked}
       aria-label={label}
+      data-press="off"
       className={styles.hit}
       onClick={onToggle}
     >

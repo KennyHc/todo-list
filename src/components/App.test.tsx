@@ -562,7 +562,7 @@ describe('completing tasks', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Only step' }));
     await gone('Project');
     expect(rowIds()).toHaveLength(0);
-    expect(await screen.findByText('All clear')).toBeInTheDocument();
+    expect(await screen.findByText('All clear. Nice work.')).toBeInTheDocument();
   });
 
   it('Undo during the hold keeps the row, with nothing removed afterwards', async () => {

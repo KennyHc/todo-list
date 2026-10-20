@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react';
 import { useThemeStore, type ThemePref } from '../store/theme';
 import styles from './ThemeToggle.module.css';
+import { spring } from '../styles/motion';
 
 const OPTIONS: { value: ThemePref; label: string; Icon: LucideIcon }[] = [
   { value: 'light', label: 'Light', Icon: Sun },
@@ -51,7 +52,7 @@ export function ThemeToggle({ size = 'md' }: { size?: 'md' | 'sm' }) {
               <motion.span
                 layoutId="theme-thumb"
                 className={styles.thumb}
-                transition={{ type: 'spring', stiffness: 500, damping: 36 }}
+                transition={spring.snappy}
               />
             )}
             <Icon size={14} strokeWidth={1.75} className={styles.icon} aria-hidden="true" />

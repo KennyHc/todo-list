@@ -5,16 +5,25 @@
   background: var(--surface);
   box-shadow: var(--shadow-card);
   transition:
-    border-color var(--t-fast),
-    box-shadow var(--t-fast),
+    border-color var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out),
     background-color var(--t-theme);
 }
 
+/* Focus: the card lifts 1px, its shadow deepens, and the accent ring settles around it. */
 .composer:focus-within {
   border-color: var(--accent);
   box-shadow:
     0 0 0 3px var(--ring),
-    var(--shadow-card);
+    var(--shadow-lift);
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer:focus-within {
+    transform: none;
+  }
 }
 
 .field {
@@ -134,7 +143,8 @@
   cursor: pointer;
   transition:
     background-color var(--t-fast),
-    color var(--t-fast);
+    color var(--t-fast),
+    var(--t-press);
 }
 
 .tool:hover,
@@ -183,7 +193,8 @@
   cursor: pointer;
   transition:
     background-color var(--t-fast),
-    color var(--t-fast);
+    color var(--t-fast),
+    var(--t-press);
 }
 
 .clear:hover {
@@ -217,6 +228,7 @@
   color: var(--text-2);
   font-size: 13px;
   cursor: pointer;
+  transition: var(--t-press);
 }
 
 .option:hover,

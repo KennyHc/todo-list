@@ -18,7 +18,9 @@
   text-decoration-color: transparent;
   text-underline-offset: 3px;
   cursor: pointer;
-  transition: text-decoration-color var(--t-fast);
+  transition:
+    text-decoration-color var(--t-fast),
+    var(--t-press);
 }
 
 .link:hover:not(:disabled) {
@@ -94,7 +96,8 @@
   cursor: pointer;
   transition:
     filter var(--t-fast),
-    opacity var(--t-fast);
+    opacity var(--t-fast),
+    var(--t-press);
 }
 
 .danger:hover:not(:disabled) {

@@ -35,6 +35,7 @@ import {
   type NewTask,
   type TaskPatch,
 } from '../lib/tree';
+import { useSessionStore } from './session';
 import { allTags, deadlineList, todayISO, visibleTreeIds } from '../lib/views';
 import type { ColorSource } from '../lib/colorResolve';
 import type { Task, TaskTree } from '../types';
@@ -220,11 +221,14 @@ export const createTaskStore = () =>
       const count = getDescendants(treeOf(state), id).length;
       const label = `Deleted \u201c${task.title}\u201d${count > 0 ? ` and ${plural(count, 'subtask', 'subtasks')}` : ''}`;
       const after = deleteTask(treeOf(state), id);
+      // An untitled, childless row is an abandoned draft (e.g. a new subtask left empty): removing
+      // it is not a deletion worth an Undo toast, so the previous undo entry stays as it was.
+      const abandonedDraft = task.title.trim() === '' && count === 0;
       set({
         ...after,
         history: historyAfter(state, after),
         lastToggle: null,
-        undo: undoEntry(state, label),
+        undo: abandonedDraft ? state.undo : undoEntry(state, label),
       });
     },
     toggle: (id) => {
@@ -258,6 +262,7 @@ export const createTaskStore = () =>
       }
 
       const diff = diffCompletions(before, after, id, now, state.tagColors);
+      if (toggled.tasks[id]?.done) useSessionStore.setState({ completedSomething: true });
       const history = applyHistory(state.history, diff);
       const title = state.tasks[id]?.title ?? '';
       const next = spawned.has(id) ? after.tasks[spawned.get(id)!].dueDate : null;

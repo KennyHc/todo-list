@@ -19,6 +19,7 @@
   font-size: 13px;
   font-weight: 550;
   cursor: pointer;
+  transition: var(--t-press);
 }
 
 .link:hover {
@@ -60,7 +61,8 @@
   cursor: pointer;
   transition:
     background-color var(--t-fast),
-    color var(--t-fast);
+    color var(--t-fast),
+    var(--t-press);
 }
 
 .modeOption[aria-checked='true'] {

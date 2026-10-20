@@ -20,7 +20,7 @@
   position: relative;
   z-index: 1;
   min-height: 256px;
-  padding: 12px;
+  padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   background: var(--surface);
@@ -33,7 +33,7 @@
   align-items: center;
   gap: 10px;
   height: 44px;
-  padding: 0 10px 0 12px;
+  padding: 0 10px 0 var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   background: var(--surface-2);
@@ -97,25 +97,25 @@
 }
 
 .list {
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .children {
   margin-left: 22px;
-  padding-left: 4px;
+  padding-left: var(--space-1);
   border-left: 1px solid var(--border);
 }
 
 .row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   min-height: 44px;
-  padding: 0 8px 0 22px;
+  padding: 0 var(--space-2) 0 22px;
   border-radius: var(--r-md);
   transition:
     background-color var(--t-fast),
-    box-shadow 200ms ease;
+    box-shadow var(--dur-base) var(--ease-in-out);
 }
 
 .row:hover {
@@ -138,7 +138,7 @@
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .count {

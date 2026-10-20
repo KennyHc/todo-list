@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { CalendarClock, History, ListTree, type LucideIcon } from 'lucide-react';
 import { useUIStore, type View } from '../store/ui';
 import styles from './ViewSwitch.module.css';
+import { spring } from '../styles/motion';
 
 const OPTIONS: { value: View; label: string; Icon: LucideIcon }[] = [
   { value: 'tree', label: 'Tree', Icon: ListTree },
@@ -47,7 +48,7 @@ export function ViewSwitch() {
               <motion.span
                 layoutId="view-thumb"
                 className={styles.thumb}
-                transition={{ type: 'spring', stiffness: 500, damping: 36 }}
+                transition={spring.snappy}
               />
             )}
             <Icon size={14} strokeWidth={1.75} className={styles.icon} aria-hidden="true" />

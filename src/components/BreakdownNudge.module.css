@@ -42,6 +42,7 @@
   font: inherit;
   font-weight: 550;
   cursor: pointer;
+  transition: var(--t-press);
 }
 
 .button:hover {

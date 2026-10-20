@@ -72,7 +72,8 @@
   cursor: pointer;
   transition:
     background-color var(--t-fast),
-    color var(--t-fast);
+    color var(--t-fast),
+    var(--t-press);
 }
 
 .close:hover {
@@ -99,7 +100,9 @@
   border-radius: 999px;
   background: var(--border-strong);
   cursor: pointer;
-  transition: background-color var(--t-fast);
+  transition:
+    background-color var(--t-fast),
+    var(--t-press);
 }
 
 .switch[aria-checked='true'] {
@@ -115,7 +118,7 @@
   border-radius: 50%;
   background: #fff;
   box-shadow: var(--shadow-thumb);
-  transition: transform 160ms var(--ease-out);
+  transition: transform var(--dur-base) var(--ease-out);
 }
 
 .switch[aria-checked='true'] .thumb {
@@ -148,7 +151,8 @@
     background-color var(--t-fast),
     border-color var(--t-fast),
     color var(--t-fast),
-    filter var(--t-fast);
+    filter var(--t-fast),
+    var(--t-press);
 }
 
 .primary {

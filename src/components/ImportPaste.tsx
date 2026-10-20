@@ -9,6 +9,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { ImportPreview, plural } from './ImportPreview';
 import modal from './AiModal.module.css';
 import styles from './ImportPaste.module.css';
+import { dur } from '../styles/motion';
 
 const DETECT_DEBOUNCE_MS = 200;
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
@@ -238,7 +239,7 @@ export function ImportPaste({
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.12 }}
+            transition={{ duration: dur.fast }}
           >
             {detected.kind === 'error' && <p className={modal.error}>{detected.error}</p>}
             {detected.kind === 'ai' && (

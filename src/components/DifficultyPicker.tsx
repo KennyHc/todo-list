@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { LEVELS, difficultyAria, difficultyLabel } from '../lib/difficulty';
 import type { Difficulty } from '../types';
 import styles from './DifficultyPicker.module.css';
+import { dur, spring } from '../styles/motion';
 
 const POP_STAGGER = 0.03;
 
@@ -101,12 +102,10 @@ export function DifficultyPicker({
                 animate={{ scale: 1, opacity }}
                 transition={{
                   scale: {
-                    type: 'spring',
-                    stiffness: 600,
-                    damping: 18,
+                    ...spring.pop,
                     delay: popping ? (level - change.from - 1) * POP_STAGGER : 0,
                   },
-                  opacity: { duration: 0.12 },
+                  opacity: { duration: dur.fast },
                 }}
               />
               <span className={styles.num}>{level}</span>

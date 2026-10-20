@@ -50,6 +50,7 @@ export function TaskMenu({ id, buttonClassName, motionProps, onAddSubtask, onDel
         {...motionProps}
         ref={anchorRef}
         type="button"
+        data-press="off"
         className={buttonClassName}
         aria-label="More options"
         aria-haspopup="dialog"

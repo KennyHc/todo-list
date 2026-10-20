@@ -12,6 +12,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Copy, X } from 'lucide-react';
 import { copyText } from '../lib/clipboard';
 import styles from './AiModal.module.css';
+import { dur, ease, spring } from '../styles/motion';
 
 const FOCUSABLE =
   'button:not(:disabled), textarea:not(:disabled), input:not(:disabled), [href], [tabindex]:not([tabindex="-1"])';
@@ -71,7 +72,7 @@ function Modal({ onClose, title, aside, subtitle, sheet, children }: ModalProps)
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.16 }}
+      transition={{ duration: dur.base, ease: ease.out }}
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -86,7 +87,7 @@ function Modal({ onClose, title, aside, subtitle, sheet, children }: ModalProps)
         initial={{ opacity: 0, scale: 0.97, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97, y: 10 }}
-        transition={{ type: 'spring', stiffness: 520, damping: 34 }}
+        transition={spring.snappy}
         onKeyDown={onKeyDown}
       >
         <header className={styles.header}>
@@ -201,7 +202,7 @@ export function CopyButton({
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.12 }}
+          transition={{ duration: dur.fast }}
         >
           {copied ? (
             <Check size={14} strokeWidth={2.25} aria-hidden="true" />
