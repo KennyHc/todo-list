@@ -40,9 +40,20 @@ export const row = (page: Page, title: string) =>
 export const check = (page: Page, title: string) =>
   page.getByRole('checkbox', { name: `Done: ${title}`, exact: true });
 
-/** Opens a row's ⋯ "More options" menu (a sheet on phones). */
+/**
+ * Opens a row's ⋯ "More options" menu (a sheet on phones). Phone rows carry no ⋯ of their own:
+ * tapping the title opens the inline editor, whose trailing ⋯ opens the sheet.
+ */
 export async function openMenu(page: Page, title: string) {
-  await row(page, title).getByRole('button', { name: 'More options' }).first().click();
+  const id = await row(page, title).getAttribute('data-row-id');
+  const li = page.locator(`li[data-row-id="${id}"]`);
+  const more = li.getByRole('button', { name: 'More options' }).first();
+  if ((await more.count()) === 0) {
+    await titleBtn(page, title).first().click();
+    await li.getByRole('button', { name: 'More options' }).click();
+  } else {
+    await more.click();
+  }
   const menu = page.getByRole('dialog', { name: 'Task options' });
   await expect(menu).toBeVisible();
   return menu;

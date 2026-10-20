@@ -120,10 +120,25 @@ describe('signInWithGoogle', () => {
     expect(fb.signInWithRedirect).not.toHaveBeenCalled();
   });
 
-  it('handles the redirect result on startup', async () => {
+  it('handles the redirect result on startup when a redirect sign-in is pending', async () => {
+    sessionStorage.setItem('auth-redirecting', '1');
     fb.getRedirectResult.mockResolvedValue({ user: fakeUser });
     initAuth();
     await vi.waitFor(() => expect(useAuthStore.getState().freshSignIn).toBe(true));
+    expect(sessionStorage.getItem('auth-redirecting')).toBeNull();
+  });
+
+  it('does not fetch a redirect result on a normal load', () => {
+    // getRedirectResult pulls in Google's iframe script; a slow or blocked script used to keep
+    // every page load on the splash, so it must only run when a redirect is in flight.
+    initAuth();
+    expect(fb.getRedirectResult).not.toHaveBeenCalled();
+  });
+
+  it('passes the popup/redirect resolver explicitly to sign-in calls', async () => {
+    fb.signInWithPopup.mockResolvedValue({});
+    await useAuthStore.getState().signInWithGoogle();
+    expect(fb.signInWithPopup.mock.calls[0]).toHaveLength(3);
   });
 });
 

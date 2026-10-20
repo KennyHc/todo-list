@@ -34,8 +34,17 @@
   padding-top: var(--space-2);
 }
 
+/* "Today · 2": the count is generated, so the header's own text stays just the section name. */
+.header[data-count]::after {
+  content: '\00b7  ' attr(data-count);
+  margin-left: 2px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
 /* The Completed header is a disclosure button that looks like the other headers. */
 .toggle {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -86,10 +95,56 @@
   background: var(--surface-2);
 }
 
+/*
+ * Phone: no card. Section headers are small sticky labels on the blurred page, pinned just under
+ * the compact bar and the view row.
+ */
 @media (max-width: 480px) {
   .list {
-    margin-top: var(--space-4);
-    padding: var(--space-1);
+    margin: 0 calc(-1 * var(--gutter-r)) 0 calc(-1 * var(--gutter-l));
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .header {
+    top: var(--sticky-2);
+    margin-top: var(--space-3);
+    padding: var(--space-2) var(--gutter-r) var(--space-2) var(--gutter-l);
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .header:first-child {
+    margin-top: 0;
+    padding-top: var(--space-2);
+  }
+
+  .toggle {
+    min-height: 32px;
+    margin: -8px -6px;
+    padding: 8px 6px;
+  }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    inset: -6px -4px;
+  }
+
+  .more {
+    padding: var(--space-1) var(--gutter-r) var(--space-2) var(--gutter-l);
+  }
+
+  .moreBtn {
+    min-height: 44px;
+    margin-left: -8px;
+    font-size: 15px;
   }
 }
 
@@ -111,7 +166,7 @@
 
 @media (max-width: 480px) {
   .allClear {
-    margin-top: var(--space-4);
+    margin-top: var(--space-6);
   }
 }
 

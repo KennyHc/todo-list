@@ -6,12 +6,15 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type FocusEvent,
   type KeyboardEvent,
 } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Calendar, Plus, Repeat as RepeatIcon, Tag, X } from 'lucide-react';
 import { useIsTouch } from '../hooks/useIsTouch';
+import { useKeyboardInset } from '../hooks/useKeyboardInset';
+import { useIsPhone } from '../hooks/useMediaQuery';
 import { dueLabel } from '../lib/dates';
 import { firstOccurrence } from '../lib/recur';
 import { parseQuickAdd, SUPPORTS_REPEAT, tokenKey, type QuickToken } from '../lib/quickAdd';
@@ -77,6 +80,9 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const closePanel = useCallback(() => setPanel(null), []);
 
   const isTouch = useIsTouch();
+  const phone = useIsPhone();
+  // The phone's composer docks to the bottom edge; lift it above the keyboard while it has focus.
+  const keyboard = useKeyboardInset(phone && focused);
   // First run after sign-in: ready to type. Skipped on touch so the keyboard doesn't pop up.
   useEffect(() => {
     if (autoFocus && !isTouch) inputRef.current?.focus();
@@ -232,245 +238,254 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const toolbarDue = due ?? (pickedRepeat !== null ? dueDate : null);
 
   return (
-    <div className={styles.composer} onFocus={() => setFocused(true)} onBlur={onBlur}>
-      <div className={styles.field}>
-        <Plus className={styles.icon} size={16} strokeWidth={1.75} aria-hidden="true" />
-        <input
-          ref={inputRef}
-          id="composer"
-          className={`${styles.input} ${phraseFading ? styles.phFade : ''}`}
-          value={value}
-          placeholder={PLACEHOLDERS[phrase]}
-          aria-label="New task"
-          role="combobox"
-          aria-expanded={listOpen}
-          aria-controls={listId}
-          aria-autocomplete="list"
-          aria-activedescendant={listOpen ? `${listId}-${activeIndex}` : undefined}
-          autoComplete="off"
-          onChange={(e) => {
-            setValue(e.target.value);
-            if (e.target.value === '') setIgnored(new Set());
-            setCaret(e.target.selectionStart ?? e.target.value.length);
-            setActive(0);
-          }}
-          onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
-          onKeyDown={onKeyDown}
-        />
-        {!focused && value === '' ? (
-          <kbd className={`${styles.kbd} ${styles.kbdHint}`} aria-hidden="true">
-            N
-          </kbd>
-        ) : (
-          <kbd className={`${styles.kbd} ${parsed.title ? styles.kbdOn : ''}`} aria-hidden="true">
-            ↵
-          </kbd>
-        )}
-      </div>
+    <div
+      className={styles.dock}
+      data-intro="2"
+      data-keyboard={keyboard > 0 || undefined}
+      style={keyboard > 0 ? ({ '--kb': `${keyboard}px` } as CSSProperties) : undefined}
+    >
+      <div className={styles.composer} onFocus={() => setFocused(true)} onBlur={onBlur}>
+        <div className={styles.field}>
+          <Plus className={styles.icon} size={18} strokeWidth={1.75} aria-hidden="true" />
+          <input
+            ref={inputRef}
+            id="composer"
+            className={`${styles.input} ${phraseFading ? styles.phFade : ''}`}
+            value={value}
+            placeholder={PLACEHOLDERS[phrase]}
+            aria-label="New task"
+            role="combobox"
+            aria-expanded={listOpen}
+            aria-controls={listId}
+            aria-autocomplete="list"
+            aria-activedescendant={listOpen ? `${listId}-${activeIndex}` : undefined}
+            autoComplete="off"
+            onChange={(e) => {
+              setValue(e.target.value);
+              if (e.target.value === '') setIgnored(new Set());
+              setCaret(e.target.selectionStart ?? e.target.value.length);
+              setActive(0);
+            }}
+            onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
+            onKeyDown={onKeyDown}
+          />
+          {!focused && value === '' ? (
+            <kbd className={`${styles.kbd} ${styles.kbdHint}`} aria-hidden="true">
+              N
+            </kbd>
+          ) : (
+            <kbd className={`${styles.kbd} ${parsed.title ? styles.kbdOn : ''}`} aria-hidden="true">
+              ↵
+            </kbd>
+          )}
+        </div>
 
-      {listOpen && (
-        <ul id={listId} role="listbox" aria-label="Matching tags" className={styles.suggest}>
-          {suggestions.map(({ tag, count }, i) => (
-            <li
-              key={tag}
-              id={`${listId}-${i}`}
-              role="option"
-              aria-selected={i === activeIndex}
-              className={`${styles.option} ${i === activeIndex ? styles.optionActive : ''}`}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => accept(tag)}
-            >
-              <span className={styles.optionDot} style={{ background: tagColor(tag) }} />
-              <span className={styles.optionLabel}>#{tag}</span>
-              <span className={styles.optionCount}>{count}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <AnimatePresence initial={false}>
-        {hasChips && (
-          <motion.div
-            key="chips"
-            className={styles.chipRow}
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={SLIDE}
-            style={{ overflow: 'hidden' }}
-          >
-            <ul className={styles.chips} aria-label="Recognised in this task">
-              <AnimatePresence initial={false}>
-                {dateToken && parsed.dueDate && (
-                  <motion.li
-                    key="date"
-                    className={styles.chipItem}
-                    initial={CHIP_HIDDEN}
-                    animate={CHIP_SHOWN}
-                    exit={CHIP_HIDDEN}
-                    transition={CHIP_FADE}
-                  >
-                    <QuickChip
-                      icon={<Calendar size={12} strokeWidth={1.75} aria-hidden="true" />}
-                      label={dateToken.label}
-                      accent={dueStatus(parsed.dueDate, todayISO()) === 'today'}
-                      muted={due !== null}
-                      title={due !== null ? 'The due date you picked is used instead' : undefined}
-                      removeLabel={`Don't treat "${dateToken.raw}" as a due date`}
-                      onRemove={() => ignore(dateToken)}
-                    />
-                  </motion.li>
-                )}
-                {difficultyToken && parsed.difficulty && (
-                  <motion.li
-                    key="difficulty"
-                    className={styles.chipItem}
-                    initial={CHIP_HIDDEN}
-                    animate={CHIP_SHOWN}
-                    exit={CHIP_HIDDEN}
-                    transition={CHIP_FADE}
-                  >
-                    <QuickChip
-                      icon={<DifficultyGlyph value={parsed.difficulty} />}
-                      label={String(parsed.difficulty)}
-                      title={difficultyToken.label}
-                      removeLabel={`Don't treat "${difficultyToken.raw}" as a difficulty`}
-                      onRemove={() => ignore(difficultyToken)}
-                    />
-                  </motion.li>
-                )}
-                {SUPPORTS_REPEAT && repeatToken && repeat && (
-                  <motion.li
-                    key="repeat"
-                    className={styles.chipItem}
-                    initial={CHIP_HIDDEN}
-                    animate={CHIP_SHOWN}
-                    exit={CHIP_HIDDEN}
-                    transition={CHIP_FADE}
-                  >
-                    <QuickChip
-                      icon={<RepeatIcon size={12} strokeWidth={1.75} aria-hidden="true" />}
-                      label={repeatToken.label}
-                      muted={pickedRepeat !== null}
-                      title={
-                        pickedRepeat !== null ? 'The repeat you picked is used instead' : undefined
-                      }
-                      removeLabel={`Don't treat "${repeatToken.raw}" as a repeat`}
-                      onRemove={() => ignore(repeatToken)}
-                    />
-                  </motion.li>
-                )}
-                {previewTags.map((tag) => (
-                  <motion.li
-                    key={`tag:${tag}`}
-                    className={styles.chipItem}
-                    initial={CHIP_HIDDEN}
-                    animate={CHIP_SHOWN}
-                    exit={CHIP_HIDDEN}
-                    transition={CHIP_FADE}
-                  >
-                    <TagChip
-                      tag={tag}
-                      onRemove={() => {
-                        setTags(tags.filter((t) => t !== tag));
-                        ignore(...tagTokens.filter((t) => normalizeTag(t.raw) === tag));
-                      }}
-                    />
-                  </motion.li>
-                ))}
-              </AnimatePresence>
-            </ul>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence initial={false}>
-        {showToolbar && (
-          <motion.div
-            key="toolbar"
-            initial={{ height: 0, opacity: 0, overflow: 'hidden' }}
-            animate={{ height: 'auto', opacity: 1, transitionEnd: { overflow: 'visible' } }}
-            exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
-            transition={SLIDE}
-          >
-            <div className={styles.toolbar}>
-              <button
-                ref={tagBtnRef}
-                type="button"
-                className={`${styles.tool} ${tags.length > 0 ? styles.toolSet : ''}`}
-                aria-haspopup="dialog"
-                aria-expanded={panel === 'tag'}
-                onClick={() => setPanel(panel === 'tag' ? null : 'tag')}
+        {listOpen && (
+          <ul id={listId} role="listbox" aria-label="Matching tags" className={styles.suggest}>
+            {suggestions.map(({ tag, count }, i) => (
+              <li
+                key={tag}
+                id={`${listId}-${i}`}
+                role="option"
+                aria-selected={i === activeIndex}
+                className={`${styles.option} ${i === activeIndex ? styles.optionActive : ''}`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => accept(tag)}
               >
-                <Tag size={13} strokeWidth={1.75} aria-hidden="true" />
-                <span>Tag</span>
-                {tags.length > 0 && <span className={styles.count}>{tags.length}</span>}
-              </button>
-
-              <span className={`${styles.dateGroup} ${toolbarDue ? styles.toolSet : ''}`}>
-                <button
-                  ref={dateBtnRef}
-                  type="button"
-                  className={`${styles.tool} ${styles.dateBtn}`}
-                  aria-haspopup="dialog"
-                  aria-expanded={panel === 'date'}
-                  onClick={() => setPanel(panel === 'date' ? null : 'date')}
-                >
-                  {pickedRepeat ? (
-                    <RepeatIcon size={13} strokeWidth={1.75} aria-hidden="true" />
-                  ) : (
-                    <Calendar size={13} strokeWidth={1.75} aria-hidden="true" />
-                  )}
-                  <span>{toolbarDue ? dueLabel(toolbarDue) : 'Due date'}</span>
-                </button>
-                {toolbarDue && (
-                  <button
-                    type="button"
-                    className={styles.clear}
-                    aria-label="Clear due date"
-                    onClick={() => {
-                      setDue(null);
-                      setPickedRepeat(null);
-                    }}
-                  >
-                    <X size={12} strokeWidth={2} aria-hidden="true" />
-                  </button>
-                )}
-              </span>
-            </div>
-          </motion.div>
+                <span className={styles.optionDot} style={{ background: tagColor(tag) }} />
+                <span className={styles.optionLabel}>#{tag}</span>
+                <span className={styles.optionCount}>{count}</span>
+              </li>
+            ))}
+          </ul>
         )}
-      </AnimatePresence>
 
-      <Popover
-        open={panel === 'tag'}
-        onClose={closePanel}
-        anchorRef={tagBtnRef}
-        label="Tags"
-        width={252}
-        sheetOnMobile={false}
-      >
-        <TagEditor tags={tags} onChange={setTags} autoFocus />
-      </Popover>
-      <Popover
-        open={panel === 'date'}
-        onClose={closePanel}
-        anchorRef={dateBtnRef}
-        label="Due date"
-        width={288}
-        sheetOnMobile={false}
-      >
-        <DatePicker
-          value={toolbarDue}
-          onChange={(date) => {
-            setDue(date);
-            if (date === null) setPickedRepeat(null);
-          }}
-          onPicked={closePanel}
-          repeat={pickedRepeat}
-          onRepeatChange={setPickedRepeat}
-        />
-      </Popover>
+        <AnimatePresence initial={false}>
+          {hasChips && (
+            <motion.div
+              key="chips"
+              className={styles.chipRow}
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={SLIDE}
+              style={{ overflow: 'hidden' }}
+            >
+              <ul className={styles.chips} aria-label="Recognised in this task">
+                <AnimatePresence initial={false}>
+                  {dateToken && parsed.dueDate && (
+                    <motion.li
+                      key="date"
+                      className={styles.chipItem}
+                      initial={CHIP_HIDDEN}
+                      animate={CHIP_SHOWN}
+                      exit={CHIP_HIDDEN}
+                      transition={CHIP_FADE}
+                    >
+                      <QuickChip
+                        icon={<Calendar size={12} strokeWidth={1.75} aria-hidden="true" />}
+                        label={dateToken.label}
+                        accent={dueStatus(parsed.dueDate, todayISO()) === 'today'}
+                        muted={due !== null}
+                        title={due !== null ? 'The due date you picked is used instead' : undefined}
+                        removeLabel={`Don't treat "${dateToken.raw}" as a due date`}
+                        onRemove={() => ignore(dateToken)}
+                      />
+                    </motion.li>
+                  )}
+                  {difficultyToken && parsed.difficulty && (
+                    <motion.li
+                      key="difficulty"
+                      className={styles.chipItem}
+                      initial={CHIP_HIDDEN}
+                      animate={CHIP_SHOWN}
+                      exit={CHIP_HIDDEN}
+                      transition={CHIP_FADE}
+                    >
+                      <QuickChip
+                        icon={<DifficultyGlyph value={parsed.difficulty} />}
+                        label={String(parsed.difficulty)}
+                        title={difficultyToken.label}
+                        removeLabel={`Don't treat "${difficultyToken.raw}" as a difficulty`}
+                        onRemove={() => ignore(difficultyToken)}
+                      />
+                    </motion.li>
+                  )}
+                  {SUPPORTS_REPEAT && repeatToken && repeat && (
+                    <motion.li
+                      key="repeat"
+                      className={styles.chipItem}
+                      initial={CHIP_HIDDEN}
+                      animate={CHIP_SHOWN}
+                      exit={CHIP_HIDDEN}
+                      transition={CHIP_FADE}
+                    >
+                      <QuickChip
+                        icon={<RepeatIcon size={12} strokeWidth={1.75} aria-hidden="true" />}
+                        label={repeatToken.label}
+                        muted={pickedRepeat !== null}
+                        title={
+                          pickedRepeat !== null
+                            ? 'The repeat you picked is used instead'
+                            : undefined
+                        }
+                        removeLabel={`Don't treat "${repeatToken.raw}" as a repeat`}
+                        onRemove={() => ignore(repeatToken)}
+                      />
+                    </motion.li>
+                  )}
+                  {previewTags.map((tag) => (
+                    <motion.li
+                      key={`tag:${tag}`}
+                      className={styles.chipItem}
+                      initial={CHIP_HIDDEN}
+                      animate={CHIP_SHOWN}
+                      exit={CHIP_HIDDEN}
+                      transition={CHIP_FADE}
+                    >
+                      <TagChip
+                        tag={tag}
+                        onRemove={() => {
+                          setTags(tags.filter((t) => t !== tag));
+                          ignore(...tagTokens.filter((t) => normalizeTag(t.raw) === tag));
+                        }}
+                      />
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
+              </ul>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence initial={false}>
+          {showToolbar && (
+            <motion.div
+              key="toolbar"
+              initial={{ height: 0, opacity: 0, overflow: 'hidden' }}
+              animate={{ height: 'auto', opacity: 1, transitionEnd: { overflow: 'visible' } }}
+              exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
+              transition={SLIDE}
+            >
+              <div className={styles.toolbar}>
+                <button
+                  ref={tagBtnRef}
+                  type="button"
+                  className={`${styles.tool} ${tags.length > 0 ? styles.toolSet : ''}`}
+                  aria-haspopup="dialog"
+                  aria-expanded={panel === 'tag'}
+                  onClick={() => setPanel(panel === 'tag' ? null : 'tag')}
+                >
+                  <Tag size={13} strokeWidth={1.75} aria-hidden="true" />
+                  <span>Tag</span>
+                  {tags.length > 0 && <span className={styles.count}>{tags.length}</span>}
+                </button>
+
+                <span className={`${styles.dateGroup} ${toolbarDue ? styles.toolSet : ''}`}>
+                  <button
+                    ref={dateBtnRef}
+                    type="button"
+                    className={`${styles.tool} ${styles.dateBtn}`}
+                    aria-haspopup="dialog"
+                    aria-expanded={panel === 'date'}
+                    onClick={() => setPanel(panel === 'date' ? null : 'date')}
+                  >
+                    {pickedRepeat ? (
+                      <RepeatIcon size={13} strokeWidth={1.75} aria-hidden="true" />
+                    ) : (
+                      <Calendar size={13} strokeWidth={1.75} aria-hidden="true" />
+                    )}
+                    <span>{toolbarDue ? dueLabel(toolbarDue) : 'Due date'}</span>
+                  </button>
+                  {toolbarDue && (
+                    <button
+                      type="button"
+                      className={styles.clear}
+                      aria-label="Clear due date"
+                      onClick={() => {
+                        setDue(null);
+                        setPickedRepeat(null);
+                      }}
+                    >
+                      <X size={12} strokeWidth={2} aria-hidden="true" />
+                    </button>
+                  )}
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <Popover
+          open={panel === 'tag'}
+          onClose={closePanel}
+          anchorRef={tagBtnRef}
+          label="Tags"
+          width={252}
+          sheetOnMobile={false}
+        >
+          <TagEditor tags={tags} onChange={setTags} autoFocus />
+        </Popover>
+        <Popover
+          open={panel === 'date'}
+          onClose={closePanel}
+          anchorRef={dateBtnRef}
+          label="Due date"
+          width={288}
+          sheetOnMobile={false}
+        >
+          <DatePicker
+            value={toolbarDue}
+            onChange={(date) => {
+              setDue(date);
+              if (date === null) setPickedRepeat(null);
+            }}
+            onPicked={closePanel}
+            repeat={pickedRepeat}
+            onRepeatChange={setPickedRepeat}
+          />
+        </Popover>
+      </div>
     </div>
   );
 }

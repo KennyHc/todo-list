@@ -69,6 +69,7 @@ function Entry({
   const edge = normalizeTaskColor(entry.color);
   const late = entry.dueDate !== null && todayISO(new Date(entry.completedAt)) > entry.dueDate;
   const level = Math.min(MAX_DIFFICULTY, Math.max(1, Math.round(entry.difficulty))) as Difficulty;
+  const hasMeta = entry.dueDate !== null || entry.tags.length > 0 || entry.path.length > 0;
   const canRestore = taskDone === true;
   const gone = taskDone === undefined;
   const reason =
@@ -108,7 +109,7 @@ function Entry({
         onComplete={restoreEntry}
         onDelete={noop}
       >
-        <div className={styles.entry}>
+        <div className={styles.entry} data-meta={hasMeta || undefined}>
           <button
             type="button"
             role="checkbox"
@@ -133,37 +134,22 @@ function Entry({
                 </span>
               )}
             </div>
-            <div className={styles.meta}>
-              {entry.path.length > 0 && (
-                <span className={styles.crumb}>{entry.path.join(' › ')}</span>
-              )}
-              {entry.isParent ? (
-                <span
-                  className={styles.badge}
-                  title={`${entry.subtaskCount} subtask${entry.subtaskCount === 1 ? '' : 's'}, difficulty ${entry.difficulty} in total`}
-                >
-                  Σ {entry.difficulty}
-                </span>
-              ) : (
-                <span
-                  className={styles.glyph}
-                  role="img"
-                  aria-label={difficultyAria(level)}
-                  title={DIFFICULTY_NAMES[level]}
-                >
-                  <DifficultyGlyph value={level} />
-                </span>
-              )}
-              {entry.tags.map((tag) => (
-                <TagChip key={tag} tag={tag} onClick={() => setTagFilter(tag)} />
-              ))}
-              {entry.dueDate !== null && (
-                <span className={styles.due}>
-                  <DuePill dueDate={entry.dueDate} done />
-                  {late && <span className={styles.late}>late</span>}
-                </span>
-              )}
-            </div>
+            {hasMeta && (
+              <div className={styles.meta}>
+                {entry.dueDate !== null && (
+                  <span className={styles.due}>
+                    <DuePill dueDate={entry.dueDate} done />
+                    {late && <span className={styles.late}>late</span>}
+                  </span>
+                )}
+                {entry.tags.map((tag) => (
+                  <TagChip key={tag} tag={tag} plain onClick={() => setTagFilter(tag)} />
+                ))}
+                {entry.path.length > 0 && (
+                  <span className={styles.crumb}>{entry.path.join(' › ')}</span>
+                )}
+              </div>
+            )}
           </motion.div>
           {canRestore && !editing && (
             <button
@@ -184,6 +170,23 @@ function Entry({
           >
             {formatTime(entry.completedAt)}
           </motion.time>
+          {entry.isParent ? (
+            <span
+              className={styles.badge}
+              title={`${entry.subtaskCount} subtask${entry.subtaskCount === 1 ? '' : 's'}, difficulty ${entry.difficulty} in total`}
+            >
+              Σ {entry.difficulty}
+            </span>
+          ) : (
+            <span
+              className={styles.glyph}
+              role="img"
+              aria-label={difficultyAria(level)}
+              title={DIFFICULTY_NAMES[level]}
+            >
+              <DifficultyGlyph value={level} />
+            </span>
+          )}
           <AnimatePresence initial={false}>
             {editing && (
               <motion.button
@@ -247,35 +250,6 @@ export function HistoryList() {
   let index = 0;
   return (
     <div className={styles.card}>
-      {history.length > 0 && (
-        <div className={styles.bar}>
-          <AnimatePresence initial={false}>
-            {editing && (
-              <motion.button
-                key="all"
-                type="button"
-                className={`${styles.textBtn} ${styles.danger}`}
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 8 }}
-                transition={{ duration: dur.fast, ease: ease.out }}
-                onClick={() => setConfirming(true)}
-              >
-                Delete all
-              </motion.button>
-            )}
-          </AnimatePresence>
-          <button
-            type="button"
-            className={styles.textBtn}
-            data-strong
-            aria-pressed={editing}
-            onClick={() => setEditing((on) => !on)}
-          >
-            {editing ? 'Done' : 'Edit'}
-          </button>
-        </div>
-      )}
       {groups.length === 0 ? (
         <div className={styles.empty}>
           <HistoryIcon size={18} strokeWidth={1.75} aria-hidden="true" />
@@ -286,9 +260,41 @@ export function HistoryList() {
         </div>
       ) : (
         <LayoutGroup>
-          {groups.map((group) => (
+          {groups.map((group, groupIndex) => (
             <section key={group.label} className={styles.group}>
-              <h3 className={styles.heading}>{group.label}</h3>
+              <div className={styles.headerRow} data-header="">
+                <h3 className={styles.heading}>{group.label}</h3>
+                {/* Edit and Delete all live in the first day's header, which sticks on phones. */}
+                {groupIndex === 0 && (
+                  <div className={styles.controls}>
+                    <AnimatePresence initial={false}>
+                      {editing && (
+                        <motion.button
+                          key="all"
+                          type="button"
+                          className={`${styles.textBtn} ${styles.danger}`}
+                          initial={{ opacity: 0, x: 8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 8 }}
+                          transition={{ duration: dur.fast, ease: ease.out }}
+                          onClick={() => setConfirming(true)}
+                        >
+                          Delete all
+                        </motion.button>
+                      )}
+                    </AnimatePresence>
+                    <button
+                      type="button"
+                      className={styles.textBtn}
+                      data-strong
+                      aria-pressed={editing}
+                      onClick={() => setEditing((on) => !on)}
+                    >
+                      {editing ? 'Done' : 'Edit'}
+                    </button>
+                  </div>
+                )}
+              </div>
               <ul className={styles.list}>
                 <AnimatePresence initial={false}>
                   {group.entries.map((entry) => (

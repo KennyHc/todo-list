@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useKeyboardInset } from '../hooks/useKeyboardInset';
 import { useIsPhone } from '../hooks/useMediaQuery';
 import styles from './Popover.module.css';
 import { dur, ease, spring } from '../styles/motion';
@@ -46,7 +47,6 @@ function PopoverPanel({
   const reduced = useReducedMotion();
   const dragRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ startY: number; lastY: number; lastT: number; v: number } | null>(null);
-  const [lift, setLift] = useState(0);
 
   // Place under the anchor, flipping above when there is no room and shifting into the viewport.
   useLayoutEffect(() => {
@@ -85,19 +85,7 @@ function PopoverPanel({
   }, [anchorRef, align, sheet]);
 
   // A sheet sits on the bottom edge of the layout viewport; lift it above the on-screen keyboard.
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!sheet || !vv) return;
-    const update = () =>
-      setLift(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)));
-    update();
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
-    };
-  }, [sheet]);
+  const lift = useKeyboardInset(sheet);
 
   useEffect(() => {
     const panel = ref.current;

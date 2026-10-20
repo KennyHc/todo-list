@@ -7,7 +7,7 @@ import {
   type User,
 } from 'firebase/auth';
 import { create } from 'zustand';
-import { auth, googleProvider } from '../lib/firebase';
+import { auth, googleProvider, popupRedirect } from '../lib/firebase';
 import { clearDeletePending, isDeletePending } from '../sync/deletePending';
 import { flushActiveSync, stopActiveSync } from '../sync/syncControl';
 import { resetTaskStore } from './tasks';
@@ -94,12 +94,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       // partitioning break: the user comes back signed out. On mobile the popup opens a tab.
       // It must open synchronously inside the click, so nothing is awaited before this call.
       try {
-        await signInWithPopup(auth, googleProvider);
+        await signInWithPopup(auth, googleProvider, popupRedirect);
         set({ freshSignIn: true });
       } catch (error) {
         if ((error as { code?: string }).code !== 'auth/popup-blocked') throw error;
         write(() => sessionStorage, REDIRECT_KEY, '1');
-        await signInWithRedirect(auth, googleProvider);
+        await signInWithRedirect(auth, googleProvider, popupRedirect);
       }
     } catch (error) {
       write(() => sessionStorage, REDIRECT_KEY, null);
@@ -126,7 +126,15 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
 /** Wires Firebase auth into the store. Call once at startup; returns an unsubscribe. */
 export function initAuth(): () => void {
-  void getRedirectResult(auth)
+  // Only a redirect sign-in (or the delete-account re-auth) that is actually in flight needs its
+  // result fetched; checking on every load would pull in Google's iframe script for nothing.
+  const redirectPending = read(() => sessionStorage, REDIRECT_KEY) === '1' || isDeletePending();
+  if (redirectPending) handleRedirectResult();
+  return watchAuthState();
+}
+
+function handleRedirectResult(): void {
+  void getRedirectResult(auth, popupRedirect)
     .then((result) => {
       write(() => sessionStorage, REDIRECT_KEY, null);
       if (result?.user && isDeletePending()) {
@@ -146,7 +154,9 @@ export function initAuth(): () => void {
       write(() => sessionStorage, REDIRECT_KEY, null);
       useAuthStore.setState({ error: messageFor(error) });
     });
+}
 
+function watchAuthState(): () => void {
   return onAuthStateChanged(auth, (user) => {
     if (user) {
       write(() => localStorage, HINT_KEY, '1');

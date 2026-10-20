@@ -56,6 +56,7 @@ function CompletedHeader({ count, collapsed }: { count: number; collapsed: boole
   return (
     <motion.li
       className={styles.header}
+      data-header=""
       layout="position"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -127,31 +128,46 @@ export function DeadlineList() {
         ]),
   ];
 
+  // Rows per section, for the "Today · 2" headers; a held row still counts under its header.
+  const counts = new Map<string, number>();
+  let current = '';
+  for (const key of open) {
+    if (isHeader(key)) current = key;
+    else counts.set(current, (counts.get(current) ?? 0) + 1);
+  }
+  let section: DeadlineBucket | undefined;
+
   return (
     <LayoutGroup>
       <ul className={styles.list}>
         <AnimatePresence initial={false}>
           {shown.map((key) => {
             if (key === COMPLETED_HEADER) {
+              section = 'done';
               return <CompletedHeader key={key} count={completed.length} collapsed={collapsed} />;
             }
             if (key === SHOW_ALL) return <ShowAll key={key} count={completed.length} />;
             if (isHeader(key)) {
+              section = key.slice(HEADER.length) as DeadlineBucket;
               return (
                 <motion.li
                   key={key}
                   className={styles.header}
+                  data-header=""
+                  data-count={counts.get(key) ?? 0}
                   layout="position"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={FADE}
                 >
-                  {BUCKET_LABELS[key.slice(HEADER.length) as DeadlineBucket]}
+                  {BUCKET_LABELS[section]}
                 </motion.li>
               );
             }
-            return <TaskItem key={key} id={key} depth={0} flat exitStyle="move" />;
+            return (
+              <TaskItem key={key} id={key} depth={0} flat exitStyle="move" section={section} />
+            );
           })}
         </AnimatePresence>
       </ul>

@@ -1,7 +1,7 @@
 .item {
-  --indent: 22px;
-  /* Horizontal centre of a row's checkbox: padding 8 + chevron 20 + gap 8 + half the 18px box. */
-  --guide-x: 45px;
+  --indent: 24px;
+  /* Horizontal centre of a row's checkbox: the row's 8px padding plus half the 18px box. */
+  --guide-x: 17px;
   position: relative;
   list-style: none;
   min-width: 0;
@@ -24,15 +24,18 @@
 
 .row {
   /*
-   * Every row is a first-line band: the checkbox, title, difficulty glyph / Σ badge and the ⋯ button
-   * all centre on the first line (40px tall on desktop, 48px on phones), so a title that wraps or
-   * grows a chips line never drags them away from it. Rows are top-aligned to make that so.
+   * Every row is a first-line band: the checkbox, title and the trailing cluster all centre on
+   * the first line (40px tall on desktop, 52px on phones for a row without a meta line), so a
+   * title that wraps or grows a meta line never drags them away from it. Rows are top-aligned
+   * to make that so. The title's top padding is derived from the same numbers.
    */
-  --band: 40px;
-  /* 6 + a 28px control + 6 fills the 40px band exactly. */
   --pad-y: 6px;
+  --lh: 20px;
+  --band: 40px;
   /* Pulls a 28px control up/down so its centre sits on the band's centre. */
   --nudge: calc(var(--band) / 2 - 14px - var(--pad-y));
+  /* What the row sits on, so the hover actions can fade into it. */
+  --row-bg: var(--surface);
   position: relative;
   display: flex;
   align-items: flex-start;
@@ -63,11 +66,13 @@
 
 .row:hover,
 .row:has(:focus-visible) {
+  --row-bg: var(--surface-2);
   background: var(--surface-2);
 }
 
 .rowFocused,
 .rowFocused:hover {
+  --row-bg: var(--surface-2);
   background: var(--surface-2);
 }
 
@@ -130,20 +135,13 @@
   pointer-events: none;
 }
 
-.chevronSpacer {
-  flex: none;
-  width: 20px;
-}
-
 /* The 44px checkbox hit area is centred on the first-line band without growing the row. */
 .row > [role='checkbox'] {
   margin-top: calc(var(--band) / 2 - 22px - var(--pad-y));
   margin-bottom: -24px;
 }
 
-.row > .chevron,
-.row > .meta,
-.row > .actions {
+.row > .meta {
   margin-top: var(--nudge);
 }
 
@@ -180,25 +178,23 @@
   color: var(--danger);
 }
 
-.due {
-  display: contents;
-}
-
+/* The meta line: due date first, then tags, in quiet 13px text. Inline after the title where it fits. */
 .tail {
   display: inline-flex;
   flex: 0 1 auto;
   min-width: 0;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  margin-top: 0;
+  gap: 0 var(--space-2);
+  min-height: 20px;
+  color: var(--text-2);
+  font-size: 13px;
 }
 
 .more {
-  padding: 2px 4px;
   color: var(--muted);
-  font-size: 11.5px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 450;
   line-height: 16px;
 }
 
@@ -207,7 +203,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -218,19 +214,15 @@
   outline-offset: 1px;
 }
 
-.chevron {
-  width: 20px;
-}
-
 .title {
   flex: 1 1 0;
   min-width: 0;
-  /* Band centre (20) minus the row padding (6) minus half the 20px line. */
-  padding-top: 4px;
+  /* Centres the first line on the band (see .row). */
+  padding-top: calc(var(--band) / 2 - var(--pad-y) - var(--lh) / 2);
   font-size: 14.5px;
   font-weight: 450;
   letter-spacing: -0.005em;
-  line-height: 20px;
+  line-height: var(--lh);
 }
 
 .titleLine {
@@ -260,9 +252,10 @@
 /* Seamless inline editing: same type as the label, only the caret and row tint show. */
 .titleInput {
   display: block;
+  flex: 1;
   width: 100%;
   min-width: 0;
-  height: 20px;
+  height: var(--lh);
   padding: 0;
   margin: 0;
   border: 0;
@@ -278,47 +271,84 @@
   outline: none;
 }
 
+/* Phone: the title editor ends in a ⋯, which is how a phone row reaches its options sheet. */
+.editorLine {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  min-width: 0;
+}
+
+.editorMenu {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  /* Taller than the line: pull the extra height back so the row does not grow. */
+  margin: calc(var(--lh) / 2 - 14px) -6px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.editorMenu::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+/* The trailing cluster: difficulty (or sum, progress and disclosure chevron), at the far edge. */
 .meta {
+  position: relative;
   display: flex;
   flex: none;
   align-items: center;
+  /* The 28px glyph button carries 6px of air each side; this puts the glyph itself on the row's
+     8px inset, the same as the checkbox on the left. */
+  margin-right: -6px;
   min-height: 28px;
 }
 
 .summary {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
+  margin-right: 6px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   transition: color var(--t-theme);
 }
 
 .badge {
-  padding: 2px 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
   color: var(--text-2);
-  font-size: 11.5px;
   font-weight: 550;
-  line-height: 16px;
-  transition:
-    background-color var(--t-fast),
-    border-color var(--t-theme),
-    color var(--t-theme);
 }
 
-.row:hover .badge {
-  background: var(--surface);
+.chevron {
+  margin-left: -4px;
 }
 
+/*
+ * Hover actions (more, add subtask, delete) appear to the LEFT of the trailing cluster and overlay
+ * the row's empty space, fading in from the row's own background. At rest the row is balanced:
+ * checkbox, title, then difficulty at the far edge.
+ */
 .actions {
+  position: absolute;
+  top: 50%;
+  right: 100%;
   display: flex;
-  flex: none;
   align-items: center;
-  min-height: 28px;
+  padding-left: var(--space-6);
+  background: linear-gradient(to right, transparent, var(--row-bg) var(--space-5));
   opacity: 0;
+  transform: translateY(-50%);
   /* Hover reveals fade out quicker than they fade in. */
   transition: opacity var(--dur-instant) var(--ease-out);
 }
@@ -330,9 +360,19 @@
   transition-duration: var(--dur-fast);
 }
 
-@media (hover: none) {
+.rowEditing .actions {
+  display: none;
+}
+
+/* Touch tablets have no hover: the ⋯ stays put, in line after the difficulty. */
+@media (hover: none) and (min-width: 481px) {
   .actions {
+    position: static;
+    padding: 0;
+    background: none;
     opacity: 1;
+    transform: none;
+    order: 2;
   }
 }
 
@@ -373,11 +413,11 @@
   bottom: 14px;
 }
 
-/* Drag handle in the left gutter, before the chevron. */
+/* Drag handle: hangs in the card's left padding on hover, so it never takes layout width. */
 .grip {
   position: absolute;
   top: calc(var(--band) / 2);
-  left: -6px;
+  left: -8px;
   z-index: 1;
   display: inline-flex;
   align-items: center;
@@ -427,94 +467,89 @@
   inset: -8px -6px;
 }
 
+/*
+ * Phone: no card. Rows sit edge to edge on the page with a hairline between them that starts at
+ * the title (the iOS inset separator) and runs to the screen edge, none after the last row.
+ */
 @media (max-width: 480px) {
   .item {
-    --indent: 14px;
-    /* Row padding 12 + chevron 20 + gap 8 + half the 20px checkbox. */
-    --guide-x: 50px;
+    --indent: 16px;
+    /* The checkbox centre: the gutter plus half the 20px box. */
+    --guide-x: calc(var(--gutter-l) + 10px);
+    /* Where the title starts: the gutter, the 20px checkbox and a 12px gap. */
+    --title-x: calc(var(--gutter-l) + 32px);
   }
 
-  /*
-   * Top-aligned, with every first-line item centred in a 28px band, so a row that grows to
-   * two lines or a second line of chips keeps its checkbox and trailing cluster on line 1.
-   */
+  .item::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: calc(var(--title-x) + var(--depth, 0) * var(--indent));
+    height: 1px;
+    background: var(--border);
+    pointer-events: none;
+  }
+
+  .item:last-of-type::after,
+  .item:has(+ [data-header])::after {
+    display: none;
+  }
+
   .row {
-    --band: 48px;
     --pad-y: 10px;
-    gap: 0 var(--space-2);
-    padding: var(--pad-y) 6px var(--pad-y) var(--space-3);
+    --lh: 21.6px;
+    --band: 52px;
+    --row-bg: var(--bg);
+    gap: 0 var(--space-3);
+    padding: var(--pad-y) var(--gutter-r) var(--pad-y) var(--gutter-l);
+    border-radius: 0;
     -webkit-touch-callout: none;
   }
 
-  .chevron {
-    height: 28px;
+  /* With a meta line the row is as tall as its text; the first line still centres the controls. */
+  .row[data-meta] {
+    --band: calc(var(--pad-y) * 2 + var(--lh));
+  }
+
+  .flash,
+  .reveal,
+  .tint {
+    border-radius: 0;
   }
 
   .title {
-    padding-top: 3px;
-    font-size: 15px;
-    line-height: 22px;
+    font-size: 16px;
+    letter-spacing: -0.011em;
   }
 
   .titleLine {
-    gap: var(--space-1) 6px;
+    gap: 2px 0;
   }
 
-  /* Line 2: chips, due date and (in the deadline view) the breadcrumb, under the title. */
+  /* Line 2: the meta line, under the title. */
   .titleBtn {
     flex: 1 1 100%;
   }
 
-  /* One non-wrapping line: the due date first (it matters most), then the chips, cut off at the edge. */
+  /* One non-wrapping line: due date first, then the tags, cut off at the edge. */
   .tail {
-    flex: 0 1 auto;
+    flex: 1 1 100%;
     flex-wrap: nowrap;
-    gap: 6px;
+    min-height: 16px;
     overflow: hidden;
   }
 
-  .due {
-    display: inline-flex;
-    flex: none;
-    order: -1;
-  }
-
-  /* One chip on phones; it may ellipsise a long tag, but never shrinks into an unreadable stub. */
-  .tail > span:not(.due, .more) {
-    flex: 0 1 auto;
-    min-width: 4.5em;
-  }
-
-  .more {
+  .tail > * {
     flex: none;
   }
 
-  .more,
-  .crumb {
-    font-size: 12px;
-  }
-
-  .crumb {
-    flex: 1 1 0;
-  }
-
-  /* The trailing cluster: difficulty (or sum) and the menu button. */
   .meta {
     min-height: 28px;
-    margin-left: 4px;
   }
 
   .summary {
-    gap: 6px;
-  }
-
-  .badge {
-    padding: 1px 6px;
-    font-size: 11px;
-  }
-
-  .actions {
-    margin-left: -2px;
+    gap: var(--space-2);
   }
 
   .grip {

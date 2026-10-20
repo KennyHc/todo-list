@@ -170,8 +170,8 @@ describe('completing a repeating task', () => {
     await waitFor(() =>
       expect(screen.getAllByRole('checkbox', { name: 'Done: Stand-up' })).toHaveLength(2),
     );
-    // The section header and the pill both say it.
-    expect(screen.getAllByText('Tomorrow')).toHaveLength(2);
+    // The section header says it; the rows under it show only the repeat icon.
+    expect(screen.getAllByText('Tomorrow')).toHaveLength(1);
     expect(screen.getAllByTestId('repeat-icon')).toHaveLength(2);
   });
 });

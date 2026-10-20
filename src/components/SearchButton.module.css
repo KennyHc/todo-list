@@ -31,10 +31,20 @@
 
 @media (max-width: 480px) {
   .button {
+    position: relative;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     padding: 0;
+    border-color: transparent;
+    background: none;
+  }
+
+  /* A 44px target around the 36px button. */
+  .button::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
   }
 
   .label,

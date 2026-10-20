@@ -5,7 +5,7 @@ import { ViewSwitch } from './ViewSwitch';
 
 export function ViewToolbar() {
   return (
-    <div className={styles.bar}>
+    <div className={styles.bar} data-intro="3">
       <ViewSwitch />
       <div className={styles.actions}>
         <SearchButton />

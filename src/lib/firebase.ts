@@ -1,5 +1,12 @@
 import { initializeApp } from 'firebase/app';
-import { connectAuthEmulator, getAuth, GoogleAuthProvider } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  browserPopupRedirectResolver,
+  connectAuthEmulator,
+  GoogleAuthProvider,
+  indexedDBLocalPersistence,
+  initializeAuth,
+} from 'firebase/auth';
 
 /**
  * Browser-only Firebase app + auth bootstrap. It must never import `firebase/firestore`: this
@@ -18,7 +25,18 @@ export const app = initializeApp({
   appId: env.VITE_FIREBASE_APP_ID,
 });
 
-export const auth = getAuth(app);
+/**
+ * Auth is initialised WITHOUT a popup/redirect resolver. getAuth() installs one by default, and
+ * it makes every page load fetch Google's apis.google.com iframe script before reporting the
+ * signed-in user, so a slow or blocked script kept the app on its splash (measured: up to 28s).
+ * The resolver is passed only to the calls that open Google sign-in (see `popupRedirect`).
+ */
+export const auth = initializeAuth(app, {
+  persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+});
+
+/** For signInWithPopup/Redirect, getRedirectResult and reauthentication only. */
+export const popupRedirect = browserPopupRedirectResolver;
 
 if (useEmulators) {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });

@@ -195,10 +195,19 @@ input {
 
 @media (max-width: 480px) {
   .app {
-    padding-top: calc(env(safe-area-inset-top, 0px) + var(--space-5));
-    padding-right: max(var(--space-3), env(safe-area-inset-right));
-    padding-bottom: max(var(--space-8), env(safe-area-inset-bottom));
-    padding-left: max(var(--space-3), env(safe-area-inset-left));
+    /* Phone chrome: a 44px compact bar and a 44px view row stick to the top while scrolling;
+       the composer docks to the bottom. Sticky section headers sit below the first two. */
+    --gutter-l: max(var(--space-4), env(safe-area-inset-left));
+    --gutter-r: max(var(--space-4), env(safe-area-inset-right));
+    --top-safe: env(safe-area-inset-top, 0px);
+    --bar-h: 44px;
+    --sticky-1: calc(var(--top-safe) + var(--bar-h));
+    --sticky-2: calc(var(--sticky-1) + 44px);
+    --dock-clear: calc(104px + env(safe-area-inset-bottom, 0px));
+    padding-top: calc(var(--top-safe) + var(--space-3));
+    padding-right: var(--gutter-r);
+    padding-bottom: var(--dock-clear);
+    padding-left: var(--gutter-l);
   }
 }
 

@@ -20,6 +20,7 @@ import {
 } from 'framer-motion';
 import { ChevronRight, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
+import type { DeadlineBucket } from '../lib/dates';
 import { popDelays } from '../hooks/useCompletionHold';
 import { useIsPhone } from '../hooks/useMediaQuery';
 import { useIsTouch } from '../hooks/useIsTouch';
@@ -71,6 +72,11 @@ type Props = {
    * just fades out.
    */
   exitStyle?: 'pop' | 'move';
+  /**
+   * Deadline view: the section this row sits under. Today and Tomorrow already say when, so a
+   * row there shows no date (just the repeat icon); This week shows only the weekday.
+   */
+  section?: DeadlineBucket;
 };
 
 export type RowDrag = Pick<
@@ -84,7 +90,7 @@ export type RowDrag = Pick<
 
 const NO_PATH: string[] = [];
 const MAX_TAGS_SHOWN = 3;
-const MAX_TAGS_SHOWN_PHONE = 1;
+const MAX_TAGS_SHOWN_PHONE = 2;
 const SHAKE_X = [0, -7, 7, -5, 5, -2, 0];
 const SHAKE_SECONDS = 0.38;
 
@@ -157,7 +163,15 @@ function contentExit(
 
 const ENTER = { ...spring.snappy, layout: spring.layout } as const;
 
-function TaskItemInner({ id, depth, flat = false, guides = '', drag, exitStyle = 'pop' }: Props) {
+function TaskItemInner({
+  id,
+  depth,
+  flat = false,
+  guides = '',
+  drag,
+  exitStyle = 'pop',
+  section,
+}: Props) {
   const liveTask = useTask(id);
   const liveLeaf = useIsLeaf(id);
   const liveSum = useEffectiveDifficulty(id);
@@ -182,6 +196,8 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag, exitStyle =
     (s) => !flat && tagFilter !== null && isContextOnly(s, id, tagFilter),
   );
   const path = useTaskStore(useShallow((s) => (flat ? taskPath(s, id) : NO_PATH)));
+  // Phones carry no ⋯ on the row: the title editor's ⋯ opens the options sheet instead.
+  const [menuOpen, setMenuOpen] = useState(false);
   const [confirm, setConfirm] = useState<{ open: boolean; count: number }>({
     open: false,
     count: 0,
@@ -327,6 +343,14 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag, exitStyle =
   // Menus close themselves before calling this; addSubtask primes the iOS keyboard first.
   const addChild = () => void addSubtask(id);
 
+  const dueDisplay =
+    section === 'today' || section === 'tomorrow'
+      ? 'icon'
+      : section === 'week'
+        ? 'weekday'
+        : 'full';
+  const showDue = task.dueDate !== null && (dueDisplay !== 'icon' || task.repeat !== null);
+  const hasMeta = showDue || task.tags.length > 0 || (flat && path.length > 0);
   const tagLimit = phone ? MAX_TAGS_SHOWN_PHONE : MAX_TAGS_SHOWN;
   const shownTags = task.tags.slice(0, tagLimit);
   const hiddenTags = task.tags.slice(tagLimit);
@@ -359,7 +383,10 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag, exitStyle =
       className={styles.item}
       data-completing={completing || undefined}
       style={
-        completing ? ({ '--pop-delay': `${popDelays.get(id) ?? 0}s` } as CSSProperties) : undefined
+        {
+          '--depth': depth,
+          ...(completing && { '--pop-delay': `${popDelays.get(id) ?? 0}s` }),
+        } as CSSProperties
       }
       data-depth={depth}
       data-flat={flat || undefined}
@@ -381,7 +408,7 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag, exitStyle =
         <div
           ref={drag?.setNodeRef}
           className={styles.wrap}
-          style={{ ...drag?.style, '--depth': depth } as CSSProperties}
+          style={drag?.style}
           data-dragging={dragging || undefined}
         >
           {guides.split('').map((flag, level) => (
@@ -404,6 +431,7 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag, exitStyle =
               <motion.div
                 ref={rowRef}
                 className={`${styles.row} ${task.done ? styles.rowDone : ''} ${editing ? styles.rowEditing : ''} ${focused ? styles.rowFocused : ''}`}
+                data-meta={hasMeta || undefined}
                 data-dim={dimmed || undefined}
                 data-focused={focused || undefined}
                 data-row-color={color ?? undefined}
@@ -464,9 +492,6 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag, exitStyle =
                     <GripVertical size={14} strokeWidth={1.75} aria-hidden="true" />
                   </button>
                 )}
-                {/* Phones put the disclosure chevron on the trailing side (iOS-style), so the checkbox
-                  sits on the content's leading edge instead of after an empty chevron column. */}
-                {flat || phone ? null : leaf ? <span className={styles.chevronSpacer} /> : chevron}
                 <Checkbox
                   checked={task.done}
                   label={`Done: ${task.title}`}
@@ -482,7 +507,12 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag, exitStyle =
                     }}
                   >
                     {editing ? (
-                      <TitleEditor id={id} initial={task.title} parentId={task.parentId} />
+                      <TitleEditor
+                        id={id}
+                        initial={task.title}
+                        parentId={task.parentId}
+                        onMenu={phone ? () => setMenuOpen(true) : undefined}
+                      />
                     ) : (
                       <>
                         <button
@@ -495,23 +525,27 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag, exitStyle =
                             {task.title}
                           </StrikeText>
                         </button>
-                        {(task.tags.length > 0 || task.dueDate !== null) && (
+                        {(showDue || task.tags.length > 0) && (
                           <span className={styles.tail}>
+                            {showDue && task.dueDate !== null && (
+                              <DuePill
+                                dueDate={task.dueDate}
+                                done={task.done}
+                                repeat={task.repeat}
+                                display={dueDisplay}
+                              />
+                            )}
                             {shownTags.map((tag) => (
-                              <TagChip key={tag} tag={tag} onClick={() => setTagFilter(tag)} />
+                              <TagChip
+                                key={tag}
+                                tag={tag}
+                                plain
+                                onClick={() => setTagFilter(tag)}
+                              />
                             ))}
                             {hiddenTags.length > 0 && (
                               <span className={styles.more} title={hiddenTags.join(', ')}>
                                 +{hiddenTags.length}
-                              </span>
-                            )}
-                            {task.dueDate !== null && (
-                              <span className={styles.due}>
-                                <DuePill
-                                  dueDate={task.dueDate}
-                                  done={task.done}
-                                  repeat={task.repeat}
-                                />
                               </span>
                             )}
                           </span>
@@ -524,6 +558,44 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag, exitStyle =
                   </div>
                 </div>
                 <div className={styles.meta}>
+                  {/* Hover actions sit to the left of the trailing cluster, overlaying the row's
+                    empty space, so nothing reserves room for them at rest. */}
+                  {!phone && (
+                    <div className={styles.actions}>
+                      <TaskMenu
+                        id={id}
+                        buttonClassName={styles.iconBtn}
+                        motionProps={iconMotion}
+                        onAddSubtask={addChild}
+                        onDelete={requestDelete}
+                      />
+                      {/* Touch has the menu and swipe-to-delete; the row stays quiet. */}
+                      {!touch && (
+                        <>
+                          <motion.button
+                            {...iconMotion}
+                            type="button"
+                            data-press="off"
+                            className={styles.iconBtn}
+                            aria-label="Add subtask"
+                            onClick={addChild}
+                          >
+                            <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
+                          </motion.button>
+                          <motion.button
+                            {...iconMotion}
+                            type="button"
+                            data-press="off"
+                            className={`${styles.iconBtn} ${styles.deleteBtn}`}
+                            aria-label="Delete task"
+                            onClick={requestDelete}
+                          >
+                            <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
+                          </motion.button>
+                        </>
+                      )}
+                    </div>
+                  )}
                   {leaf ? (
                     <DifficultyIcon
                       value={task.difficulty}
@@ -538,48 +610,26 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag, exitStyle =
                       </span>
                     </span>
                   )}
-                  {phone && !flat && !leaf && chevron}
+                  {!flat && !leaf && chevron}
                 </div>
-                <div className={styles.actions}>
+                {phone && (
                   <TaskMenu
                     id={id}
                     buttonClassName={styles.iconBtn}
                     motionProps={iconMotion}
                     onAddSubtask={addChild}
                     onDelete={requestDelete}
+                    open={menuOpen}
+                    onOpenChange={setMenuOpen}
+                    hideTrigger
                   />
-                  {/* Touch has the menu and swipe-to-delete; the row stays quiet. */}
-                  {!touch && (
-                    <>
-                      <motion.button
-                        {...iconMotion}
-                        type="button"
-                        data-press="off"
-                        className={styles.iconBtn}
-                        aria-label="Add subtask"
-                        onClick={addChild}
-                      >
-                        <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
-                      </motion.button>
-                      <motion.button
-                        {...iconMotion}
-                        type="button"
-                        data-press="off"
-                        className={`${styles.iconBtn} ${styles.deleteBtn}`}
-                        aria-label="Delete task"
-                        onClick={requestDelete}
-                      >
-                        <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
-                      </motion.button>
-                    </>
-                  )}
-                </div>
+                )}
               </motion.div>
             </SwipeRow>
 
             <AnimatePresence initial={false}>
               {leaf && !task.done && task.difficulty === MAX_DIFFICULTY && (
-                <BreakdownNudge key="nudge" flat={flat} onBreakdown={addChild} />
+                <BreakdownNudge key="nudge" onBreakdown={addChild} />
               )}
             </AnimatePresence>
           </div>

@@ -38,7 +38,7 @@ export function TagFilter() {
         onClick={() => setOpen(!open)}
       >
         <Filter size={13} strokeWidth={1.75} aria-hidden="true" />
-        <span>Filter</span>
+        <span className={styles.buttonLabel}>Filter</span>
       </button>
       <Popover
         open={open}

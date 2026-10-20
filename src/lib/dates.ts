@@ -56,6 +56,9 @@ export function dueLabel(dueDate: string, today: string = todayISO()): string {
   return (sameYear ? shortDate : longDate).format(date);
 }
 
+/** "Friday": just the weekday, for a date already known to fall within the week. */
+export const weekdayName = (iso: string): string => weekdayFormat.format(parseISO(iso));
+
 /** "Sun, Oct 25". */
 export const weekdayDate = (iso: string): string => weekdayDateFormat.format(parseISO(iso));
 

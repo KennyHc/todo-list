@@ -3,16 +3,12 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 2px 6px;
-  /* Align with the title: row padding 8 + chevron 20 + checkbox 18 + two 8px gaps. */
-  padding: 0 8px 6px 62px;
+  /* Align with the title: row padding 8 + checkbox 18 + an 8px gap. */
+  padding: 0 8px 6px 34px;
   color: var(--text-2);
   font-size: 12px;
   line-height: 20px;
   transition: color var(--t-theme);
-}
-
-.flat {
-  padding-left: 34px;
 }
 
 .short {
@@ -64,13 +60,10 @@
 
 @media (max-width: 480px) {
   .nudge {
-    /* Align with the title: row padding 12 + chevron 20 + checkbox 20 + two 8px gaps. */
-    padding: 0 12px 10px 68px;
+    /* Align with the title: the gutter, the 20px checkbox and a 12px gap. */
+    padding: 0 var(--gutter-r) 10px calc(var(--gutter-l) + 32px);
     color: var(--muted);
-  }
-
-  .flat {
-    padding-left: 40px;
+    font-size: 13px;
   }
 
   /* One short line on a phone. */

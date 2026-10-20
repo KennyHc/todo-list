@@ -12,10 +12,15 @@
     border-color var(--t-theme);
 }
 
+/* Phone: no card; the list is edge to edge and the rows draw their own hairlines. */
 @media (max-width: 480px) {
   .list {
-    margin-top: var(--space-4);
-    padding: var(--space-1);
+    margin: 0 calc(-1 * var(--gutter-r)) 0 calc(-1 * var(--gutter-l));
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
   }
 }
 
@@ -75,7 +80,7 @@
 
 @media (max-width: 480px) {
   .allClear {
-    margin-top: var(--space-4);
+    margin-top: var(--space-6);
   }
 }
 

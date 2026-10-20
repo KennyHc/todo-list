@@ -10,10 +10,25 @@
     border-color var(--t-theme);
 }
 
-.heading {
-  margin: 0;
+/* A day's header: its label on the left; on the first day, Edit / Delete all on the right. */
+.headerRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
   /* 16 above, 8 below: the same rhythm as the deadline sections. */
   padding: var(--space-4) var(--space-2) var(--space-2);
+  background: var(--surface);
+  transition: background-color var(--t-theme);
+}
+
+.group:first-child .headerRow {
+  padding-top: var(--space-2);
+}
+
+.heading {
+  margin: 0;
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
@@ -22,8 +37,12 @@
   text-transform: uppercase;
 }
 
-.group:first-child .heading {
-  padding-top: var(--space-2);
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  /* The buttons are taller than the label: pull the extra back so the header keeps its height. */
+  margin: -8px -4px;
 }
 
 .list {
@@ -38,11 +57,16 @@
 }
 
 .entry {
+  /* The same first-line band as a task row, so the time and glyph sit on the title's line. */
+  --pad-y: 6px;
+  --lh: 20px;
+  --band: 40px;
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 0 var(--space-2);
   min-width: 0;
-  padding: var(--space-2) 6px var(--space-2) var(--space-2);
+  min-height: var(--band);
+  padding: var(--pad-y) var(--space-2);
   border-radius: var(--r-md);
   transition:
     background-color var(--t-fast),
@@ -69,7 +93,7 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  margin: -12px -13px -13px -13px;
+  margin: calc(var(--band) / 2 - 22px - var(--pad-y)) -13px -24px;
   padding: 0;
   border: 0;
   border-radius: var(--r-md);
@@ -120,8 +144,9 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 2px;
   min-width: 0;
+  padding-top: calc(var(--band) / 2 - var(--pad-y) - var(--lh) / 2);
 }
 
 .titleLine {
@@ -137,7 +162,7 @@
   font-size: 14.5px;
   font-weight: 450;
   letter-spacing: -0.005em;
-  line-height: 20px;
+  line-height: var(--lh);
   overflow-wrap: anywhere;
 }
 
@@ -154,13 +179,15 @@
   text-transform: uppercase;
 }
 
-/* One calm line: path, difficulty, tags, due date. Whatever doesn't fit is clipped, not wrapped. */
+/* One calm line: due date, tags, then the path. Whatever doesn't fit is clipped, not wrapped. */
 .meta {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 0 var(--space-2);
   min-width: 0;
   overflow: hidden;
+  color: var(--text-2);
+  font-size: 13px;
 }
 
 .meta > * {
@@ -171,53 +198,51 @@
   flex: 0 1 auto;
 }
 
-.glyph {
-  display: inline-flex;
-  align-items: center;
-}
-
 .crumb {
   min-width: 0;
   overflow: hidden;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* The difficulty sits at the row's far edge, on the title's line, after the time. */
+.glyph {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: var(--lh);
+  opacity: 0.6;
+}
+
 .badge {
-  padding: 0 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
+  flex: none;
+  margin-top: calc((var(--lh) - 16px) / 2);
   color: var(--text-2);
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 550;
   line-height: 16px;
   white-space: nowrap;
 }
 
-.entry:hover .badge {
-  background: var(--surface);
-}
-
 .due {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-1);
 }
 
 .late {
   color: var(--danger);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 16px;
 }
 
 .time {
   flex: none;
-  margin-top: 2px;
+  margin-top: calc((var(--lh) - 16px) / 2);
   color: var(--muted);
   font-size: 12px;
   line-height: 16px;
@@ -231,7 +256,7 @@
   justify-content: center;
   gap: 5px;
   height: 28px;
-  margin: -4px 0;
+  margin: calc(var(--band) / 2 - 14px - var(--pad-y)) 0 -24px;
   padding: 0 8px;
   border: 0;
   border-radius: var(--r-sm);
@@ -270,7 +295,7 @@
   .restore {
     min-width: 44px;
     height: 44px;
-    margin: -12px -4px -12px 0;
+    margin: calc(var(--band) / 2 - 22px - var(--pad-y)) -4px -24px 0;
     color: var(--muted);
     opacity: 1;
   }
@@ -298,18 +323,9 @@
   font-size: 13px;
 }
 
-.bar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  min-height: 32px;
-  padding: 0 2px;
-}
-
 .textBtn {
   min-height: 32px;
-  padding: 4px 8px;
+  padding: 4px var(--space-2);
   border: 0;
   border-radius: var(--r-sm);
   background: none;
@@ -343,7 +359,7 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  margin: -12px -6px -12px 0;
+  margin: calc(var(--band) / 2 - 22px - var(--pad-y)) -6px -24px 0;
   padding: 0;
   border: 0;
   background: none;
@@ -375,17 +391,108 @@
   transform: scale(0.88);
 }
 
+/*
+ * Phone: no card. Entries are edge to edge with the same inset hairlines as the task list, and
+ * each day's header is a small sticky label on the blurred page (with Edit on the first one).
+ */
 @media (max-width: 480px) {
   .card {
-    margin-top: var(--space-4);
-    padding: var(--space-1);
+    margin: 0 calc(-1 * var(--gutter-r)) 0 calc(-1 * var(--gutter-l));
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .group {
+    position: relative;
+  }
+
+  .headerRow {
+    position: sticky;
+    top: var(--sticky-2);
+    z-index: 2;
+    margin-top: var(--space-3);
+    padding: var(--space-2) var(--gutter-r) var(--space-2) var(--gutter-l);
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
+  }
+
+  .group:first-child .headerRow {
+    margin-top: 0;
+  }
+
+  .heading {
+    font-size: 12px;
+  }
+
+  /* 44px tall tap targets, without making the header any taller. */
+  .controls {
+    margin: -12px -8px;
+  }
+
+  .textBtn {
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 15px;
+  }
+
+  .item {
+    position: relative;
+    border-radius: 0;
+  }
+
+  /* The inset hairline, starting at the title (gutter + 20px check + 12px gap). */
+  .item::before {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: calc(var(--gutter-l) + 32px);
+    height: 1px;
+    background: var(--border);
+    pointer-events: none;
+  }
+
+  .item:last-of-type::before {
+    display: none;
+  }
+
+  .entry {
+    --pad-y: 10px;
+    --lh: 21.6px;
+    --band: 52px;
+    gap: 0 var(--space-3);
+    padding: var(--pad-y) var(--gutter-r) var(--pad-y) var(--gutter-l);
+    border-radius: 0;
+  }
+
+  /* With a meta line the entry is as tall as its text. */
+  .entry[data-meta] {
+    --band: calc(var(--pad-y) * 2 + var(--lh));
+  }
+
+  .title {
+    font-size: 16px;
+    letter-spacing: -0.011em;
+  }
+
+  .checkDot {
+    width: 20px;
+    height: 20px;
+  }
+
+  .check {
+    margin-right: -12px;
+    margin-left: -12px;
   }
 
   .minus {
     margin-right: -10px;
   }
 
-  /* Phones: the icon alone (the button keeps its accessible name). */
   .restoreLabel {
     display: none;
   }

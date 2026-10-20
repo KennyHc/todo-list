@@ -16,10 +16,12 @@ type Props = {
   onColor?: () => void;
   /** Reflects an open colour picker on the dot button. */
   colorOpen?: boolean;
+  /** Rows and lists: just the colour dot and the name, no pill. Chips stay pills. */
+  plain?: boolean;
 };
 
 /** A tag chip in the tag's assigned colour, or else its stable hash colour (chips only). */
-export function TagChip({ tag, onClick, onRemove, muted, hash, onColor, colorOpen }: Props) {
+export function TagChip({ tag, onClick, onRemove, muted, hash, onColor, colorOpen, plain }: Props) {
   const assigned = useTaskStore((s) => s.tagColors[tag]);
   const style = { ['--tag' as string]: assigned ?? tagColor(tag) };
   const body = (
@@ -33,7 +35,7 @@ export function TagChip({ tag, onClick, onRemove, muted, hash, onColor, colorOpe
   );
   return (
     <span
-      className={`${styles.chip} ${muted ? styles.muted : ''}`}
+      className={`${styles.chip} ${plain ? styles.plain : ''} ${muted ? styles.muted : ''}`}
       style={style}
       data-assigned={assigned ? '' : undefined}
     >

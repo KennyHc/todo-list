@@ -1,13 +1,23 @@
+import { MoreHorizontal } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useIsTouch } from '../hooks/useIsTouch';
 import { useIsPhone } from '../hooks/useMediaQuery';
 import { useTaskStore } from '../store/tasks';
 import styles from './TaskItem.module.css';
 
-type Props = { id: string; initial: string; parentId: string | null };
+type Props = {
+  id: string;
+  initial: string;
+  parentId: string | null;
+  /**
+   * Phones only: adds a trailing ⋯ that saves the title and opens the row's options sheet, since
+   * the row itself carries no ⋯ there.
+   */
+  onMenu?: () => void;
+};
 
 /** Inline title input. Mounted only while `editingId === id`, so its draft state is fresh each time. */
-export function TitleEditor({ id, initial, parentId }: Props) {
+export function TitleEditor({ id, initial, parentId, onMenu }: Props) {
   const [draft, setDraft] = useState(initial);
   const ref = useRef<HTMLInputElement>(null);
   const touch = useIsTouch();
@@ -79,7 +89,7 @@ export function TitleEditor({ id, initial, parentId }: Props) {
     }
   };
 
-  return (
+  const input = (
     <input
       ref={ref}
       className={styles.titleInput}
@@ -96,5 +106,29 @@ export function TitleEditor({ id, initial, parentId }: Props) {
         finish();
       }}
     />
+  );
+  if (!onMenu) return input;
+
+  return (
+    <div className={styles.editorLine}>
+      {input}
+      <button
+        type="button"
+        className={styles.editorMenu}
+        aria-label="More options"
+        aria-haspopup="dialog"
+        // Keep focus in the input until the click, so the blur does not end the edit first.
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => {
+          handled.current = true;
+          const empty = draft.trim() === '';
+          save();
+          finish();
+          if (!empty) onMenu();
+        }}
+      >
+        <MoreHorizontal size={18} strokeWidth={1.75} aria-hidden="true" />
+      </button>
+    </div>
   );
 }

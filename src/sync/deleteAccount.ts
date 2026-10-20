@@ -16,7 +16,7 @@ import {
   type DocumentReference,
   type Firestore,
 } from 'firebase/firestore';
-import { auth as defaultAuth, googleProvider } from '../lib/firebase';
+import { auth as defaultAuth, googleProvider, popupRedirect } from '../lib/firebase';
 import { db as defaultDb } from '../lib/firestore';
 import { useAiDraft } from '../store/aiDraft';
 import { useImportDraft } from '../store/importDraft';
@@ -91,12 +91,12 @@ const CANCEL_CODES = new Set([
 /** Must be called synchronously from the click so the browser allows the popup. */
 async function reauthenticateWithGoogle(user: User): Promise<void> {
   try {
-    await reauthenticateWithPopup(user, googleProvider);
+    await reauthenticateWithPopup(user, googleProvider, popupRedirect);
   } catch (error) {
     if (codeOf(error) !== 'auth/popup-blocked') throw error;
     session.set(DELETE_PENDING_KEY, '1');
     try {
-      await reauthenticateWithRedirect(user, googleProvider); // navigates away
+      await reauthenticateWithRedirect(user, googleProvider, popupRedirect); // navigates away
     } catch (redirectError) {
       clearDeletePending();
       throw redirectError;

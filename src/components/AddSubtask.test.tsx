@@ -31,7 +31,14 @@ afterEach(() => {
 
 const openMenu = (title: string) => {
   const row = screen.getByText(title).closest('li') as HTMLElement;
-  fireEvent.click(within(row).getAllByRole('button', { name: 'More options' })[0]);
+  let more = within(row).queryAllByRole('button', { name: 'More options' })[0];
+  if (!more) {
+    // Phone rows carry no ⋯: tap the title to edit it, then the editor's trailing ⋯.
+    fireEvent.click(within(row).getByRole('button', { name: title }));
+    const editing = document.querySelector<HTMLElement>(`li[data-row-id="${row.dataset.rowId}"]`)!;
+    more = within(editing).getByRole('button', { name: 'More options' });
+  }
+  fireEvent.click(more);
   return screen.getByRole('dialog', { name: 'Task options' });
 };
 

@@ -36,6 +36,38 @@
   color: var(--accent-ink);
 }
 
+@media (max-width: 480px) {
+  .filter {
+    gap: var(--space-1);
+  }
+
+  .filter > :not(button, [role='dialog']):first-child {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 128px;
+  }
+
+  .button {
+    position: relative;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-color: transparent;
+    background: none;
+  }
+
+  .button::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+  }
+
+  .buttonLabel {
+    display: none;
+  }
+}
+
 .empty {
   margin: 0;
   padding: 4px;

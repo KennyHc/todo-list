@@ -75,3 +75,16 @@
 .pop {
   display: inline-flex;
 }
+
+/* Phone lists are edge to edge: square corners, and the page itself behind a swiping row. */
+@media (max-width: 480px) {
+  .swipe,
+  .surface,
+  .layer {
+    border-radius: 0;
+  }
+
+  .swipe[data-swiping] .surface {
+    background: var(--bg);
+  }
+}

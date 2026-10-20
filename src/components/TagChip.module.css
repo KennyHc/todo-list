@@ -121,3 +121,45 @@
   background: var(--border-strong);
   color: var(--text);
 }
+
+/*
+ * Plain: a 6px colour dot and the tag's name in secondary text, with no pill behind it. It is the
+ * quiet way a tag reads in a row, so the title stays the loudest thing there.
+ */
+.plain {
+  position: relative;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.plain .body {
+  gap: 6px;
+  padding: 0;
+}
+
+.chip.plain:has(.clickable:hover) {
+  background: none;
+}
+
+.plain .clickable:hover .label {
+  color: var(--text);
+}
+
+/* A larger target around the small text, without changing the line it sits on. */
+.plain .clickable {
+  position: relative;
+}
+
+.plain .clickable::after {
+  content: '';
+  position: absolute;
+  inset: -8px -4px;
+}
+
+@media (max-width: 480px) {
+  .plain .clickable::after {
+    inset: -10px -6px -12px;
+  }
+}

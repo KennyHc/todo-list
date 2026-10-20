@@ -5,7 +5,8 @@
 }
 
 .off {
-  fill: var(--border-strong);
+  fill: var(--muted);
+  opacity: 0.4;
   transition: fill var(--t-theme);
 }
 

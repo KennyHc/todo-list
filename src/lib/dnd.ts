@@ -4,7 +4,7 @@ import type { MoveTarget } from './tree';
 import { treeRows } from './views';
 
 /** Indent step of one nesting level in px. Mirrors `--indent` in TaskItem.module.css (desktop). */
-export const INDENT = 22;
+export const INDENT = 24;
 
 /** A row of the flattened tree: what is needed to project a drop. */
 export type FlatItem = { id: string; depth: number; parentId: string | null };

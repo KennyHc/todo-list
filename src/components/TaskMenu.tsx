@@ -25,17 +25,36 @@ type Props = {
   motionProps: MotionProps;
   onAddSubtask: () => void;
   onDelete: () => void;
+  /**
+   * Controlled open state, for a menu opened from somewhere else (the phone's title editor has
+   * its own ⋯). Without `onOpenChange` the menu keeps its own state.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Render the sheet only; something else opens it. */
+  hideTrigger?: boolean;
 };
 
 /** The "more" button and its popover (a sheet on phones): difficulty, tags, due date, colour. */
-export function TaskMenu({ id, buttonClassName, motionProps, onAddSubtask, onDelete }: Props) {
+export function TaskMenu({
+  id,
+  buttonClassName,
+  motionProps,
+  onAddSubtask,
+  onDelete,
+  open: controlledOpen,
+  onOpenChange,
+  hideTrigger = false,
+}: Props) {
   const task = useTask(id);
   const leaf = useIsLeaf(id);
   const sum = useEffectiveDifficulty(id);
   const colorSource = useColorSource(id);
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = onOpenChange ? (controlledOpen ?? false) : ownOpen;
+  const setOpen = onOpenChange ?? setOwnOpen;
   const anchorRef = useRef<HTMLButtonElement>(null);
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => setOpen(false), [setOpen]);
   if (!task) return null;
 
   const update = useTaskStore.getState().update;
@@ -46,19 +65,21 @@ export function TaskMenu({ id, buttonClassName, motionProps, onAddSubtask, onDel
   };
   return (
     <>
-      <motion.button
-        {...motionProps}
-        ref={anchorRef}
-        type="button"
-        data-press="off"
-        className={buttonClassName}
-        aria-label="More options"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <MoreHorizontal size={16} strokeWidth={1.75} aria-hidden="true" />
-      </motion.button>
+      {!hideTrigger && (
+        <motion.button
+          {...motionProps}
+          ref={anchorRef}
+          type="button"
+          data-press="off"
+          className={buttonClassName}
+          aria-label="More options"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
+          <MoreHorizontal size={16} strokeWidth={1.75} aria-hidden="true" />
+        </motion.button>
+      )}
       <Popover
         open={open}
         onClose={close}
