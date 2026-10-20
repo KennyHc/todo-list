@@ -223,7 +223,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Ship it' }));
     fireEvent.click(screen.getByRole('radio', { name: 'History' }));
 
-    expect(await screen.findByText('Clear history')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Edit' })).toBeInTheDocument();
     expect(screen.getByText('Ship it')).toBeInTheDocument();
     expect(screen.getByText('Today')).toBeInTheDocument();
     expect(screen.queryByText('No completed tasks yet')).not.toBeInTheDocument();
@@ -270,14 +270,29 @@ describe('keyboard workflow', () => {
     expect(useUIStore.getState().focusedId).toBeNull();
   });
 
-  it('toggles the focused task with x and Space', () => {
-    const { a } = seed();
+  it('toggles the focused task with x and Space, moving focus on when it leaves the list', () => {
+    const { a, b } = seed();
     render(<App />);
     press('j');
     press('x');
     expect(useTaskStore.getState().tasks[a].done).toBe(true);
+    // Alpha is filed in History; focus moves to the next row that stays.
+    expect(useUIStore.getState().focusedId).toBe(b);
     press(' ');
-    expect(useTaskStore.getState().tasks[a].done).toBe(false);
+    expect(useTaskStore.getState().tasks[b].done).toBe(true);
+    expect(useTaskStore.getState().tasks[a].done).toBe(true);
+  });
+
+  it('skips completed rows with j and k', () => {
+    const { a, b, c } = seed();
+    render(<App />);
+    act(() => useTaskStore.getState().toggle(b));
+    press('j');
+    expect(useUIStore.getState().focusedId).toBe(a);
+    press('j');
+    expect(useUIStore.getState().focusedId).toBe(c);
+    press('k');
+    expect(useUIStore.getState().focusedId).toBe(a);
   });
 
   it('ignores shortcuts while typing in the composer', () => {
@@ -487,5 +502,198 @@ describe('drag and drop', () => {
       press('ArrowRight');
       expect(parentOf(b)).toBeNull();
     });
+  });
+});
+
+describe('completing tasks', () => {
+  const rowIds = () => [...document.querySelectorAll('[data-row-id]')].map((el) => el.textContent);
+  const gone = (title: string) =>
+    waitFor(() => expect(screen.queryByRole('checkbox', { name: `Done: ${title}` })).toBeNull(), {
+      timeout: 3000,
+    });
+  const openHistory = async () => {
+    fireEvent.click(screen.getByRole('radio', { name: 'History' }));
+    await screen.findByRole('button', { name: 'Edit' });
+  };
+
+  it('keeps a checked task struck through for a beat, then files it in History', async () => {
+    render(<App />);
+    act(() => void useTaskStore.getState().add({ title: 'Ship it' }));
+    act(() => void useTaskStore.getState().add({ title: 'Other' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Ship it' }));
+    expect(screen.getByRole('checkbox', { name: 'Done: Ship it' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(rowIds()).toHaveLength(2);
+    await gone('Ship it');
+    expect(rowIds()).toHaveLength(1);
+    expect(useTaskStore.getState().history.map((e) => e.title)).toEqual(['Ship it']);
+    await openHistory();
+    expect(screen.getByText('Ship it')).toBeInTheDocument();
+  });
+
+  it('removes a completed subtask at once; the parent stays and shows its progress', async () => {
+    render(<App />);
+    let kid = '';
+    act(() => {
+      const p = useTaskStore.getState().add({ title: 'Project' });
+      kid = useTaskStore.getState().add({ title: 'Step one', parentId: p });
+      useTaskStore.getState().add({ title: 'Step two', parentId: p });
+    });
+    expect(screen.getByText('0/2')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Step one' }));
+    await gone('Step one');
+    expect(screen.getByRole('checkbox', { name: 'Done: Project' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    expect(screen.getByText('1/2')).toBeInTheDocument();
+    expect(screen.getByText('Step two')).toBeInTheDocument();
+    expect(useTaskStore.getState().tasks[kid].done).toBe(true);
+  });
+
+  it('removes a whole project when its last subtask completes it', async () => {
+    render(<App />);
+    act(() => {
+      const p = useTaskStore.getState().add({ title: 'Project' });
+      useTaskStore.getState().add({ title: 'Only step', parentId: p });
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Only step' }));
+    await gone('Project');
+    expect(rowIds()).toHaveLength(0);
+    expect(await screen.findByText('All clear')).toBeInTheDocument();
+  });
+
+  it('Undo during the hold keeps the row, with nothing removed afterwards', async () => {
+    render(<App />);
+    act(() => void useTaskStore.getState().add({ title: 'Oops' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Oops' }));
+    fireEvent.click((await findToast()).querySelector('button')!);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    expect(screen.getByRole('checkbox', { name: 'Done: Oops' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+  });
+
+  it('the deadline view has no Completed section', async () => {
+    render(<App />);
+    act(() => {
+      useTaskStore.getState().add({ title: 'Dated', dueDate: '2099-01-01' });
+      useTaskStore.getState().add({ title: 'Finished' });
+    });
+    fireEvent.click(screen.getByRole('radio', { name: 'By deadline' }));
+    // Deadline sections show up once the Tree has faded out.
+    expect(await screen.findByText('No deadline')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Finished' }));
+    await gone('Finished');
+    expect(screen.queryByText('Completed')).toBeNull();
+    // The section it sat in goes with it.
+    await waitFor(() => expect(screen.queryByText('No deadline')).toBeNull());
+    expect(screen.getByText('Dated')).toBeInTheDocument();
+  });
+
+  it('restores a task from History into the Tree, with an Undo toast', async () => {
+    render(<App />);
+    let id = '';
+    act(() => void (id = useTaskStore.getState().add({ title: 'Again' })));
+    act(() => useTaskStore.getState().toggle(id));
+    await gone('Again');
+    await openHistory();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Again' }));
+    expect(useTaskStore.getState().tasks[id].done).toBe(false);
+    expect(useTaskStore.getState().history).toEqual([]);
+    await waitFor(() => expect(queryToast()?.textContent).toContain('Restored \u201cAgain\u201d'));
+    fireEvent.click(screen.getByRole('radio', { name: 'Tree' }));
+    expect(await screen.findByRole('checkbox', { name: 'Done: Again' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+  });
+
+  it('disables the check of an entry whose task was deleted', async () => {
+    render(<App />);
+    let id = '';
+    act(() => void (id = useTaskStore.getState().add({ title: 'Gone' })));
+    act(() => useTaskStore.getState().toggle(id));
+    await gone('Gone');
+    act(() => useTaskStore.getState().remove(id));
+    await openHistory();
+    const check = screen.getByRole('checkbox', { name: 'Done: Gone' });
+    expect(check).toBeDisabled();
+    expect(check).toHaveAttribute('title', 'This task was deleted');
+  });
+});
+
+describe('History edit mode', () => {
+  async function completedHistory(titles: string[]) {
+    render(<App />);
+    const ids: string[] = [];
+    act(() => {
+      for (const title of titles) ids.push(useTaskStore.getState().add({ title }));
+    });
+    act(() => {
+      for (const id of ids) useTaskStore.getState().toggle(id);
+    });
+    await waitFor(() => expect(document.querySelector('[data-row-id]')).toBeNull(), {
+      timeout: 3000,
+    });
+    fireEvent.click(screen.getByRole('radio', { name: 'History' }));
+    await screen.findByRole('button', { name: 'Edit' });
+    return ids;
+  }
+
+  it('shows delete buttons in edit mode; deleting removes the task for good, and Undo restores it', async () => {
+    const [id] = await completedHistory(['First', 'Second']);
+    expect(screen.queryByRole('button', { name: /Delete ".*" permanently/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+    const del = await screen.findByRole('button', { name: 'Delete "First" permanently' });
+    fireEvent.click(del);
+    expect(useTaskStore.getState().tasks[id]).toBeUndefined();
+    await waitFor(() => expect(screen.queryByText('First')).toBeNull());
+    expect(screen.getByText('Second')).toBeInTheDocument();
+    await waitFor(() => expect(queryToast()?.textContent).toContain('Deleted “First”'));
+    fireEvent.click(within(queryToast()!).getByRole('button', { name: 'Undo' }));
+    expect(useTaskStore.getState().tasks[id].done).toBe(true);
+    expect(await screen.findByText('First')).toBeInTheDocument();
+  });
+
+  it('Done and Escape leave edit mode', async () => {
+    await completedHistory(['One']);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await screen.findByRole('button', { name: 'Delete "One" permanently' });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Delete "One" permanently' })).toBeNull(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await screen.findByRole('button', { name: 'Delete "One" permanently' });
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument());
+  });
+
+  it('Delete all asks first, then deletes every completed task in one undo', async () => {
+    await completedHistory(['One', 'Two']);
+    act(() => void useTaskStore.getState().add({ title: 'Still open' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete all' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog.textContent).toContain('2 completed tasks');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(useTaskStore.getState().history).toHaveLength(2);
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all' }));
+    fireEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete all' }),
+    );
+    expect(useTaskStore.getState().history).toEqual([]);
+    expect(Object.values(useTaskStore.getState().tasks).map((t) => t.title)).toEqual([
+      'Still open',
+    ]);
+    await waitFor(() => expect(queryToast()?.textContent).toContain('Deleted all completed (2)'));
+    expect(await screen.findByText('No completed tasks yet')).toBeInTheDocument();
   });
 });

@@ -24,6 +24,7 @@ import {
 } from '@dnd-kit/sortable';
 import { AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
+import { useCompletionHold } from '../hooks/useCompletionHold';
 import { useSettledOrder } from '../hooks/useSettledOrder';
 import {
   INDENT,
@@ -41,6 +42,7 @@ import { useDragStore } from '../store/drag';
 import { useTaskStore } from '../store/tasks';
 import { useUIStore } from '../store/ui';
 import { DragPreview } from './DragPreview';
+import { EmptyState } from './EmptyState';
 import { SortableTaskItem } from './TaskItem';
 import styles from './TaskList.module.css';
 
@@ -92,8 +94,10 @@ export function TaskList() {
   const activeId = useDragStore((s) => s.activeId);
   const liveIds = useTaskStore(useShallow((s) => flattenTree(s, { tag })));
   const key = useTaskStore((s) => structureKey(s));
-  // Done rows sink after a beat; moves apply at once; nothing reorders mid-drag.
-  const ids = useSettledOrder(liveIds, 700, { key, frozen: activeId !== null });
+  // Moves apply at once; nothing reorders mid-drag. A just-completed row (already filed in
+  // History, so absent from `liveIds`) stays until its strike has played, then pops out.
+  const settledIds = useSettledOrder(liveIds, 700, { key, frozen: activeId !== null });
+  const ids = useCompletionHold(settledIds);
   const tasks = useTaskStore((s) => s.tasks);
   const items = useMemo(() => itemsFor({ tasks }, ids), [tasks, ids]);
   const guides = useMemo(() => guideFlags(items), [items]);
@@ -328,6 +332,12 @@ export function TaskList() {
           {activeId ? <DragPreview id={activeId} subtasks={subtasks} /> : null}
         </DragOverlay>
       </DndContext>
+      {ids.length === 0 && tag === null && (
+        // Everything is done: once the last rows have popped away, say so.
+        <div className={styles.allClear}>
+          <EmptyState />
+        </div>
+      )}
       <div className={styles.srOnly} aria-live="polite">
         {liveText}
       </div>

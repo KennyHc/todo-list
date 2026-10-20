@@ -15,6 +15,7 @@ import {
   type QuerySnapshot,
   type WriteBatch,
 } from 'firebase/firestore';
+import { synthesizeHistory } from '../lib/history';
 import { normalizeTree } from '../lib/normalizeTree';
 import {
   clearLegacyLocalTasks,
@@ -441,17 +442,21 @@ export function startSync(uid: string, options: SyncOptions): () => void {
       return;
     }
 
-    // `last` is the normalized state, so repairs are kept in memory but not written back.
+    // `last` is the normalized state, so tree repairs are kept in memory but not written back.
     const state = normalizeTree(remote);
+    // Done tasks are hidden from the Tree, so a done task without a History entry (data from
+    // before the Tree hid them) gets one. Those entries differ from `last`, so they are written.
+    const history = synthesizeHistory(state);
     store.getState().hydrate({
       tasks: state.tasks,
       rootIds: state.rootIds,
-      history: state.history,
+      history,
       tagColors: state.tagColors,
     });
     last = pick(state);
     live = true;
     startLocalWatch();
+    if (history !== state.history) schedule();
     updateStatus();
   };
 

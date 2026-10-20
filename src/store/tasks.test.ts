@@ -6,6 +6,7 @@ import {
   resetTaskStore,
   useTaskStore,
 } from './tasks';
+import { mkTask } from '../test/factories';
 import { useUIStore } from './ui';
 
 const get = () => useTaskStore.getState();
@@ -603,5 +604,157 @@ describe('recurring tasks', () => {
     expect(get().tasks[id].repeat).toEqual({ every: 'day' });
     get().update(id, { dueDate: null });
     expect(get().tasks[id]).toMatchObject({ dueDate: null, repeat: null });
+  });
+});
+
+describe('completed tasks: delete, restore, repair', () => {
+  function project() {
+    const p = get().add({ title: 'P' });
+    const c1 = get().add({ title: 'C1', parentId: p });
+    const c2 = get().add({ title: 'C2', parentId: p });
+    const other = get().add({ title: 'Other' });
+    return { p, c1, c2, other };
+  }
+  const entryFor = (taskId: string) => get().history.find((e) => e.taskId === taskId)!;
+
+  it('deleteCompleted removes the entry, the done task and its subtree in one undo', () => {
+    const { p, c1, c2, other } = project();
+    get().toggle(p);
+    const before = { tasks: get().tasks, rootIds: get().rootIds, history: get().history };
+    get().deleteCompleted(entryFor(p).id);
+    expect(Object.keys(get().tasks)).toEqual([other]);
+    expect(get().rootIds).toEqual([other]);
+    // The subtasks' own entries go with them, so History lists nothing that no longer exists.
+    expect(get().history).toEqual([]);
+    expect(get().undo?.label).toBe('Deleted \u201cP\u201d');
+    get().undoLast();
+    expect(get().tasks).toBe(before.tasks);
+    expect(get().rootIds).toBe(before.rootIds);
+    expect(get().history).toBe(before.history);
+    expect(get().tasks[c1].done && get().tasks[c2].done).toBe(true);
+  });
+
+  it('deleteCompleted of a done subtask keeps its open parent', () => {
+    const { p, c1, c2 } = project();
+    get().toggle(c1);
+    get().deleteCompleted(entryFor(c1).id);
+    expect(get().tasks[c1]).toBeUndefined();
+    expect(get().tasks[p].childIds).toEqual([c2]);
+    expect(get().tasks[p].done).toBe(false);
+    expect(get().history).toEqual([]);
+  });
+
+  it('deleteCompleted only drops the entry when its task is already gone', () => {
+    const { other } = project();
+    get().toggle(other);
+    const id = entryFor(other).id;
+    get().remove(other);
+    get().deleteCompleted(id);
+    expect(get().history).toEqual([]);
+    expect(get().undo?.label).toBe('Deleted \u201cOther\u201d');
+    // Unknown entries are a no-op.
+    const undo = get().undo;
+    get().deleteCompleted('nope');
+    expect(get().undo).toBe(undo);
+  });
+
+  it('deleteAllCompleted removes every done task and the History in one undo', () => {
+    const { p, other } = project();
+    get().toggle(p);
+    get().toggle(other);
+    get().remove(other);
+    expect(get().history).toHaveLength(4);
+    get().deleteAllCompleted();
+    expect(get().tasks).toEqual({});
+    expect(get().history).toEqual([]);
+    expect(get().undo?.label).toBe('Deleted all completed (4)');
+    get().undoLast();
+    expect(Object.keys(get().tasks)).toHaveLength(3);
+    expect(get().history).toHaveLength(4);
+  });
+
+  it('deleteAllCompleted keeps open tasks and is a no-op when nothing is completed', () => {
+    const { other } = project();
+    get().deleteAllCompleted();
+    expect(get().undo).toBeNull();
+    expect(get().tasks[other]).toBeDefined();
+    get().toggle(other);
+    get().deleteAllCompleted();
+    expect(Object.keys(get().tasks)).toHaveLength(3);
+  });
+
+  it('restoreFromHistory reopens the task, drops its entry and labels the undo', () => {
+    const { other } = project();
+    get().toggle(other);
+    get().restoreFromHistory(entryFor(other).id);
+    expect(get().tasks[other].done).toBe(false);
+    expect(get().history).toEqual([]);
+    expect(get().undo?.label).toBe('Restored \u201cOther\u201d');
+    get().undoLast();
+    expect(get().tasks[other].done).toBe(true);
+    expect(get().history).toHaveLength(1);
+  });
+
+  it('restoreFromHistory is a no-op when the task is gone or already open', () => {
+    const { other, c1 } = project();
+    get().toggle(other);
+    const gone = entryFor(other).id;
+    get().remove(other);
+    get().dismissUndo();
+    get().restoreFromHistory(gone);
+    expect(get().undo).toBeNull();
+    expect(get().history).toHaveLength(1);
+    get().toggle(c1);
+    get().toggle(c1);
+    get().dismissUndo();
+    get().restoreFromHistory('nope');
+    expect(get().undo).toBeNull();
+  });
+
+  it('files a parent in History when deleting its last open subtask completes it', () => {
+    const { p, c1, c2 } = project();
+    get().toggle(c1);
+    get().remove(c2);
+    expect(get().tasks[p].done).toBe(true);
+    expect(get().history.map((e) => e.taskId)).toEqual([c1, p]);
+    expect(entryFor(p).auto).toBe(true);
+    get().undoLast();
+    expect(get().tasks[p].done).toBe(false);
+    expect(get().history.map((e) => e.taskId)).toEqual([c1]);
+  });
+
+  it('adding a subtask to a done parent reopens it and removes its entry', () => {
+    const { p } = project();
+    get().toggle(p);
+    get().add({ title: 'New', parentId: p });
+    expect(get().tasks[p].done).toBe(false);
+    expect(get().history.find((e) => e.taskId === p)).toBeUndefined();
+  });
+
+  it('migrateTasksState gives done tasks without an entry a History entry', () => {
+    const done = {
+      id: 'd',
+      title: 'Done',
+      difficulty: 2,
+      color: null,
+      done: true,
+      collapsed: false,
+      tags: [],
+      dueDate: null,
+      parentId: null,
+      childIds: [],
+      createdAt: 5,
+      completedAt: 50,
+    };
+    const out = migrateTasksState({ tasks: { d: done }, rootIds: ['d'] });
+    expect(out.history).toHaveLength(1);
+    expect(out.history[0]).toMatchObject({ taskId: 'd', title: 'Done', completedAt: 50 });
+    expect(migrateTasksState(out)).toEqual(out);
+  });
+
+  it('replaceAll repairs imported done tasks too', () => {
+    const task = { ...mkTask('x'), done: true, completedAt: 9 };
+    get().replaceAll({ tasks: { x: task }, rootIds: ['x'], history: [], tagColors: {} }, 'Import');
+    expect(get().history.map((e) => e.taskId)).toEqual(['x']);
   });
 });

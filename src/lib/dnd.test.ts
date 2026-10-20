@@ -127,13 +127,24 @@ function build() {
 }
 
 describe('flattenTree / itemsFor / guideFlags', () => {
-  it('flattens in render order, sinking done tasks and skipping collapsed subtrees', () => {
+  it('flattens in render order, skipping collapsed subtrees', () => {
     const s = build();
     expect(flattenTree(s.tree, { tag: null })).toEqual([s.A, s.a1, s.a2, s.B, s.C]);
-    const sunk = toggleDone(s.tree, s.A);
-    expect(flattenTree(sunk, { tag: null })).toEqual([s.B, s.C, s.A, s.a1, s.a2]);
     const collapsed = updateTask(s.tree, s.A, { collapsed: true });
     expect(flattenTree(collapsed, { tag: null })).toEqual([s.A, s.B, s.C]);
+  });
+
+  it('leaves out done tasks, and a done parent takes its whole subtree along', () => {
+    const s = build();
+    const parentDone = toggleDone(s.tree, s.A);
+    expect(flattenTree(parentDone, { tag: null })).toEqual([s.B, s.C]);
+    // A done subtask disappears on its own; its parent stays.
+    const childDone = toggleDone(s.tree, s.a1);
+    expect(flattenTree(childDone, { tag: null })).toEqual([s.A, s.a2, s.B, s.C]);
+    // Hidden rows never reach the drag projection.
+    const items = itemsFor(childDone, flattenTree(childDone, { tag: null }));
+    expect(items.map((i) => i.id)).toEqual([s.A, s.a2, s.B, s.C]);
+    expect(flattenTree(toggleDone(s.tree, s.B), { tag: null })).toEqual([s.A, s.a1, s.a2, s.C]);
   });
 
   it('applies a tag filter', () => {
@@ -201,12 +212,20 @@ describe('siblingMoveTarget', () => {
     expect(siblingMoveTarget(s.tree, s.a1, 1)).toEqual({ parentId: s.A, index: 1 });
   });
 
-  it('is null at the ends, across done groups and for unknown ids', () => {
+  it('is null at the ends and for unknown ids', () => {
     const s = build();
     expect(siblingMoveTarget(s.tree, s.A, -1)).toBeNull();
     expect(siblingMoveTarget(s.tree, s.C, 1)).toBeNull();
     expect(siblingMoveTarget(toggleDone(s.tree, s.C), s.B, 1)).toBeNull();
     expect(siblingMoveTarget(s.tree, 'zzz', 1)).toBeNull();
+  });
+
+  it('steps over done siblings, which are hidden', () => {
+    const s = build();
+    const tree = toggleDone(s.tree, s.B);
+    // A, [B done], C: C's visible neighbour above is A, past the hidden B.
+    expect(siblingMoveTarget(tree, s.C, -1)).toEqual({ parentId: null, index: 0 });
+    expect(siblingMoveTarget(tree, s.A, 1)).toEqual({ parentId: null, index: 2 });
   });
 
   it('skips siblings hidden by a filter', () => {

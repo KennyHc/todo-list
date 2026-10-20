@@ -1,6 +1,6 @@
-import { useMemo, useState, type CSSProperties } from 'react';
-import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
-import { Check, History as HistoryIcon, X } from 'lucide-react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'framer-motion';
+import { Check, History as HistoryIcon, Minus } from 'lucide-react';
 import { normalizeTaskColor } from '../lib/colors';
 import { dayHeader, formatTime } from '../lib/dates';
 import type { HistoryEntry } from '../lib/history';
@@ -11,8 +11,6 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { DuePill } from './DuePill';
 import { TagChip } from './TagChip';
 import styles from './HistoryList.module.css';
-
-type Ask = { kind: 'completed' | 'history'; open: boolean };
 
 function groupByDay(entries: HistoryEntry[]): { label: string; entries: HistoryEntry[] }[] {
   const groups: { label: string; entries: HistoryEntry[] }[] = [];
@@ -25,28 +23,86 @@ function groupByDay(entries: HistoryEntry[]): { label: string; entries: HistoryE
   return groups;
 }
 
-function Entry({ entry }: { entry: HistoryEntry }) {
+/** Why a row is leaving, so its exit can differ: a restored row drifts back toward the Tree. */
+const leaving = new Map<string, 'restore' | 'delete'>();
+
+const DELETE_EXIT = {
+  opacity: 0,
+  x: -12,
+  height: 0,
+  overflow: 'hidden',
+  transition: { duration: 0.2 },
+};
+const RESTORE_EXIT = {
+  opacity: 0,
+  x: 10,
+  height: 0,
+  overflow: 'hidden',
+  transition: { duration: 0.22 },
+};
+
+const BUTTON_SPRING = { type: 'spring', stiffness: 520, damping: 30 } as const;
+const STAGGER_S = 0.025;
+
+function Entry({
+  entry,
+  index,
+  editing,
+}: {
+  entry: HistoryEntry;
+  index: number;
+  editing: boolean;
+}) {
+  const reduced = useReducedMotion();
   const setTagFilter = useUIStore((s) => s.setTagFilter);
-  const remove = useTaskStore((s) => s.removeHistoryEntry);
+  const restore = useTaskStore((s) => s.restoreFromHistory);
+  const deleteCompleted = useTaskStore((s) => s.deleteCompleted);
+  // undefined: the task is gone; false: it was reopened (e.g. a subtask was added); true: done.
+  const taskDone = useTaskStore((s) => s.tasks[entry.taskId]?.done);
   // Entries from before tag colours snapshot the old default blue, which meant "no colour".
   const edge = normalizeTaskColor(entry.color);
   const late = entry.dueDate !== null && todayISO(new Date(entry.completedAt)) > entry.dueDate;
+  const canRestore = taskDone === true;
+  const reason =
+    taskDone === undefined
+      ? 'This task was deleted'
+      : taskDone
+        ? undefined
+        : 'Already in your list';
   return (
     <motion.li
       className={styles.entry}
       data-row-color={edge ?? undefined}
       data-done=""
+      data-editing={editing || undefined}
       style={edge ? ({ '--row-color': edge } as CSSProperties) : undefined}
       layout="position"
       initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, x: -12, height: 0, overflow: 'hidden', transition: { duration: 0.2 } }}
+      variants={{
+        exit: () => (leaving.get(entry.id) === 'restore' ? RESTORE_EXIT : DELETE_EXIT),
+      }}
+      exit="exit"
       transition={{ type: 'spring', stiffness: 500, damping: 35 }}
     >
-      <span className={styles.check} aria-hidden="true">
-        <Check size={12} strokeWidth={3} />
-      </span>
-      <div className={styles.body}>
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked="true"
+        aria-label={`Done: ${entry.title}`}
+        className={styles.check}
+        disabled={!canRestore}
+        title={reason ?? 'Restore to your list'}
+        onClick={() => {
+          leaving.set(entry.id, 'restore');
+          restore(entry.id);
+        }}
+      >
+        <span className={styles.checkDot} aria-hidden="true">
+          <Check size={12} strokeWidth={3} />
+        </span>
+      </button>
+      <motion.div className={styles.body} layout="position">
         <div className={styles.titleLine}>
           <span className={styles.title}>{entry.title}</span>
           {entry.auto && (
@@ -72,53 +128,101 @@ function Entry({ entry }: { entry: HistoryEntry }) {
             </span>
           )}
         </div>
-      </div>
-      <time className={styles.time} dateTime={new Date(entry.completedAt).toISOString()}>
-        {formatTime(entry.completedAt)}
-      </time>
-      <button
-        type="button"
-        className={styles.remove}
-        aria-label={`Remove "${entry.title}" from history`}
-        onClick={() => remove(entry.id)}
+      </motion.div>
+      <motion.time
+        className={styles.time}
+        layout="position"
+        dateTime={new Date(entry.completedAt).toISOString()}
       >
-        <X size={14} strokeWidth={1.75} aria-hidden="true" />
-      </button>
+        {formatTime(entry.completedAt)}
+      </motion.time>
+      <AnimatePresence initial={false}>
+        {editing && (
+          <motion.button
+            key="delete"
+            type="button"
+            className={styles.minus}
+            aria-label={`Delete "${entry.title}" permanently`}
+            initial={reduced ? { opacity: 0 } : { opacity: 0, x: 12 }}
+            animate={reduced ? { opacity: 1 } : { opacity: 1, x: 0 }}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, x: 12 }}
+            transition={
+              reduced ? { duration: 0.12 } : { ...BUTTON_SPRING, delay: index * STAGGER_S }
+            }
+            onClick={() => {
+              leaving.set(entry.id, 'delete');
+              deleteCompleted(entry.id);
+            }}
+          >
+            <span className={styles.minusDot} aria-hidden="true">
+              <Minus size={14} strokeWidth={3} />
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
     </motion.li>
   );
 }
 
 export function HistoryList() {
   const history = useTaskStore((s) => s.history);
-  const doneCount = useTaskStore((s) => Object.values(s.tasks).filter((t) => t.done).length);
-  const clearCompleted = useTaskStore((s) => s.clearCompleted);
-  const clearHistory = useTaskStore((s) => s.clearHistory);
+  const deleteAll = useTaskStore((s) => s.deleteAllCompleted);
   const tag = useUIStore((s) => s.tagFilter);
-  const [ask, setAsk] = useState<Ask>({ kind: 'completed', open: false });
+  const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const groups = useMemo(
     () => groupByDay(history.filter((e) => tag === null || e.tags.includes(tag)).reverse()),
     [history, tag],
   );
-  const close = () => setAsk((a) => ({ ...a, open: false }));
 
-  const dialog =
-    ask.kind === 'completed'
-      ? {
-          title: 'Clear completed tasks?',
-          body: `This removes ${doneCount} completed task${doneCount === 1 ? '' : 's'} from your list. Your history is kept.`,
-          confirmLabel: 'Clear',
-          run: clearCompleted,
-        }
-      : {
-          title: 'Clear history?',
-          body: `This removes ${history.length} ${history.length === 1 ? 'entry' : 'entries'} from your history. Your tasks are not affected.`,
-          confirmLabel: 'Clear',
-          run: clearHistory,
-        };
+  // Nothing left to edit; and Escape leaves edit mode (a dialog or popover keeps its own Escape).
+  useEffect(() => {
+    if (history.length === 0) setEditing(false);
+  }, [history.length]);
+  useEffect(() => {
+    if (!editing) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      setEditing(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [editing]);
 
+  let index = 0;
   return (
     <div className={styles.card}>
+      {history.length > 0 && (
+        <div className={styles.bar}>
+          <AnimatePresence initial={false}>
+            {editing && (
+              <motion.button
+                key="all"
+                type="button"
+                className={`${styles.textBtn} ${styles.danger}`}
+                initial={{ opacity: 0, x: 8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 8 }}
+                transition={{ duration: 0.15 }}
+                onClick={() => setConfirming(true)}
+              >
+                Delete all
+              </motion.button>
+            )}
+          </AnimatePresence>
+          <button
+            type="button"
+            className={styles.textBtn}
+            data-strong
+            aria-pressed={editing}
+            onClick={() => setEditing((on) => !on)}
+          >
+            {editing ? 'Done' : 'Edit'}
+          </button>
+        </div>
+      )}
       {groups.length === 0 ? (
         <div className={styles.empty}>
           <HistoryIcon size={18} strokeWidth={1.75} aria-hidden="true" />
@@ -135,7 +239,7 @@ export function HistoryList() {
               <ul className={styles.list}>
                 <AnimatePresence initial={false}>
                   {group.entries.map((entry) => (
-                    <Entry key={entry.id} entry={entry} />
+                    <Entry key={entry.id} entry={entry} index={index++} editing={editing} />
                   ))}
                 </AnimatePresence>
               </ul>
@@ -144,36 +248,16 @@ export function HistoryList() {
         </LayoutGroup>
       )}
 
-      {(history.length > 0 || doneCount > 0) && (
-        <div className={styles.footer}>
-          <button
-            type="button"
-            className={styles.textBtn}
-            disabled={doneCount === 0}
-            onClick={() => setAsk({ kind: 'completed', open: true })}
-          >
-            Clear completed tasks from list
-          </button>
-          <button
-            type="button"
-            className={styles.textBtn}
-            disabled={history.length === 0}
-            onClick={() => setAsk({ kind: 'history', open: true })}
-          >
-            Clear history
-          </button>
-        </div>
-      )}
-
       <ConfirmDialog
-        open={ask.open}
-        title={dialog.title}
-        body={dialog.body}
-        confirmLabel={dialog.confirmLabel}
-        onCancel={close}
+        open={confirming}
+        title="Delete all completed tasks?"
+        body={`This permanently deletes ${history.length} completed ${history.length === 1 ? 'task' : 'tasks'} and your whole history. You can undo it right after.`}
+        confirmLabel="Delete all"
+        onCancel={() => setConfirming(false)}
         onConfirm={() => {
-          close();
-          dialog.run();
+          setConfirming(false);
+          setEditing(false);
+          deleteAll();
         }}
       />
     </div>

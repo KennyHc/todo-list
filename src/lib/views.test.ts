@@ -99,7 +99,7 @@ describe('visibleTreeIds', () => {
 });
 
 describe('deadlineList', () => {
-  it('orders dated asc, then undated by createdAt, then done by completedAt desc', () => {
+  it('orders dated asc, then undated by createdAt, and leaves done tasks out', () => {
     const b = build();
     const noDate1 = b.add('nd1');
     const late = b.add('late', { dueDate: '2026-03-01' });
@@ -109,14 +109,7 @@ describe('deadlineList', () => {
     const doneB = b.add('doneB');
     b.tree = toggleDone(b.tree, doneA, 5000);
     b.tree = toggleDone(b.tree, doneB, 6000);
-    expect(deadlineList(b.tree, { tag: null })).toEqual([
-      early,
-      late,
-      noDate1,
-      noDate2,
-      doneB,
-      doneA,
-    ]);
+    expect(deadlineList(b.tree, { tag: null })).toEqual([early, late, noDate1, noDate2]);
   });
 
   it('flattens subtasks and parents ignoring hierarchy', () => {
@@ -134,7 +127,7 @@ describe('deadlineList', () => {
     expect(deadlineList(b.tree, { tag: null })).toEqual([x, y, z]);
   });
 
-  it('keeps insertion order for equal createdAt and equal completedAt', () => {
+  it('keeps insertion order for equal createdAt', () => {
     let tree = emptyTree();
     const ids: string[] = [];
     for (const t of ['a', 'b', 'c']) {
@@ -144,7 +137,7 @@ describe('deadlineList', () => {
     }
     expect(deadlineList(tree, { tag: null })).toEqual(ids);
     tree = toggleDone(toggleDone(tree, ids[0], 9), ids[1], 9);
-    expect(deadlineList(tree, { tag: null })).toEqual([ids[2], ids[0], ids[1]]);
+    expect(deadlineList(tree, { tag: null })).toEqual([ids[2]]);
   });
 
   it('filters by tag', () => {
@@ -156,14 +149,15 @@ describe('deadlineList', () => {
     expect(deadlineList(b.tree, { tag: 'none' })).toEqual([]);
   });
 
-  it('moves a task into the done group when completed', () => {
+  it('drops a task when it is completed, and a done parent hides its subtasks too', () => {
     const b = build();
     const a = b.add('a', { dueDate: '2026-05-01' });
     const c = b.add('c', { dueDate: '2026-06-01' });
+    const kid = b.add('kid', { parentId: c, dueDate: '2026-07-01' });
     b.tree = toggleDone(b.tree, a, 100);
-    expect(deadlineList(b.tree, { tag: null })).toEqual([c, a]);
-    b.tree = updateTask(b.tree, c, { dueDate: null });
-    expect(deadlineList(b.tree, { tag: null })).toEqual([c, a]);
+    expect(deadlineList(b.tree, { tag: null })).toEqual([c, kid]);
+    b.tree = toggleDone(b.tree, c, 200);
+    expect(deadlineList(b.tree, { tag: null })).toEqual([]);
   });
 });
 
@@ -214,12 +208,12 @@ describe('visibleOrder', () => {
     expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([a, a1, a2, c, d]);
   });
 
-  it('puts done tasks after undone siblings, like the list', () => {
+  it('skips done tasks, and a done parent with its subtree, like the list', () => {
     const { b, a, a1, a2, c, d } = sample();
     b.tree = toggleDone(b.tree, a1, 10);
-    expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([a, a2, a1, c, d]);
+    expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([a, a2, c, d]);
     b.tree = toggleDone(b.tree, a, 20);
-    expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([c, d, a, a1, a2]);
+    expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([c, d]);
   });
 
   it('skips the children of collapsed parents', () => {

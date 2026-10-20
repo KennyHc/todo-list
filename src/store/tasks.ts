@@ -9,7 +9,12 @@ import { effectiveColor } from '../lib/colorResolve';
 import { isHexColor, isSafeTagKey, normalizeTagColors, normalizeTaskColor } from '../lib/colors';
 import { normalizeTag } from '../lib/tags';
 import { nextLabel, normalizeRepeat, spawnNextOccurrence } from '../lib/recur';
-import { applyHistory, diffCompletions, type HistoryEntry } from '../lib/history';
+import {
+  applyHistory,
+  diffCompletions,
+  synthesizeHistory,
+  type HistoryEntry,
+} from '../lib/history';
 import {
   addTask,
   clearCompleted,
@@ -64,6 +69,15 @@ type TaskActions = {
   clearCompleted: () => void;
   clearHistory: () => void;
   removeHistoryEntry: (id: string) => void;
+  /**
+   * Deletes a completed task for good: its History entry and, if it still exists and is done,
+   * the task with its subtree. One undo entry.
+   */
+  deleteCompleted: (entryId: string) => void;
+  /** Deletes every completed task and the whole History in one undo entry. */
+  deleteAllCompleted: () => void;
+  /** Reopens the task behind a History entry (it returns to the Tree). No-op if it is gone. */
+  restoreFromHistory: (entryId: string) => void;
   indent: (id: string) => void;
   outdent: (id: string) => void;
   /** Moves a task (with its subtree) to `target` and records an undo. */
@@ -96,7 +110,8 @@ export type PersistedTasks = Pick<TaskStore, 'tasks' | 'rootIds' | 'history' | '
 /**
  * v1 -> v2: every task gains `tags: []` and `dueDate: null`, and the store gains an empty
  * `history`. v2 -> v3: the old default blue (which meant "unset") becomes `color: null`
- * ("automatic"), and the store gains `tagColors`. Tasks also gain `repeat` (missing -> null). Idempotent, so it also tolerates partially
+ * ("automatic"), and the store gains `tagColors`. Tasks also gain `repeat` (missing -> null).
+ * Done tasks without a History entry get one. Idempotent, so it also tolerates partially
  * migrated data.
  */
 export function migrateTasksState(persisted: unknown): PersistedTasks {
@@ -112,13 +127,21 @@ export function migrateTasksState(persisted: unknown): PersistedTasks {
     };
     if (typeof task.spawnedFrom !== 'string') delete tasks[id].spawnedFrom;
   }
-  return {
+  const data = {
     tasks,
     rootIds: Array.isArray(old.rootIds) ? (old.rootIds as string[]) : [],
     history: Array.isArray(old.history) ? (old.history as HistoryEntry[]) : [],
     tagColors: normalizeTagColors(old.tagColors),
   };
+  // Done tasks are hidden from the Tree, so each needs a History entry to be reachable.
+  return { ...data, history: synthesizeHistory(data) };
 }
+
+/** `data` with History entries added for any done task that lacks one (see synthesizeHistory). */
+export const withHistoryRepaired = (data: PersistedTasks): PersistedTasks => {
+  const history = synthesizeHistory(data);
+  return history === data.history ? data : { ...data, history };
+};
 
 const LEGACY_KEY = 'tasks-v1';
 
@@ -153,6 +176,16 @@ const undoEntry = (s: TaskState, label: string): UndoEntry => ({
   at: Date.now(),
 });
 
+/**
+ * History for a structural edit (add, delete, move, indent) that can flip a parent's done flag
+ * (its last open subtask went away, or a subtask was added to a done parent): the parent files
+ * itself in History, or leaves it, exactly as if it had been toggled.
+ */
+const historyAfter = (state: TaskState, after: TaskTree, now = Date.now()): HistoryEntry[] =>
+  after.tasks === state.tasks
+    ? state.history
+    : applyHistory(state.history, diffCompletions(treeOf(state), after, '', now, state.tagColors));
+
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /**
@@ -169,8 +202,14 @@ export const createTaskStore = () =>
     undo: null,
 
     add: (input) => {
-      const { tree, id } = addTask(treeOf(get()), input);
-      set({ tasks: tree.tasks, rootIds: tree.rootIds, lastToggle: null });
+      const state = get();
+      const { tree, id } = addTask(treeOf(state), input);
+      set({
+        tasks: tree.tasks,
+        rootIds: tree.rootIds,
+        history: historyAfter(state, tree),
+        lastToggle: null,
+      });
       return id;
     },
     update: (id, patch) => set(updateTask(treeOf(get()), id, patch)),
@@ -180,7 +219,13 @@ export const createTaskStore = () =>
       if (!task) return;
       const count = getDescendants(treeOf(state), id).length;
       const label = `Deleted \u201c${task.title}\u201d${count > 0 ? ` and ${plural(count, 'subtask', 'subtasks')}` : ''}`;
-      set({ ...deleteTask(treeOf(state), id), lastToggle: null, undo: undoEntry(state, label) });
+      const after = deleteTask(treeOf(state), id);
+      set({
+        ...after,
+        history: historyAfter(state, after),
+        lastToggle: null,
+        undo: undoEntry(state, label),
+      });
     },
     toggle: (id) => {
       const state = get();
@@ -256,8 +301,60 @@ export const createTaskStore = () =>
         undo: undoEntry(state, 'Removed from history'),
       });
     },
-    indent: (id) => set({ ...indentTask(treeOf(get()), id), lastToggle: null }),
-    outdent: (id) => set({ ...outdentTask(treeOf(get()), id), lastToggle: null }),
+    deleteCompleted: (entryId) => {
+      const state = get();
+      const entry = state.history.find((e) => e.id === entryId);
+      if (!entry) return;
+      const task = state.tasks[entry.taskId];
+      const removeTask = task !== undefined && task.done;
+      const tree = removeTask ? deleteTask(treeOf(state), entry.taskId) : treeOf(state);
+      // Entries of the deleted subtree go too, or History would list tasks that no longer exist.
+      const gone = new Set(
+        removeTask ? [entry.taskId, ...getDescendants(treeOf(state), entry.taskId)] : [],
+      );
+      const history = state.history.filter((e) => e.id !== entryId && !gone.has(e.taskId));
+      set({
+        tasks: tree.tasks,
+        rootIds: tree.rootIds,
+        history,
+        lastToggle: null,
+        undo: undoEntry(state, `Deleted \u201c${entry.title}\u201d`),
+      });
+    },
+    deleteAllCompleted: () => {
+      const state = get();
+      const after = clearCompleted(treeOf(state));
+      const removed = Object.keys(state.tasks).length - Object.keys(after.tasks).length;
+      if (removed === 0 && state.history.length === 0) return;
+      const count = state.history.length > 0 ? state.history.length : removed;
+      set({
+        tasks: after.tasks,
+        rootIds: after.rootIds,
+        history: [],
+        lastToggle: null,
+        undo: undoEntry(state, `Deleted all completed (${count})`),
+      });
+    },
+    restoreFromHistory: (entryId) => {
+      const state = get();
+      const entry = state.history.find((e) => e.id === entryId);
+      const task = entry && state.tasks[entry.taskId];
+      if (!entry || !task || !task.done) return;
+      get().toggle(entry.taskId);
+      // toggle labels its own undo "Reopened ..."; History calls it a restore.
+      const undo = get().undo;
+      if (undo) set({ undo: { ...undo, label: `Restored \u201c${entry.title}\u201d` } });
+    },
+    indent: (id) => {
+      const state = get();
+      const after = indentTask(treeOf(state), id);
+      set({ ...after, history: historyAfter(state, after), lastToggle: null });
+    },
+    outdent: (id) => {
+      const state = get();
+      const after = outdentTask(treeOf(state), id);
+      set({ ...after, history: historyAfter(state, after), lastToggle: null });
+    },
     move: (id, target) => {
       const state = get();
       const task = state.tasks[id];
@@ -268,6 +365,7 @@ export const createTaskStore = () =>
       set({
         tasks: after.tasks,
         rootIds: after.rootIds,
+        history: historyAfter(state, after),
         lastToggle: null,
         undo: undoEntry(state, `Moved \u201c${task.title}\u201d`),
       });
@@ -303,7 +401,8 @@ export const createTaskStore = () =>
           partial.tasks[toggled] !== state.tasks[toggled];
         return { ...partial, ...(changed ? { lastToggle: null } : {}) };
       }),
-    replaceAll: (data, label) =>
+    replaceAll: (raw, label) => {
+      const data = withHistoryRepaired(raw);
       set({
         tasks: data.tasks,
         rootIds: data.rootIds,
@@ -311,7 +410,8 @@ export const createTaskStore = () =>
         tagColors: data.tagColors,
         lastToggle: null,
         undo: undoEntry(get(), label),
-      }),
+      });
+    },
     appendTasks: (tasks, label) => {
       const state = get();
       const { tree, ids, count } = appendAiTasks(treeOf(state), tasks);

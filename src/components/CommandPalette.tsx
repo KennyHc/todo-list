@@ -229,7 +229,8 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
 
   const sections = useMemo<Section[]>(() => {
     const q = query.trim();
-    const all = Object.values(tasks);
+    // Done tasks live in History, so there is no row to reveal.
+    const all = Object.values(tasks).filter((t) => !t.done);
     const toRow = (task: Task, indices: number[]): Row => ({
       kind: 'task',
       id: `task-${task.id}`,
@@ -247,7 +248,6 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
 
     if (q === '') {
       const recent = all
-        .filter((t) => !t.done)
         .sort((a, b) => b.createdAt - a.createdAt)
         .slice(0, MAX_RECENT)
         .map((t) => toRow(t, []));

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { siblingMoveTarget } from '../lib/dnd';
 import { isLeaf } from '../lib/tree';
-import { visibleOrder, visibleTreeIds } from '../lib/views';
+import { neighborAfterRemoval, visibleOrder, visibleTreeIds } from '../lib/views';
 import { useTaskStore } from '../store/tasks';
 import { useUIStore, type View } from '../store/ui';
 import type { Difficulty } from '../types';
@@ -182,9 +182,20 @@ export function useHotkeys(): void {
           ui.setFocusedId(order[next]);
           break;
         }
-        case 'toggle':
-          if (focusedId) tasks.toggle(focusedId);
+        case 'toggle': {
+          if (!focusedId) break;
+          tasks.toggle(focusedId);
+          // A completed row leaves the list (with its subtree, and maybe its parent), so focus
+          // moves on to the next row that stays, and j/k keep working.
+          const stays = new Set(
+            visibleOrder(useTaskStore.getState(), { view: ui.view, tag: ui.tagFilter }),
+          );
+          if (!stays.has(focusedId)) {
+            const gone = new Set(order.filter((other) => !stays.has(other)));
+            ui.setFocusedId(neighborAfterRemoval(order, focusedId, gone));
+          }
           break;
+        }
         case 'edit':
           if (focusedId) tasks.setEditingId(focusedId);
           break;

@@ -52,17 +52,60 @@
   background: var(--surface-2);
 }
 
+/* The round check restores the task. A 44px hit area that doesn't grow the row. */
 .check {
+  position: relative;
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -12px -13px -13px -13px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  cursor: pointer;
+}
+
+.check:disabled {
+  cursor: default;
+}
+
+.check:focus-visible {
+  outline: none;
+}
+
+.check:focus-visible .checkDot {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.checkDot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 18px;
   height: 18px;
-  margin-top: 1px;
   border-radius: 50%;
   background: var(--accent);
   color: var(--check-ink);
+  transition:
+    transform var(--t-fast),
+    opacity var(--t-fast);
+}
+
+.check:disabled .checkDot {
+  opacity: 0.45;
+}
+
+.check:not(:disabled):hover .checkDot {
+  transform: scale(1.12);
+}
+
+.check:not(:disabled):active .checkDot {
+  transform: scale(0.88);
 }
 
 .body {
@@ -158,44 +201,6 @@
   line-height: 16px;
 }
 
-.remove {
-  position: relative;
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  margin: -4px 0;
-  padding: 0;
-  border: 0;
-  border-radius: var(--r-sm);
-  background: none;
-  color: var(--muted);
-  opacity: 0;
-  cursor: pointer;
-  transition:
-    opacity var(--t-fast),
-    background-color var(--t-fast),
-    color var(--t-fast);
-}
-
-.entry:hover .remove,
-.remove:focus-visible {
-  opacity: 1;
-}
-
-.remove:hover {
-  background: var(--border-strong);
-  color: var(--text-2);
-}
-
-@media (hover: none) {
-  .remove {
-    opacity: 1;
-  }
-}
-
 .empty {
   display: flex;
   flex-direction: column;
@@ -218,35 +223,80 @@
   font-size: 13px;
 }
 
-.footer {
+.bar {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 4px 12px;
-  margin-top: 6px;
-  padding: 8px 6px 2px;
-  border-top: 1px solid var(--border);
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 2px;
 }
 
 .textBtn {
-  padding: 4px 6px;
+  min-height: 32px;
+  padding: 4px 8px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   background: none;
-  color: var(--muted);
-  font-size: 12.5px;
+  color: var(--accent-ink);
+  font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
-  transition: color var(--t-fast);
+  transition:
+    color var(--t-fast),
+    background-color var(--t-fast);
 }
 
-.textBtn:hover:not(:disabled) {
-  color: var(--text);
+.textBtn[data-strong] {
+  font-weight: 600;
 }
 
-.textBtn:disabled {
-  opacity: 0.5;
-  cursor: default;
+.textBtn:hover {
+  background: var(--surface-2);
+}
+
+.danger {
+  color: var(--danger);
+}
+
+/* iOS-style delete: a red round minus, in a 44px touch target at the row's right edge. */
+.minus {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -12px -6px -12px 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.minus:focus-visible {
+  outline: none;
+}
+
+.minus:focus-visible .minusDot {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.minusDot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+  transition: transform var(--t-fast);
+}
+
+.minus:active .minusDot {
+  transform: scale(0.88);
 }
 
 @media (max-width: 480px) {
@@ -254,9 +304,7 @@
     padding: 4px;
   }
 
-  .remove::after {
-    content: '';
-    position: absolute;
-    inset: -8px;
+  .minus {
+    margin-right: -10px;
   }
 }

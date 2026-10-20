@@ -1,5 +1,5 @@
 import type { TaskTree } from '../types';
-import { getAncestors, getDescendants, sortedChildIds } from './tree';
+import { getAncestors, getDescendants } from './tree';
 
 export type DueStatus = 'overdue' | 'today' | 'soon' | 'later';
 
@@ -41,9 +41,10 @@ export function visibleTreeIds(tree: TaskTree, tag: string | null): Set<string> 
 }
 
 /**
- * Every task (parents and subtasks alike, hierarchy ignored), optionally filtered by tag:
- * undone with a due date (soonest first), undone without one (oldest first), then done
- * (most recently completed first). Ties keep the tree's insertion order.
+ * Every open task (parents and subtasks alike, hierarchy ignored), optionally filtered by tag:
+ * with a due date (soonest first), then without one (oldest first). Done tasks live in History
+ * and are left out; a task under a done parent is itself done, so it never shows either. Ties
+ * keep the tree's insertion order.
  */
 export function deadlineList(tree: TaskTree, { tag }: { tag: string | null }): string[] {
   const tasks = Object.values(tree.tasks).filter((task) => tag === null || task.tags.includes(tag));
@@ -51,10 +52,7 @@ export function deadlineList(tree: TaskTree, { tag }: { tag: string | null }): s
     .filter((t) => !t.done && t.dueDate !== null)
     .sort((a, b) => (a.dueDate! < b.dueDate! ? -1 : a.dueDate! > b.dueDate! ? 1 : 0));
   const undated = tasks.filter((t) => !t.done && t.dueDate === null).sort(byCreated);
-  const finished = tasks
-    .filter((t) => t.done)
-    .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
-  return [...dated, ...undated, ...finished].map((t) => t.id);
+  return [...dated, ...undated].map((t) => t.id);
 }
 
 const byCreated = (a: { createdAt: number }, b: { createdAt: number }) => a.createdAt - b.createdAt;
@@ -90,7 +88,26 @@ export function isContextOnly(tree: TaskTree, id: string, tag: string): boolean 
 }
 
 /**
- * Ids of the rows currently on screen, in display order: tree order (undone before done,
+ * The Tree view's rows in display order: open tasks only (a done task, and with it its whole
+ * subtree, belongs to History), skipping collapsed subtrees and anything the tag filter hides.
+ */
+export function treeRows(tree: TaskTree, tag: string | null): string[] {
+  const visible = visibleTreeIds(tree, tag);
+  const out: string[] = [];
+  const walk = (ids: string[]) => {
+    for (const id of ids) {
+      const task = tree.tasks[id];
+      if (!task || task.done || (visible && !visible.has(id))) continue;
+      out.push(id);
+      if (!task.collapsed) walk(task.childIds);
+    }
+  };
+  walk(tree.rootIds);
+  return out;
+}
+
+/**
+ * Ids of the rows currently on screen, in display order: tree order (open tasks only,
  * skipping collapsed subtrees and anything the tag filter hides) or deadline order. History
  * rows aren't tasks, so that view has no keyboard order.
  */
@@ -100,18 +117,7 @@ export function visibleOrder(
 ): string[] {
   if (view === 'history') return [];
   if (view === 'deadline') return deadlineList(tree, { tag });
-  const visible = visibleTreeIds(tree, tag);
-  const out: string[] = [];
-  const walk = (ids: string[]) => {
-    for (const id of sortedChildIds(tree, ids)) {
-      const task = tree.tasks[id];
-      if (!task || (visible && !visible.has(id))) continue;
-      out.push(id);
-      if (!task.collapsed) walk(task.childIds);
-    }
-  };
-  walk(tree.rootIds);
-  return out;
+  return treeRows(tree, tag);
 }
 
 /** The row to focus once `id` (and everything in `removed`) is gone: the next one, else the previous. */

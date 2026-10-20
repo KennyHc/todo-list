@@ -39,3 +39,25 @@
     padding: 4px;
   }
 }
+
+/* Everything is done: once the last rows have popped away the card gives way to "All clear",
+   which fades in after the collapse (CSS, so it never takes part in presence). */
+.list:empty {
+  display: none;
+}
+
+.allClear {
+  animation: allClear 240ms var(--ease-out) 700ms backwards;
+}
+
+@keyframes allClear {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .allClear {
+    animation-delay: 0s;
+  }
+}

@@ -9,7 +9,8 @@ test('completing a repeating task creates the next one', async ({ page }, info) 
 
   await checkbox.click();
 
-  // Done copy stays; a fresh unchecked "Water plants" appears with the next due date.
+  // The done copy is filed in History; a fresh unchecked "Water plants" appears with the next
+  // due date.
   const toast = page.getByRole('status').filter({ hasText: /next on / });
   await expect(toast).toBeVisible();
   const next = /next on (.+?)\s*Undo/.exec((await toast.innerText()).replace(/\n/g, ' '))?.[1];
@@ -18,7 +19,7 @@ test('completing a repeating task creates the next one', async ({ page }, info) 
   const rows = page.locator('li[data-row-id]').filter({
     has: page.getByRole('button', { name: 'Water plants', exact: true }),
   });
-  await expect(rows).toHaveCount(2);
+  await expect(rows).toHaveCount(1);
   const fresh = rows.filter({
     has: page.getByRole('checkbox', { name: 'Done: Water plants', checked: false }),
   });

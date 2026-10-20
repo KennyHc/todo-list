@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TaskTree } from '../types';
-import { applyHistory, diffCompletions } from './history';
+import { applyHistory, diffCompletions, synthesizeHistory } from './history';
 import { addTask, deleteTask, emptyTree, toggleDone, updateTask } from './tree';
 
 function sample() {
@@ -159,5 +159,53 @@ describe('applyHistory', () => {
     const renamed = updateTask(s.tree, s.b, { title: 'B2' });
     const { diff } = run(renamed, s.b, 1);
     expect(diff.completed[0].title).toBe('B2');
+  });
+});
+
+describe('synthesizeHistory', () => {
+  const data = (tree: TaskTree, history: ReturnType<typeof applyHistory> = []) => ({
+    ...tree,
+    history,
+    tagColors: {},
+  });
+
+  it('returns the same array when every done task has an entry', () => {
+    const s = sample();
+    const after = toggleDone(s.tree, s.b, 100);
+    const history = applyHistory([], diffCompletions(s.tree, after, s.b, 100));
+    const input = data(after, history);
+    expect(synthesizeHistory(input)).toBe(input.history);
+    expect(synthesizeHistory(data(s.tree))).toEqual([]);
+  });
+
+  it('adds entries for done tasks lacking one, children first, ordered by completedAt', () => {
+    const s = sample();
+    const done = toggleDone(s.tree, s.a, 700);
+    const existing = applyHistory(
+      [],
+      diffCompletions(s.tree, toggleDone(s.tree, s.b, 100), s.b, 100),
+    );
+    const out = synthesizeHistory(data(done, existing), 999);
+    expect(out.map((e) => e.taskId)).toEqual([s.b, s.c, s.a]);
+    const parent = out.find((e) => e.taskId === s.a)!;
+    expect(parent).toMatchObject({
+      id: `h-${s.a}`,
+      title: 'A',
+      isParent: true,
+      subtaskCount: 2,
+      completedAt: 700,
+      color: '#111111',
+      auto: false,
+    });
+  });
+
+  it('falls back to now when the task has no completedAt', () => {
+    const s = sample();
+    const done = toggleDone(s.tree, s.b, 100);
+    const stripped = {
+      ...done,
+      tasks: { ...done.tasks, [s.b]: { ...done.tasks[s.b], completedAt: undefined } },
+    };
+    expect(synthesizeHistory(data(stripped), 4242)[0].completedAt).toBe(4242);
   });
 });

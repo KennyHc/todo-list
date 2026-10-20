@@ -1,10 +1,12 @@
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
+import { useCompletionHold } from '../hooks/useCompletionHold';
 import { useSettledOrder } from '../hooks/useSettledOrder';
 import { BUCKET_LABELS, deadlineBucket, type DeadlineBucket } from '../lib/dates';
 import { deadlineList, todayISO } from '../lib/views';
 import { useTaskStore, type TaskStore } from '../store/tasks';
 import { useShallow } from 'zustand/react/shallow';
 import { useUIStore } from '../store/ui';
+import { EmptyState } from './EmptyState';
 import { TaskItem } from './TaskItem';
 import styles from './DeadlineList.module.css';
 
@@ -27,13 +29,21 @@ function sectionKeys(state: TaskStore, tag: string | null): string[] {
   return keys;
 }
 
+/** The section header a row sits under in `keys`. */
+function headerBefore(keys: string[], id: string): string[] {
+  for (let i = keys.indexOf(id) - 1; i >= 0; i -= 1) if (isHeader(keys[i])) return [keys[i]];
+  return [];
+}
+
 export function DeadlineList() {
   const tag = useUIStore((s) => s.tagFilter);
-  // Headers and ids settle as one list, so a just-completed task keeps its place (and its
-  // section) until the strike animation has played.
-  const shown = useSettledOrder(useTaskStore(useShallow((s) => sectionKeys(s, tag))), 700, {
+  // Headers and ids settle as one list. A just-completed task (filed in History, so no longer
+  // in it) is held, with its section header if it was the last one there, until the strike
+  // animation has played.
+  const settled = useSettledOrder(useTaskStore(useShallow((s) => sectionKeys(s, tag))), 700, {
     isAnchor: isHeader,
   });
+  const shown = useCompletionHold(settled, { holdWith: headerBefore });
 
   return (
     <LayoutGroup>
@@ -58,6 +68,11 @@ export function DeadlineList() {
           )}
         </AnimatePresence>
       </ul>
+      {shown.length === 0 && tag === null && (
+        <div className={styles.allClear}>
+          <EmptyState />
+        </div>
+      )}
     </LayoutGroup>
   );
 }

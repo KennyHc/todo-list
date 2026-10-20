@@ -2,8 +2,24 @@
   --indent: 22px;
   /* Horizontal centre of a row's checkbox: padding 8 + chevron 20 + gap 8 + half the 18px box. */
   --guide-x: 45px;
+  position: relative;
   list-style: none;
   min-width: 0;
+}
+
+.pop {
+  min-width: 0;
+}
+
+/* A completed row leaving: it can't be grabbed, and its card tints toward the surface as it
+   shrinks (beat 2), on the same clock as the content's scale. */
+.item[data-completing] {
+  pointer-events: none;
+}
+
+.item[data-completing] .row {
+  background: var(--surface-2);
+  transition: background-color 220ms cubic-bezier(0.4, 0, 0.2, 1) var(--pop-delay, 0s);
 }
 
 .row {

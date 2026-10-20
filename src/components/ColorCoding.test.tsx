@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import App from '../App';
 import { tagColor } from '../lib/tags';
@@ -89,14 +89,19 @@ describe('row colour indicator', () => {
     expect(within(openMenu('Plain')).getByText('No colour')).toBeInTheDocument();
   });
 
-  it('marks done rows so the indicator is faded', () => {
+  it('marks done rows so the indicator is faded', async () => {
     render(<App />);
     let id = '';
     act(() => {
       id = useTaskStore.getState().add({ title: 'Done soon', color: PURPLE });
-      useTaskStore.getState().toggle(id);
     });
+    act(() => useTaskStore.getState().toggle(id));
+    // The just-completed row stays (struck through, faded edge) until its strike has played.
     expect(indicator(id)).toHaveAttribute('data-done');
+    // In History the entry keeps the colour and the done mark.
+    act(() => useUIStore.getState().setView('history'));
+    await waitFor(() => expect(document.querySelector('[data-row-id]')).toBeNull());
+    expect(screen.getByText('Done soon').closest('li')).toHaveAttribute('data-done');
   });
 
   it('keeps the checkbox neutral: no inline task colour', () => {
