@@ -27,11 +27,13 @@ import { applyRemote, buildState, emptyChanges, hasChanges } from './apply';
 import { diffState, isEmptyDiff } from './diff';
 import {
   fromHistoryDoc,
+  fromSettings,
   fromTagColors,
   fromTaskDoc,
   historyOrds,
   SCHEMA_VERSION,
   toHistoryDoc,
+  toSettingsDoc,
   toTaskDoc,
   type OrderedEntry,
 } from './schema';
@@ -40,7 +42,7 @@ import { registerSyncController } from './syncControl';
 import type { Task } from '../types';
 
 /*
- * Layout:   users/{uid}                  meta: rootIds, tagColors, schemaVersion, updatedAt
+ * Layout:   users/{uid}                  meta: rootIds, tagColors, settings, schemaVersion, updatedAt
  *           users/{uid}/tasks/{id}       one document per task
  *           users/{uid}/history/{id}     one document per completion-log entry
  *
@@ -75,11 +77,18 @@ export type SyncOptions = {
 const BATCH_LIMIT = 450;
 const APPLY_DELAY_MS = 25;
 
-const pick = ({ tasks, rootIds, history, tagColors }: PersistedTasks): PersistedTasks => ({
+const pick = ({
   tasks,
   rootIds,
   history,
   tagColors,
+  settings,
+}: PersistedTasks): PersistedTasks => ({
+  tasks,
+  rootIds,
+  history,
+  tagColors,
+  settings,
 });
 
 type Active = { flush: () => Promise<void>; db: Firestore; stop: () => void };
@@ -183,6 +192,7 @@ export function startSync(uid: string, options: SyncOptions): () => void {
       rootIds: next.rootIds,
       history: next.history,
       tagColors: next.tagColors,
+      settings: next.settings,
     });
   };
 
@@ -237,6 +247,7 @@ export function startSync(uid: string, options: SyncOptions): () => void {
           changes.rootIds = data.rootIds.filter((x): x is string => typeof x === 'string');
         }
         changes.tagColors = fromTagColors(data.tagColors);
+        changes.settings = fromSettings(data.settings);
         queueApply();
       }
       updateStatus();
@@ -276,30 +287,27 @@ export function startSync(uid: string, options: SyncOptions): () => void {
         ),
       );
     }
-    if (diff.tagColorsChanged) {
-      // mergeFields replaces the whole map, so a removed tag disappears (a plain merge would
-      // keep its key). The rules need `rootIds` on a freshly created meta document.
+    // mergeFields replaces a whole map, so a removed tag disappears (a plain merge would keep
+    // its key). The rules need `rootIds` on a freshly created meta document.
+    const metaOp = (field: 'tagColors' | 'settings', value: unknown) => {
       const needsRoots = !snaps.meta?.exists() || !Array.isArray(snaps.meta.data()?.rootIds);
       ops.push((b) =>
         b.set(
           metaRef,
           {
-            tagColors: current.tagColors,
+            [field]: value,
             ...(needsRoots ? { rootIds: current.rootIds } : {}),
             schemaVersion: SCHEMA_VERSION,
             updatedAt: serverTimestamp(),
           },
           {
-            mergeFields: [
-              'tagColors',
-              ...(needsRoots ? ['rootIds'] : []),
-              'schemaVersion',
-              'updatedAt',
-            ],
+            mergeFields: [field, ...(needsRoots ? ['rootIds'] : []), 'schemaVersion', 'updatedAt'],
           },
         ),
       );
-    }
+    };
+    if (diff.tagColorsChanged) metaOp('tagColors', current.tagColors);
+    if (diff.settingsChanged) metaOp('settings', toSettingsDoc(current.settings));
     for (const task of diff.taskUpserts) {
       ops.push((b) => b.set(doc(tasksCol, task.id), toTaskDoc(task)));
     }
@@ -345,7 +353,8 @@ export function startSync(uid: string, options: SyncOptions): () => void {
         s.tasks !== p.tasks ||
         s.rootIds !== p.rootIds ||
         s.history !== p.history ||
-        s.tagColors !== p.tagColors
+        s.tagColors !== p.tagColors ||
+        s.settings !== p.settings
       ) {
         schedule();
       }
@@ -390,6 +399,7 @@ export function startSync(uid: string, options: SyncOptions): () => void {
       Array.isArray(rootIds) ? rootIds.filter((x): x is string => typeof x === 'string') : [],
       history,
       fromTagColors(meta?.tagColors),
+      fromSettings(meta?.settings),
     );
   };
 
@@ -430,7 +440,13 @@ export function startSync(uid: string, options: SyncOptions): () => void {
         tagColors: migrated.tagColors ?? {},
       });
       // Everything is new to the cloud.
-      last = { tasks: {}, rootIds: [], history: [], tagColors: {} };
+      last = {
+        tasks: {},
+        rootIds: [],
+        history: [],
+        tagColors: {},
+        settings: store.getState().settings,
+      };
       live = true;
       startLocalWatch();
       updateStatus();
@@ -452,6 +468,7 @@ export function startSync(uid: string, options: SyncOptions): () => void {
       rootIds: state.rootIds,
       history,
       tagColors: state.tagColors,
+      settings: state.settings,
     });
     last = pick(state);
     live = true;

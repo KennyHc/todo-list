@@ -1,4 +1,5 @@
 import type { TaskTree } from '../types';
+import { todayList } from './today';
 import { getAncestors, getDescendants } from './tree';
 
 export type DueStatus = 'overdue' | 'today' | 'soon' | 'later';
@@ -121,8 +122,8 @@ export function treeRows(tree: TaskTree, tag: string | null): string[] {
 /**
  * Ids of the rows currently on screen, in display order: tree order (open tasks only,
  * skipping collapsed subtrees and anything the tag filter hides) or deadline order, which
- * ends with the Completed rows unless that section is collapsed (or limited to its preview).
- * History rows aren't tasks, so that view has no keyboard order.
+ * ends with the Completed rows unless that section is collapsed (or limited to its preview),
+ * or the Today list. History rows aren't tasks, so that view has no keyboard order.
  */
 export function visibleOrder(
   tree: TaskTree,
@@ -132,13 +133,15 @@ export function visibleOrder(
     completedCollapsed = false,
     completedShowAll = false,
   }: {
-    view: 'tree' | 'deadline' | 'history';
+    view: 'today' | 'tree' | 'deadline' | 'history';
     tag: string | null;
     completedCollapsed?: boolean;
     completedShowAll?: boolean;
   },
+  today: string = todayISO(),
 ): string[] {
   if (view === 'history') return [];
+  if (view === 'today') return todayList(tree, today, tag);
   if (view === 'deadline') {
     const all = deadlineList(tree, { tag });
     const open = all.filter((id) => !tree.tasks[id].done);

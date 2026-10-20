@@ -12,6 +12,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Copy, X } from 'lucide-react';
 import { copyText } from '../lib/clipboard';
 import styles from './AiModal.module.css';
+import { SwitchButton } from './Switch';
 import { dur, ease, spring } from '../styles/motion';
 
 const FOCUSABLE =
@@ -130,16 +131,7 @@ export function Switch({
   const id = useId();
   return (
     <div className={styles.switchRow}>
-      <button
-        type="button"
-        id={id}
-        role="switch"
-        aria-checked={checked}
-        className={styles.switch}
-        onClick={() => onChange(!checked)}
-      >
-        <span className={styles.thumb} aria-hidden="true" />
-      </button>
+      <SwitchButton id={id} checked={checked} onChange={onChange} />
       <label htmlFor={id} className={styles.switchLabel}>
         {children}
       </label>

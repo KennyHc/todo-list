@@ -1,11 +1,13 @@
 import type { HistoryEntry } from '../lib/history';
 import { normalizeTree } from '../lib/normalizeTree';
+import { normalizeSettings } from '../lib/settings';
 import type { PersistedTasks } from '../store/tasks';
-import type { Task } from '../types';
+import type { Settings, Task } from '../types';
 import {
   historyOrds,
   isEqualEntry,
   isEqualIds,
+  isEqualSettings,
   isEqualTagColors,
   isEqualTask,
   type OrderedEntry,
@@ -17,6 +19,7 @@ export type RemoteChanges = {
   history: Map<string, OrderedEntry | null>;
   rootIds: string[] | null;
   tagColors: Record<string, string> | null;
+  settings: Settings | null;
 };
 
 export const emptyChanges = (): RemoteChanges => ({
@@ -24,10 +27,15 @@ export const emptyChanges = (): RemoteChanges => ({
   history: new Map(),
   rootIds: null,
   tagColors: null,
+  settings: null,
 });
 
 export const hasChanges = (c: RemoteChanges) =>
-  c.tasks.size > 0 || c.history.size > 0 || c.rootIds !== null || c.tagColors !== null;
+  c.tasks.size > 0 ||
+  c.history.size > 0 ||
+  c.rootIds !== null ||
+  c.tagColors !== null ||
+  c.settings !== null;
 
 /** Build the state a full set of documents describes (initial load). */
 export function buildState(
@@ -35,10 +43,11 @@ export function buildState(
   rootIds: string[],
   history: Iterable<OrderedEntry>,
   tagColors: Record<string, string> = {},
+  settings: Settings = normalizeSettings(undefined),
 ): PersistedTasks {
   const byId: Record<string, Task> = {};
   for (const task of tasks) byId[task.id] = task;
-  return { tasks: byId, rootIds, history: sortHistory([...history]), tagColors };
+  return { tasks: byId, rootIds, history: sortHistory([...history]), tagColors, settings };
 }
 
 const sortHistory = (items: OrderedEntry[]): HistoryEntry[] =>
@@ -107,6 +116,16 @@ export function applyRemote(
     tagColors = lastTagColors = changes.tagColors;
   }
 
+  let settings = cur.settings;
+  let lastSettings = last.settings;
+  if (
+    changes.settings &&
+    cur.settings === last.settings &&
+    !isEqualSettings(cur.settings, changes.settings)
+  ) {
+    settings = lastSettings = changes.settings;
+  }
+
   let history = cur.history;
   let lastHistory = last.history;
   if (changes.history.size > 0) {
@@ -125,13 +144,14 @@ export function applyRemote(
     }
   }
 
-  const applied: PersistedTasks = { tasks, rootIds, history, tagColors };
+  const applied: PersistedTasks = { tasks, rootIds, history, tagColors, settings };
   const normalized = normalizeTree(applied);
   const changed =
     normalized.tasks !== cur.tasks ||
     normalized.rootIds !== cur.rootIds ||
     normalized.history !== cur.history ||
-    tagColors !== cur.tagColors;
+    tagColors !== cur.tagColors ||
+    settings !== cur.settings;
   if (!changed) return { next: cur, nextLast: last, changed: false };
 
   // Fold repairs into `last` only for documents without a pending local edit.
@@ -145,12 +165,13 @@ export function applyRemote(
   if (normalized.rootIds !== rootIds && lastRootIds === rootIds) lastRootIds = normalized.rootIds;
 
   return {
-    next: { tasks: normalized.tasks, rootIds: normalized.rootIds, history, tagColors },
+    next: { tasks: normalized.tasks, rootIds: normalized.rootIds, history, tagColors, settings },
     nextLast: {
       tasks: lastTasks,
       rootIds: lastRootIds,
       history: lastHistory,
       tagColors: lastTagColors,
+      settings: lastSettings,
     },
     changed: true,
   };

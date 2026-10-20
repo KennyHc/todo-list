@@ -9,7 +9,7 @@ export type Shortcut = {
 
 export type ShortcutGroup = { title: string; items: Shortcut[] };
 
-export const SHORTCUT_GROUPS: ShortcutGroup[] = [
+const GROUPS: ShortcutGroup[] = [
   {
     title: 'Navigation',
     items: [
@@ -28,6 +28,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { label: 'Edit title', keys: [['e'], ['↵']] },
       { label: 'Delete', keys: [['⌫']] },
       { label: 'Reschedule', keys: [['s']] },
+      { label: 'Plan for today', keys: [['p']] },
       { label: 'Set difficulty', keys: [['alt', '1–5']] },
       {
         label: 'Move up or down',
@@ -48,6 +49,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: 'In the Reschedule menu',
     items: [
+      { label: 'Plan for today', keys: [['p']] },
       { label: 'Today', keys: [['t']] },
       { label: 'Tomorrow', keys: [['m']] },
       { label: 'This weekend', keys: [['w']] },
@@ -57,9 +59,10 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: 'Views',
     items: [
-      { label: 'Tree', keys: [['1']] },
-      { label: 'By deadline', keys: [['2']] },
-      { label: 'History', keys: [['3']] },
+      { label: 'Today', keys: [['1']] },
+      { label: 'Tree', keys: [['2']] },
+      { label: 'By deadline', keys: [['3']] },
+      { label: 'History', keys: [['4']] },
       { label: 'Filter by tag', keys: [['/']] },
     ],
   },
@@ -72,3 +75,32 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     ],
   },
 ];
+
+/** Labels and keys that only exist while the Today view is on. */
+const TODAY_ONLY = new Set(['Plan for today']);
+const VIEW_KEYS_WITHOUT_TODAY: Record<string, string> = {
+  Tree: '1',
+  'By deadline': '2',
+  History: '3',
+};
+
+/**
+ * The shortcut list for what is on: without the Today view there is no `p`, no Plan for today
+ * in the Reschedule menu, and the views are numbered 1-3 from the Tree.
+ */
+export function shortcutGroups(todayView: boolean): ShortcutGroup[] {
+  if (todayView) return GROUPS;
+  return GROUPS.map((group) => ({
+    ...group,
+    items: group.items
+      .filter(
+        (item) =>
+          !TODAY_ONLY.has(item.label) && !(group.title === 'Views' && item.label === 'Today'),
+      )
+      .map((item) =>
+        group.title === 'Views' && item.label in VIEW_KEYS_WITHOUT_TODAY
+          ? { ...item, keys: [[VIEW_KEYS_WITHOUT_TODAY[item.label]]] }
+          : item,
+      ),
+  }));
+}

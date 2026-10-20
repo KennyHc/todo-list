@@ -1,6 +1,11 @@
 import type { Task } from '../types';
 import { todayISO } from './views';
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** True for a 'YYYY-MM-DD' string (shape only, as the Firestore rules check it). */
+export const isISODate = (v: unknown): v is string => typeof v === 'string' && ISO_DATE.test(v);
+
 export function parseISO(iso: string): Date {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d);

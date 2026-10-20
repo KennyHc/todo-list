@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { siblingMoveTarget } from '../lib/dnd';
 import { isLeaf } from '../lib/tree';
-import { neighborAfterRemoval, visibleOrder, visibleTreeIds } from '../lib/views';
+import { neighborAfterRemoval, todayISO, visibleOrder, visibleTreeIds } from '../lib/views';
 import { useTaskStore } from '../store/tasks';
-import { useUIStore, type View } from '../store/ui';
+import { currentView, useUIStore, viewOrder, type View } from '../store/ui';
 import type { Difficulty } from '../types';
 
 export type HotkeyAction =
@@ -17,6 +17,7 @@ export type HotkeyAction =
   | { type: 'edit' }
   | { type: 'delete' }
   | { type: 'reschedule' }
+  | { type: 'plan' }
   | { type: 'difficulty'; value: Difficulty }
   | { type: 'collapse'; collapsed: boolean }
   | { type: 'reorder'; step: 1 | -1 }
@@ -42,9 +43,9 @@ export type HotkeyContext = {
   view: View;
   /** A visible row is focused. */
   hasFocus: boolean;
+  /** The opt-in Today view is on: it takes key 1 and the others move up; `p` plans a row. */
+  todayView?: boolean;
 };
-
-const VIEW_KEYS: Record<string, View> = { '1': 'tree', '2': 'deadline', '3': 'history' };
 
 /**
  * Maps a key press to an action, or null when it isn't ours. Pure: everything it needs to know
@@ -93,7 +94,10 @@ export function matchHotkey(e: HotkeyEvent, ctx: HotkeyContext): HotkeyAction | 
     case '1':
     case '2':
     case '3':
-      return { type: 'view', view: VIEW_KEYS[e.key] };
+    case '4': {
+      const view = viewOrder(ctx.todayView === true)[Number(e.key) - 1];
+      return view ? { type: 'view', view } : null;
+    }
     case 'j':
       return rows ? { type: 'move', step: 1 } : null;
     case 'k':
@@ -112,6 +116,8 @@ export function matchHotkey(e: HotkeyEvent, ctx: HotkeyContext): HotkeyAction | 
       return ctx.hasFocus && !own ? { type: 'edit' } : null;
     case 's':
       return ctx.hasFocus ? { type: 'reschedule' } : null;
+    case 'p':
+      return ctx.hasFocus && ctx.todayView === true ? { type: 'plan' } : null;
     case 'Backspace':
     case 'Delete':
       return ctx.hasFocus ? { type: 'delete' } : null;
@@ -132,7 +138,7 @@ const OVERLAYS = '[role="dialog"], [role="alertdialog"]';
 
 /** The visibleOrder options for what the UI currently shows. */
 const orderOf = (ui: ReturnType<typeof useUIStore.getState>) => ({
-  view: ui.view,
+  view: currentView(),
   tag: ui.tagFilter,
   completedCollapsed: ui.completedCollapsed,
   completedShowAll: ui.completedShowAll,
@@ -154,8 +160,9 @@ export function useHotkeys(): void {
         typing: !!el?.closest(TEXT_ENTRY),
         modalOpen: !!document.querySelector(OVERLAYS),
         interactive: !!el?.closest(CONTROLS),
-        view: ui.view,
+        view: currentView(),
         hasFocus: focusedId !== null,
+        todayView: tasks.settings.todayView,
       };
       const action = matchHotkey(e, ctx);
       if (!action) return;
@@ -214,6 +221,21 @@ export function useHotkeys(): void {
         case 'reschedule':
           if (focusedId) ui.requestReschedule(focusedId);
           break;
+        case 'plan': {
+          if (!focusedId) break;
+          const task = tasks.tasks[focusedId];
+          if (!task) break;
+          const today = todayISO();
+          // Planned (for today or an earlier day, so it is in Today) -> take it out; else plan it.
+          const planned = task.plannedFor !== null && task.plannedFor <= today;
+          tasks.plan(focusedId, planned ? null : today);
+          // A row that leaves the list hands the keyboard focus on, like completing does.
+          const stays = new Set(visibleOrder(useTaskStore.getState(), orderOf(ui)));
+          if (!stays.has(focusedId)) {
+            ui.setFocusedId(neighborAfterRemoval(order, focusedId, new Set([focusedId])));
+          }
+          break;
+        }
         case 'difficulty':
           if (focusedId && isLeaf(tasks, focusedId)) {
             tasks.update(focusedId, { difficulty: action.value });

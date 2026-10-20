@@ -12,6 +12,7 @@ const task = (id: string, parentId: string | null, childIds: string[] = []): Tas
   tags: [],
   dueDate: null,
   repeat: null,
+  plannedFor: null,
   parentId,
   childIds,
   createdAt: 0,

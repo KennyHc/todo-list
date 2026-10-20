@@ -10,7 +10,12 @@ export function NoticeToast() {
       message={notice?.text ?? null}
       action={notice?.action}
       persistent={notice?.persistent}
-      onDismiss={() => useUIStore.getState().clearNotice()}
+      onDismiss={() => {
+        const current = useUIStore.getState().notice;
+        useUIStore.getState().clearNotice();
+        // Only the notice on screen: a stale callback from a replaced one must not fire.
+        if (current === notice) notice?.onDismiss?.();
+      }}
     />
   );
 }

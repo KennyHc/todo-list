@@ -14,10 +14,14 @@ export type NewTask = {
   tags?: string[];
   dueDate?: string | null;
   repeat?: Repeat | null;
+  plannedFor?: string | null;
 };
 
 export type TaskPatch = Partial<
-  Pick<Task, 'title' | 'difficulty' | 'color' | 'collapsed' | 'tags' | 'dueDate' | 'repeat'>
+  Pick<
+    Task,
+    'title' | 'difficulty' | 'color' | 'collapsed' | 'tags' | 'dueDate' | 'repeat' | 'plannedFor'
+  >
 >;
 
 export const sameRepeat = (a: Repeat | null | undefined, b: Repeat | null | undefined): boolean =>
@@ -180,6 +184,7 @@ export function addTask(
     tags,
     dueDate = null,
     repeat = null,
+    plannedFor = null,
   }: NewTask,
   now = Date.now(),
 ): { tree: TaskTree; id: string } {
@@ -197,6 +202,7 @@ export function addTask(
     tags: normalizeTags(tags ?? []),
     dueDate,
     repeat: repeat === null ? null : { ...repeat },
+    plannedFor,
     parentId,
     childIds: [],
     createdAt: now,

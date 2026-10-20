@@ -80,6 +80,16 @@ type Props = {
    * row there shows no date (just the repeat icon); This week shows only the weekday.
    */
   section?: DeadlineBucket;
+  /**
+   * Today view: why the row is there, when that adds anything ("Overdue \u00b7 Oct 18", "From
+   * Mon"). A danger reason replaces the due pill, since it already says the date.
+   */
+  reason?: string;
+  reasonDanger?: boolean;
+  /** Today view: this planned row pushes the day over capacity (tinted). */
+  over?: boolean;
+  /** Shared-layout id, so a Suggested row can glide into the list as this one. */
+  layoutId?: string;
 };
 
 export type RowDrag = Pick<
@@ -175,6 +185,10 @@ function TaskItemInner({
   drag,
   exitStyle = 'pop',
   section,
+  reason,
+  reasonDanger = false,
+  over = false,
+  layoutId,
 }: Props) {
   const liveTask = useTask(id);
   const liveLeaf = useIsLeaf(id);
@@ -366,13 +380,16 @@ function TaskItemInner({
       : section === 'week'
         ? 'weekday'
         : 'full';
-  const showDue = task.dueDate !== null && (dueDisplay !== 'icon' || task.repeat !== null);
+  const showDue =
+    task.dueDate !== null &&
+    !(reason && reasonDanger) &&
+    (dueDisplay !== 'icon' || task.repeat !== null);
   // A link in the title becomes a chip on the meta line; the title shows the rest of its words.
   // A title that is only a link keeps showing the link itself.
   const { text: linkless, links } = splitTitleLinks(task.title);
   const shownTitle = linkless === '' ? task.title : linkless;
   const chipLinks = linkless === '' ? [] : [...new Set(links)].slice(0, MAX_LINKS_SHOWN);
-  const hasTail = showDue || chipLinks.length > 0 || task.tags.length > 0;
+  const hasTail = showDue || !!reason || chipLinks.length > 0 || task.tags.length > 0;
   const hasMeta = hasTail || (flat && path.length > 0);
   const tagLimit = phone ? MAX_TAGS_SHOWN_PHONE : MAX_TAGS_SHOWN;
   const shownTags = task.tags.slice(0, tagLimit);
@@ -415,6 +432,7 @@ function TaskItemInner({
       data-flat={flat || undefined}
       data-row-id={id}
       data-hidden={hidden || undefined}
+      layoutId={layoutId}
       layout="position"
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
@@ -465,6 +483,7 @@ function TaskItemInner({
                 data-meta={hasMeta || undefined}
                 data-dim={dimmed || undefined}
                 data-focused={focused || undefined}
+                data-over={over || undefined}
                 data-row-color={color ?? undefined}
                 data-done={(color !== null && task.done) || undefined}
                 data-inherited={(color !== null && colorSource === 'parent') || undefined}
@@ -558,6 +577,14 @@ function TaskItemInner({
                         </button>
                         {hasTail && (
                           <span className={styles.tail}>
+                            {reason && (
+                              <span
+                                className={styles.reason}
+                                data-danger={reasonDanger || undefined}
+                              >
+                                {reason}
+                              </span>
+                            )}
                             {showDue && task.dueDate !== null && (
                               <DuePill
                                 dueDate={task.dueDate}

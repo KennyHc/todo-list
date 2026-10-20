@@ -1,4 +1,5 @@
 import { migrateTasksState, useTaskStore, type PersistedTasks } from '../store/tasks';
+import type { Settings } from '../types';
 
 export type Backup = {
   app: 'tasks';
@@ -9,6 +10,8 @@ export type Backup = {
   rootIds: unknown[];
   history: unknown[];
   tagColors: Record<string, string>;
+  /** Optional: files from before settings existed don't have it (the import keeps yours). */
+  settings?: Settings;
 };
 
 /** Serialize task data to a pretty JSON string. */
@@ -21,6 +24,7 @@ export function serializeBackup(data: PersistedTasks, now = new Date()): string 
     rootIds: data.rootIds,
     history: data.history,
     tagColors: data.tagColors,
+    settings: data.settings,
   };
   return JSON.stringify(backup, null, 2);
 }
@@ -78,7 +82,11 @@ export function parseBackup(text: string): ParseResult {
       rootIds: backup.rootIds,
       history: backup.history,
       tagColors: backup.tagColors,
+      settings: backup.settings,
     });
+    // A backup without settings leaves the current ones alone.
+    if (backup.settings === undefined)
+      data = { ...data, settings: useTaskStore.getState().settings };
   } catch {
     return { ok: false, error: 'corrupt' };
   }
@@ -133,8 +141,8 @@ export function formatBackupDescription(exportedAt: string | null, taskCount: nu
 export function exportBackup(): boolean {
   try {
     // Read on demand so callers don't re-render on every task change.
-    const { tasks, rootIds, history, tagColors } = useTaskStore.getState();
-    const blob = new Blob([serializeBackup({ tasks, rootIds, history, tagColors })], {
+    const { tasks, rootIds, history, tagColors, settings } = useTaskStore.getState();
+    const blob = new Blob([serializeBackup({ tasks, rootIds, history, tagColors, settings })], {
       type: 'application/json',
     });
     const url = URL.createObjectURL(blob);

@@ -260,6 +260,7 @@ describe('spawnNextOccurrence', () => {
       tags: ['home', 'plants'],
       dueDate: '2026-10-26',
       repeat: mondays,
+      plannedFor: null,
       spawnedFrom: 'water',
       parentId: null,
       childIds: [],

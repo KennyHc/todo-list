@@ -90,6 +90,7 @@ const task = (id: string, patch: Partial<Task>): Task => ({
   tags: [],
   dueDate: null,
   repeat: null,
+  plannedFor: null,
   ...patch,
 });
 

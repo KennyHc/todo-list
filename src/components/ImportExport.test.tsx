@@ -7,6 +7,7 @@ import { useImportDraft } from '../store/importDraft';
 import { resetTaskStore, useTaskStore } from '../store/tasks';
 import { useUIStore } from '../store/ui';
 import type { PersistedTasks } from '../store/tasks';
+import { DEFAULT_SETTINGS } from '../types';
 
 let writeText: ReturnType<typeof vi.fn>;
 
@@ -22,6 +23,7 @@ const restored: PersistedTasks = {
       tags: [],
       dueDate: null,
       repeat: null,
+      plannedFor: null,
       difficulty: 1,
       color: null,
       createdAt: 1000,
@@ -30,6 +32,7 @@ const restored: PersistedTasks = {
   rootIds: ['r1'],
   history: [],
   tagColors: {},
+  settings: DEFAULT_SETTINGS,
 };
 const BACKUP = serializeBackup(restored, new Date('2026-10-19T10:00:00Z'));
 const AI_REPLY = '```json\n{"tasks":[{"title":"Plan trip"},{"title":"Book flights"}]}\n```';

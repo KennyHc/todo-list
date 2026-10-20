@@ -20,14 +20,16 @@ import { LazyDialogs } from './components/LazyDialogs';
 import { FocusProxy } from './components/FocusProxy';
 import { TaskInput } from './components/TaskInput';
 import { TaskList } from './components/TaskList';
+import { TodayList } from './components/TodayList';
 import { UndoToast } from './components/UndoToast';
 import { ViewToolbar } from './components/ViewToolbar';
 import { useHotkeys } from './hooks/useHotkeys';
 import { useIsPhone } from './hooks/useMediaQuery';
 import { usePasteImport } from './hooks/usePasteImport';
+import { useTodayHint } from './hooks/useTodayHint';
 import { useAuthStore } from './store/auth';
 import { useSyncStore } from './sync/status';
-import { useUIStore } from './store/ui';
+import { useUIStore, useView } from './store/ui';
 import { useTaskStore, useTotals } from './store/tasks';
 import styles from './App.module.css';
 import { useIntro } from './hooks/useIntro';
@@ -94,7 +96,7 @@ function Controls() {
 function App() {
   const isEmpty = useTaskStore((s) => s.rootIds.length === 0);
   const hasHistory = useTaskStore((s) => s.history.length > 0);
-  const view = useUIStore((s) => s.view);
+  const view = useView();
   const tagFilter = useUIStore((s) => s.tagFilter);
   const freshSignIn = useAuthStore((s) => s.freshSignIn);
   const syncStatus = useSyncStore((s) => s.syncStatus);
@@ -102,6 +104,7 @@ function App() {
   const { y, scrolled } = useScrollState();
   useHotkeys();
   usePasteImport();
+  useTodayHint();
   const intro = useIntro();
 
   return (
@@ -148,6 +151,8 @@ function App() {
                 )}
                 {view === 'history' ? (
                   <HistoryList />
+                ) : view === 'today' ? (
+                  <TodayList />
                 ) : isEmpty ? (
                   <EmptyState welcome={freshSignIn} />
                 ) : view === 'deadline' ? (

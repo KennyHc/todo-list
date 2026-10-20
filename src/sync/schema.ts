@@ -1,8 +1,10 @@
 import { normalizeTagColors, normalizeTaskColor } from '../lib/colors';
 import type { HistoryEntry } from '../lib/history';
+import { isISODate } from '../lib/dates';
 import { normalizeRepeat } from '../lib/recur';
+import { isEqualSettings, normalizeSettings } from '../lib/settings';
 import { sameRepeat } from '../lib/tree';
-import type { Difficulty, Task } from '../types';
+import type { Difficulty, Settings, Task } from '../types';
 
 /** Plain-data helpers for the Firestore documents. No Firebase imports: unit-testable. */
 
@@ -10,7 +12,8 @@ import type { Difficulty, Task } from '../types';
  * 3: task `color` may be null ("automatic") and the meta document carries `tagColors`.
  * Version 2 documents stay readable: their default blue decodes to null.
  * Tasks may also carry `repeat` (a map, or null) and `spawnedFrom`; both are optional on read,
- * so there is no version bump.
+ * so there is no version bump. So are `plannedFor` on tasks (a date, or null) and `settings`
+ * on the meta document (a map).
  */
 export const SCHEMA_VERSION = 3;
 
@@ -35,6 +38,7 @@ export function isEqualTask(a: Task, b: Task): boolean {
       a.done === b.done &&
       a.collapsed === b.collapsed &&
       a.dueDate === b.dueDate &&
+      a.plannedFor === b.plannedFor &&
       sameRepeat(a.repeat, b.repeat) &&
       a.spawnedFrom === b.spawnedFrom &&
       a.parentId === b.parentId &&
@@ -78,6 +82,14 @@ export function isEqualTagColors(
 /** Defensive read of the meta document's `tagColors` map (absent means none). */
 export const fromTagColors = normalizeTagColors;
 
+export { isEqualSettings };
+
+/** Defensive read of the meta document's `settings` map (absent means the defaults). */
+export const fromSettings = normalizeSettings;
+
+/** The `settings` map as written: only known keys, `hints` without unset flags. */
+export const toSettingsDoc = (settings: Settings): Settings => normalizeSettings(settings);
+
 /** Document body for a task. `completedAt` is omitted (not undefined) when unset. */
 export function toTaskDoc(task: Task): Record<string, unknown> {
   const doc: Record<string, unknown> = {
@@ -89,6 +101,7 @@ export function toTaskDoc(task: Task): Record<string, unknown> {
     collapsed: task.collapsed,
     tags: task.tags,
     dueDate: task.dueDate,
+    plannedFor: task.plannedFor,
     repeat: task.repeat,
     parentId: task.parentId,
     childIds: task.childIds,
@@ -112,6 +125,7 @@ export function fromTaskDoc(id: string, data: unknown): Task | null {
     collapsed: data.collapsed === true,
     tags: strings(data.tags),
     dueDate: typeof data.dueDate === 'string' ? data.dueDate : null,
+    plannedFor: isISODate(data.plannedFor) ? data.plannedFor : null,
     repeat: normalizeRepeat(data.repeat),
     parentId: typeof data.parentId === 'string' ? data.parentId : null,
     childIds: strings(data.childIds),

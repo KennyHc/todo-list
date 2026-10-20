@@ -86,3 +86,19 @@
     margin: 4px -16px;
   }
 }
+
+/* "Plan for today" (the Today view): an icon beside the label, accent while it is planned. */
+.planned {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planned svg {
+  color: var(--text-2);
+}
+
+.item[data-current] .planned,
+.item[data-current] .planned svg {
+  color: var(--accent-ink);
+}

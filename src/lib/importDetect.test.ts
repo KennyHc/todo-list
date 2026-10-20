@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { detectImport } from './importDetect';
 import { serializeBackup } from './backup';
 import type { PersistedTasks } from '../store/tasks';
+import { DEFAULT_SETTINGS } from '../types';
 
 const data: PersistedTasks = {
   tasks: {
@@ -15,6 +16,7 @@ const data: PersistedTasks = {
       tags: [],
       dueDate: null,
       repeat: null,
+      plannedFor: null,
       difficulty: 1,
       color: null,
       createdAt: 1000,
@@ -23,6 +25,7 @@ const data: PersistedTasks = {
   rootIds: ['a'],
   history: [],
   tagColors: {},
+  settings: DEFAULT_SETTINGS,
 };
 
 const backup = serializeBackup(data, new Date('2026-10-19T10:00:00Z'));
@@ -59,7 +62,8 @@ describe('detectImport', () => {
     const r = detectImport(corrupt);
     expect(r.kind).toBe('error');
     expect(r.kind === 'error' && r.error).toMatch(/damaged/);
-    const truncated = detectImport(backup.slice(0, backup.length - 60));
+    // Cut off 41 characters before the tail (tagColors and settings) begins.
+    const truncated = detectImport(backup.slice(0, backup.indexOf('"tagColors"') - 41));
     expect(truncated).toMatchObject({ kind: 'error' });
     expect(truncated.kind === 'error' && truncated.error).toMatch(/damaged/);
   });

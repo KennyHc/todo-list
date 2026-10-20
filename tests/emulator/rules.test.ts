@@ -35,6 +35,7 @@ const task = (id: string, over: Record<string, unknown> = {}) => ({
   collapsed: false,
   tags: ['a'],
   dueDate: null,
+  plannedFor: null,
   repeat: null,
   parentId: null,
   childIds: [],
@@ -222,6 +223,62 @@ describe('task validation', () => {
     }
     await assertFails(write(task('t1', { spawnedFrom: 5 })));
     await assertFails(write(task('t1', { spawnedFrom: null })));
+  });
+
+  it('accepts a missing, null or well-formed plannedFor', async () => {
+    const { plannedFor: _omit, ...legacy } = task('t1', { plannedFor: null });
+    await assertSucceeds(write(legacy)); // documents written before the Today view
+    await assertSucceeds(write(task('t1', { plannedFor: null })));
+    await assertSucceeds(write(task('t1', { plannedFor: '2026-10-20' })));
+  });
+
+  it('rejects a plannedFor that is not a date string', async () => {
+    for (const plannedFor of [
+      5,
+      true,
+      [],
+      {},
+      '',
+      'today',
+      '2026-1-5',
+      '20261020',
+      '2026-10-20T10:00',
+      ' 2026-10-20',
+      '2026-10-20\n',
+    ]) {
+      await assertFails(write(task('t1', { plannedFor })));
+    }
+  });
+
+  it('allows settings on the meta document only as a map with a 1-50 integer capacity', async () => {
+    const meta = (extra: Record<string, unknown>) =>
+      setDoc(doc(alice(), 'users/alice'), { rootIds: [], schemaVersion: 3, ...extra });
+    await assertSucceeds(
+      meta({ settings: { todayView: true, dailyCapacity: 8, hints: { todayOffered: true } } }),
+    );
+    await assertSucceeds(meta({ settings: {} }));
+    await assertSucceeds(meta({ settings: { dailyCapacity: 1 } }));
+    await assertSucceeds(meta({ settings: { dailyCapacity: 50 } }));
+    await assertSucceeds(meta({})); // absent is fine (older clients)
+    for (const settings of ['on', 5, true, null, ['a']]) {
+      await assertFails(meta({ settings }));
+    }
+    for (const dailyCapacity of [0, 51, -3, 7.5, '8', null, true]) {
+      await assertFails(meta({ settings: { dailyCapacity } }));
+    }
+    // A merge that only touches settings still has to leave a valid document.
+    await assertSucceeds(
+      setDoc(
+        doc(alice(), 'users/alice'),
+        { settings: { todayView: false, dailyCapacity: 12 } },
+        { merge: true },
+      ),
+    );
+    await assertFails(
+      setDoc(doc(alice(), 'users/alice'), { settings: { dailyCapacity: 99 } }, { merge: true }),
+    );
+    // Someone else's meta stays off limits.
+    await assertFails(setDoc(doc(bob(), 'users/alice'), { rootIds: [], settings: {} }));
   });
 
   it('accepts tasks with a null (automatic) colour or an explicit one', async () => {

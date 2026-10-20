@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Sun } from 'lucide-react';
 import { pickDateLabel, quickPicks } from '../lib/reschedule';
 import { todayISO } from '../lib/views';
 import { useTask, useTaskStore } from '../store/tasks';
@@ -21,7 +21,8 @@ const isTypingKey = (e: KeyboardEvent) => e.metaKey || e.ctrlKey || e.altKey || 
 /**
  * "Move to": Today, Tomorrow, This weekend, Next week, a date of your choice, or no date. Each
  * quick pick shows the date it resolves to; choosing one records an undo ("Moved "X" to Sat, Oct 24").
- * Inside it t, m, w and n pick the first four.
+ * Inside it t, m, w and n pick the first four. With the Today view on, "Plan for today" tops the
+ * list (p) and the first pick reads "Due today": planning keeps the due date as it is.
  */
 export function RescheduleMenu({ id, open, onClose, anchorRef, align = 'end' }: Props) {
   const task = useTask(id);
@@ -30,6 +31,8 @@ export function RescheduleMenu({ id, open, onClose, anchorRef, align = 'end' }: 
   const today = todayISO();
   const picks = quickPicks(today);
   const dueDate = task?.dueDate ?? null;
+  const todayView = useTaskStore((s) => s.settings.todayView);
+  const planned = task?.plannedFor != null && task.plannedFor <= today;
 
   // Reopens on the quick picks, not on the date input.
   useEffect(() => {
@@ -44,10 +47,20 @@ export function RescheduleMenu({ id, open, onClose, anchorRef, align = 'end' }: 
     [id, onClose],
   );
 
+  const plan = useCallback(() => {
+    onClose();
+    useTaskStore.getState().plan(id, todayISO());
+  }, [id, onClose]);
+
   useEffect(() => {
     if (!open || picking) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.isComposing || isTypingKey(e)) return;
+      if (todayView && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        plan();
+        return;
+      }
       const hit = quickPicks(todayISO()).find((p) => p.hotkey === e.key.toLowerCase());
       if (hit) {
         e.preventDefault();
@@ -68,7 +81,7 @@ export function RescheduleMenu({ id, open, onClose, anchorRef, align = 'end' }: 
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, picking, choose]);
+  }, [open, picking, choose, plan, todayView]);
 
   if (!task) return null;
 
@@ -93,6 +106,23 @@ export function RescheduleMenu({ id, open, onClose, anchorRef, align = 'end' }: 
         />
       ) : (
         <div ref={listRef} className={styles.list} role="menu" aria-label="Reschedule">
+          {todayView && (
+            <>
+              <button
+                type="button"
+                role="menuitem"
+                className={styles.item}
+                data-current={planned || undefined}
+                onClick={plan}
+              >
+                <span className={styles.planned}>
+                  <Sun size={14} strokeWidth={1.75} aria-hidden="true" />
+                  Plan for today
+                </span>
+              </button>
+              <div className={styles.divider} role="separator" />
+            </>
+          )}
           {picks.map((pick) => (
             <button
               key={pick.key}
@@ -102,7 +132,7 @@ export function RescheduleMenu({ id, open, onClose, anchorRef, align = 'end' }: 
               data-current={dueDate === pick.date || undefined}
               onClick={() => choose(pick.date)}
             >
-              <span>{pick.label}</span>
+              <span>{todayView && pick.key === 'today' ? 'Due today' : pick.label}</span>
               <span className={styles.date}>{pickDateLabel(pick.date)}</span>
             </button>
           ))}

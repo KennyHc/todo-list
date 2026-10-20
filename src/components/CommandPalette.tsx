@@ -38,7 +38,7 @@ import { taskPath } from '../lib/views';
 import { revealTask } from '../store/reveal';
 import { useAllTags, useTaskStore } from '../store/tasks';
 import { useThemeStore } from '../store/theme';
-import { useUIStore, type View } from '../store/ui';
+import { useUIStore, viewOrder, type View } from '../store/ui';
 import type { Task } from '../types';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DuePill } from './DuePill';
@@ -66,11 +66,12 @@ type Row =
 
 type Section = { title: string; rows: Row[] };
 
-const VIEWS: { view: View; label: string; Icon: LucideIcon; key: string }[] = [
-  { view: 'tree', label: 'Go to Tree', Icon: ListTree, key: '1' },
-  { view: 'deadline', label: 'Go to By deadline', Icon: CalendarClock, key: '2' },
-  { view: 'history', label: 'Go to History', Icon: History, key: '3' },
-];
+const VIEWS: Record<View, { label: string; Icon: LucideIcon }> = {
+  today: { label: 'Go to Today', Icon: Sun },
+  tree: { label: 'Go to Tree', Icon: ListTree },
+  deadline: { label: 'Go to By deadline', Icon: CalendarClock },
+  history: { label: 'Go to History', Icon: History },
+};
 
 /** Renders `text` with the matched characters emphasised. */
 function Highlight({ text, indices }: { text: string; indices: number[] }) {
@@ -103,6 +104,7 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
   const undo = useTaskStore((s) => s.undo);
   const tags = useAllTags();
   const tagFilter = useUIStore((s) => s.tagFilter);
+  const todayView = useTaskStore((s) => s.settings.todayView);
 
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
@@ -134,11 +136,11 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
         keys: ['n'],
         run: () => document.getElementById('composer')?.focus(),
       },
-      ...VIEWS.map(({ view, label, Icon, key }) => ({
+      ...viewOrder(todayView).map((view, i) => ({
         id: `view-${view}`,
-        label,
-        Icon,
-        keys: [key],
+        label: VIEWS[view].label,
+        Icon: VIEWS[view].Icon,
+        keys: [String(i + 1)],
         run: () => ui().setView(view),
       })),
       ...tags.map(({ tag }) => ({
@@ -196,9 +198,9 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
         label: 'Copy backup to clipboard',
         Icon: Copy,
         run: () => {
-          const { tasks, rootIds, history, tagColors } = useTaskStore.getState();
-          void copyText(serializeBackup({ tasks, rootIds, history, tagColors })).then((ok) =>
-            ui().showNotice(ok ? 'Backup copied' : 'Couldn\u2019t copy the backup'),
+          const { tasks, rootIds, history, tagColors, settings } = useTaskStore.getState();
+          void copyText(serializeBackup({ tasks, rootIds, history, tagColors, settings })).then(
+            (ok) => ui().showNotice(ok ? 'Backup copied' : 'Couldn\u2019t copy the backup'),
           );
         },
       },
@@ -226,7 +228,7 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
       run: () => ui().setSheetOpen(true),
     });
     return list;
-  }, [tags, tagFilter, doneCount, undo, onAskClear]);
+  }, [tags, tagFilter, doneCount, undo, onAskClear, todayView]);
 
   const sections = useMemo<Section[]>(() => {
     const q = query.trim();

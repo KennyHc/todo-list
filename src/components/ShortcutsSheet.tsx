@@ -2,7 +2,8 @@ import { useEffect, useId, useRef, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
-import { SHORTCUT_GROUPS } from '../lib/shortcuts';
+import { shortcutGroups } from '../lib/shortcuts';
+import { useTaskStore } from '../store/tasks';
 import { useUIStore } from '../store/ui';
 import { Keys } from './Kbd';
 import styles from './ShortcutsSheet.module.css';
@@ -11,6 +12,7 @@ import { dur, ease } from '../styles/motion';
 function Sheet({ onClose }: { onClose: () => void }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
+  const todayView = useTaskStore((s) => s.settings.todayView);
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
@@ -65,7 +67,7 @@ function Sheet({ onClose }: { onClose: () => void }) {
           </button>
         </header>
         <div className={styles.groups}>
-          {SHORTCUT_GROUPS.map((group) => (
+          {shortcutGroups(todayView).map((group) => (
             <section key={group.title} className={styles.group}>
               <h3 className={styles.heading}>{group.title}</h3>
               <ul className={styles.list}>

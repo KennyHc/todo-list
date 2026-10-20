@@ -8,6 +8,8 @@ import { toggleDelay } from '../lib/cascade';
 import { effectiveColor } from '../lib/colorResolve';
 import { isHexColor, isSafeTagKey, normalizeTagColors, normalizeTaskColor } from '../lib/colors';
 import { normalizeTag } from '../lib/tags';
+import { isISODate } from '../lib/dates';
+import { applySettingsPatch, normalizeSettings, type SettingsPatch } from '../lib/settings';
 import { nextLabel, normalizeRepeat, spawnNextOccurrence } from '../lib/recur';
 import { overdueIds, overdueMoveLabel, rescheduleLabel } from '../lib/reschedule';
 import {
@@ -39,7 +41,7 @@ import {
 import { useSessionStore } from './session';
 import { allTags, deadlineList, todayISO, visibleTreeIds } from '../lib/views';
 import type { ColorSource } from '../lib/colorResolve';
-import type { Task, TaskTree } from '../types';
+import { DEFAULT_SETTINGS, type Settings, type Task, type TaskTree } from '../types';
 
 export type UndoSnapshot = {
   tasks: TaskTree['tasks'];
@@ -55,6 +57,8 @@ type TaskState = TaskTree & {
   history: HistoryEntry[];
   /** Tag -> hex colour. Tasks carrying a coloured tag show it (see lib/colorResolve). Persisted. */
   tagColors: Record<string, string>;
+  /** Per-user preferences. Persisted; not part of undo (they aren't content). */
+  settings: Settings;
   /** Task whose title input should be in edit mode. Not persisted. */
   editingId: string | null;
   /** Most recent toggle, used to time the cascade animation. Not persisted. */
@@ -66,6 +70,13 @@ type TaskState = TaskTree & {
 type TaskActions = {
   add: (input: NewTask) => string;
   update: (id: string, patch: TaskPatch) => void;
+  /**
+   * Plans a task for a day (the Today view; callers pass today) or, with null, takes it out
+   * again. Leaves the due date alone. Records an undo.
+   */
+  plan: (id: string, plannedFor: string | null) => void;
+  /** Changes preferences. Synced, but neither undoable nor part of an undo snapshot. */
+  setSetting: (patch: SettingsPatch) => void;
   /** Sets (or, with null, clears) a due date and records an undo ("Moved \u201cX\u201d to Sat, Oct 24"). */
   reschedule: (id: string, dueDate: string | null) => void;
   /**
@@ -101,7 +112,10 @@ type TaskActions = {
    * `lastToggle` is cleared if the toggled task was changed by the update.
    */
   hydrate: (partial: Partial<PersistedTasks>) => void;
-  /** Replaces tasks, rootIds, history and tag colours (e.g. a backup import) and records an undo. */
+  /**
+   * Replaces tasks, rootIds, history and tag colours (e.g. a backup import) and records an undo.
+   * Settings come with the data (parseBackup fills in the current ones for a backup without).
+   */
   replaceAll: (data: PersistedTasks, label: string) => void;
   /** Appends imported (AI) tasks at the root, with an undo. Returns the new root ids. */
   appendTasks: (tasks: AiImportTask[], label: string) => string[];
@@ -114,14 +128,18 @@ type TaskActions = {
 
 export type TaskStore = TaskState & TaskActions;
 
-export type PersistedTasks = Pick<TaskStore, 'tasks' | 'rootIds' | 'history' | 'tagColors'>;
+export type PersistedTasks = Pick<
+  TaskStore,
+  'tasks' | 'rootIds' | 'history' | 'tagColors' | 'settings'
+>;
 
 /**
  * v1 -> v2: every task gains `tags: []` and `dueDate: null`, and the store gains an empty
  * `history`. v2 -> v3: the old default blue (which meant "unset") becomes `color: null`
  * ("automatic"), and the store gains `tagColors`. Tasks also gain `repeat` (missing -> null).
  * Done tasks without a History entry get one. Idempotent, so it also tolerates partially
- * migrated data.
+ * migrated data. Tasks gain `plannedFor` (missing -> null) and the store `settings` (missing ->
+ * the defaults).
  */
 export function migrateTasksState(persisted: unknown): PersistedTasks {
   const old = (persisted ?? {}) as Partial<Record<keyof PersistedTasks, unknown>>;
@@ -133,6 +151,7 @@ export function migrateTasksState(persisted: unknown): PersistedTasks {
       tags: task.tags ?? [],
       dueDate: task.dueDate ?? null,
       repeat: normalizeRepeat(task.repeat),
+      plannedFor: isISODate(task.plannedFor) ? task.plannedFor : null,
     };
     if (typeof task.spawnedFrom !== 'string') delete tasks[id].spawnedFrom;
   }
@@ -141,6 +160,7 @@ export function migrateTasksState(persisted: unknown): PersistedTasks {
     rootIds: Array.isArray(old.rootIds) ? (old.rootIds as string[]) : [],
     history: Array.isArray(old.history) ? (old.history as HistoryEntry[]) : [],
     tagColors: normalizeTagColors(old.tagColors),
+    settings: normalizeSettings(old.settings),
   };
   // Done tasks are hidden from the Tree, so each needs a History entry to be reachable.
   return { ...data, history: synthesizeHistory(data) };
@@ -206,6 +226,7 @@ export const createTaskStore = () =>
     ...emptyTree(),
     history: [],
     tagColors: {},
+    settings: { ...DEFAULT_SETTINGS, hints: {} },
     editingId: null,
     lastToggle: null,
     undo: null,
@@ -222,6 +243,22 @@ export const createTaskStore = () =>
       return id;
     },
     update: (id, patch) => set(updateTask(treeOf(get()), id, patch)),
+    plan: (id, plannedFor) => {
+      const state = get();
+      const task = state.tasks[id];
+      if (!task) return;
+      const after = updateTask(treeOf(state), id, { plannedFor });
+      if (after.tasks === state.tasks) return;
+      const label =
+        plannedFor === null
+          ? `Removed \u201c${task.title}\u201d from today`
+          : `Planned \u201c${task.title}\u201d for today`;
+      set({ ...after, undo: undoEntry(state, label) });
+    },
+    setSetting: (patch) => {
+      const settings = applySettingsPatch(get().settings, patch);
+      if (settings !== get().settings) set({ settings });
+    },
     reschedule: (id, dueDate) => {
       const state = get();
       const task = state.tasks[id];
@@ -439,6 +476,7 @@ export const createTaskStore = () =>
         rootIds: data.rootIds,
         history: data.history,
         tagColors: data.tagColors,
+        settings: data.settings,
         lastToggle: null,
         undo: undoEntry(get(), label),
       });
@@ -482,6 +520,7 @@ export const resetTaskStore = () =>
     ...emptyTree(),
     history: [],
     tagColors: {},
+    settings: { ...DEFAULT_SETTINGS, hints: {} },
     editingId: null,
     lastToggle: null,
     undo: null,

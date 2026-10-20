@@ -154,6 +154,55 @@ describe('applyRemote: tagColors', () => {
   });
 });
 
+describe('applyRemote settings', () => {
+  const base = mkState([mkTask('a')], ['a']);
+  const remote = { todayView: true, dailyCapacity: 12, hints: { todayOffered: true } };
+
+  it('ignores deep-equal remote settings, keeping identity', () => {
+    const changes = emptyChanges();
+    changes.settings = { ...base.settings, hints: {} };
+    const out = applyRemote(base, base, changes);
+    expect(out.changed).toBe(false);
+    expect(out.next).toBe(base);
+    expect(out.next.settings).toBe(base.settings);
+  });
+
+  it('applies different remote settings and does not echo them back', () => {
+    const changes = emptyChanges();
+    changes.settings = remote;
+    const out = applyRemote(base, base, changes);
+    expect(out.changed).toBe(true);
+    expect(out.next.settings).toEqual(remote);
+    expect(out.nextLast.settings).toBe(out.next.settings);
+    expect(out.next.tasks).toBe(base.tasks);
+  });
+
+  it('keeps a pending local change', () => {
+    const cur = { ...base, settings: { ...base.settings, dailyCapacity: 3 } }; // not yet written
+    const changes = emptyChanges();
+    changes.settings = remote;
+    const out = applyRemote(cur, base, changes);
+    expect(out.changed).toBe(false);
+    expect(out.next.settings).toBe(cur.settings);
+    expect(out.nextLast.settings).toBe(base.settings);
+  });
+
+  it('is part of buildState, defaulting when absent', () => {
+    expect(buildState([], [], [], {}, remote).settings).toEqual(remote);
+    expect(buildState([], [], []).settings).toEqual({
+      todayView: false,
+      dailyCapacity: 8,
+      hints: {},
+    });
+  });
+
+  it('counts as a change', () => {
+    const c = emptyChanges();
+    c.settings = remote;
+    expect(hasChanges(c)).toBe(true);
+  });
+});
+
 describe('hasChanges', () => {
   it('reports empties', () => {
     expect(hasChanges(emptyChanges())).toBe(false);

@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { taskStorage } from './storage';
+import { useTaskStore } from './tasks';
 
-export type View = 'tree' | 'deadline' | 'history';
+export type View = 'today' | 'tree' | 'deadline' | 'history';
 /** copy/import: the AI dialogs. export/paste: backup export and the unified paste import. */
 export type AiDialog = 'copy' | 'import' | 'export' | 'paste' | null;
 
@@ -10,6 +11,8 @@ export type AiDialog = 'copy' | 'import' | 'export' | 'paste' | null;
 export type NoticeOptions = {
   action?: { label: string; run: () => void };
   persistent?: boolean;
+  /** Runs when the notice is dismissed (its close button, its action, or the countdown). */
+  onDismiss?: () => void;
 };
 export type Notice = NoticeOptions & { text: string; n: number };
 
@@ -111,3 +114,30 @@ export const useUIStore = create<UIState>()(
     },
   ),
 );
+
+/** The views in switch order. Today comes first, and only exists while the feature is on. */
+export const viewOrder = (todayView: boolean): View[] =>
+  todayView ? ['today', 'tree', 'deadline', 'history'] : ['tree', 'deadline', 'history'];
+
+/** The view actually shown: a persisted 'today' falls back to the Tree while the feature is off. */
+export const effectiveView = (view: View, todayView: boolean): View =>
+  view === 'today' && !todayView ? 'tree' : view;
+
+/** The view being shown (see effectiveView). */
+export const useView = (): View => {
+  const view = useUIStore((s) => s.view);
+  const todayView = useTaskStore((s) => s.settings.todayView);
+  return effectiveView(view, todayView);
+};
+
+/** The same, read on demand (event handlers). */
+export const currentView = (): View =>
+  effectiveView(useUIStore.getState().view, useTaskStore.getState().settings.todayView);
+
+/** Turns the Today view on (and shows it) or off (leaving it if it is showing). */
+export function setTodayView(on: boolean): void {
+  useTaskStore.getState().setSetting({ todayView: on });
+  const ui = useUIStore.getState();
+  if (on) ui.setView('today');
+  else if (ui.view === 'today') ui.setView('tree');
+}

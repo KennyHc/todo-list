@@ -4,12 +4,15 @@ import {
   fromHistoryDoc,
   fromTaskDoc,
   historyOrds,
+  fromSettings,
   fromTagColors,
+  isEqualSettings,
   isEqualEntry,
   isEqualTagColors,
   isEqualTask,
   SCHEMA_VERSION,
   toHistoryDoc,
+  toSettingsDoc,
   toTaskDoc,
 } from './schema';
 
@@ -136,5 +139,74 @@ describe('repeat and spawnedFrom in task docs', () => {
     expect(isEqualTask(t, { ...t, repeat: { every: 'day' } })).toBe(false);
     expect(isEqualTask(t, { ...t, repeat: null })).toBe(false);
     expect(isEqualTask(t, { ...t, spawnedFrom: 'x' })).toBe(false);
+  });
+});
+
+describe('plannedFor', () => {
+  it('round-trips a date and a null', () => {
+    const planned = mkTask('a', { plannedFor: '2026-10-20' });
+    expect(toTaskDoc(planned).plannedFor).toBe('2026-10-20');
+    expect(fromTaskDoc('a', toTaskDoc(planned))).toEqual(planned);
+    expect(toTaskDoc(mkTask('b')).plannedFor).toBeNull();
+    expect(fromTaskDoc('b', toTaskDoc(mkTask('b')))?.plannedFor).toBeNull();
+  });
+
+  it('decodes a missing or invalid value to null', () => {
+    expect(fromTaskDoc('a', {})?.plannedFor).toBeNull();
+    for (const plannedFor of [5, true, [], {}, '', 'today', '2026-1-5', '20261020']) {
+      expect(fromTaskDoc('a', { plannedFor })?.plannedFor, JSON.stringify(plannedFor)).toBeNull();
+    }
+  });
+
+  it('is noticed by isEqualTask', () => {
+    const t = mkTask('a', { plannedFor: '2026-10-20' });
+    expect(isEqualTask(t, { ...t })).toBe(true);
+    expect(isEqualTask(t, { ...t, plannedFor: null })).toBe(false);
+    expect(isEqualTask(t, { ...t, plannedFor: '2026-10-21' })).toBe(false);
+  });
+});
+
+describe('settings', () => {
+  const full = { todayView: true, dailyCapacity: 12, hints: { todayOffered: true } };
+
+  it('decodes a well-formed map', () => {
+    expect(fromSettings(full)).toEqual(full);
+  });
+
+  it('decodes absence and garbage to the defaults', () => {
+    const defaults = { todayView: false, dailyCapacity: 8, hints: {} };
+    for (const raw of [undefined, null, 'on', 5, [], true]) {
+      expect(fromSettings(raw), JSON.stringify(raw)).toEqual(defaults);
+    }
+  });
+
+  it('repairs individual fields', () => {
+    expect(fromSettings({ todayView: 'yes' }).todayView).toBe(false);
+    expect(fromSettings({ dailyCapacity: 'lots' }).dailyCapacity).toBe(8);
+    expect(fromSettings({ dailyCapacity: NaN }).dailyCapacity).toBe(8);
+    expect(fromSettings({ dailyCapacity: 0 }).dailyCapacity).toBe(1);
+    expect(fromSettings({ dailyCapacity: 400 }).dailyCapacity).toBe(50);
+    expect(fromSettings({ dailyCapacity: 7.6 }).dailyCapacity).toBe(8);
+    expect(fromSettings({ hints: { todayOffered: 'yes' } }).hints).toEqual({});
+    expect(fromSettings({ hints: 'x' }).hints).toEqual({});
+    expect(fromSettings({ hints: { other: true } }).hints).toEqual({});
+  });
+
+  it('writes only known keys, without unset hints', () => {
+    const doc = toSettingsDoc({ ...full, extra: 1 } as typeof full);
+    expect(doc).toEqual(full);
+    expect(toSettingsDoc({ todayView: false, dailyCapacity: 8, hints: {} })).toEqual({
+      todayView: false,
+      dailyCapacity: 8,
+      hints: {},
+    });
+    expect('todayOffered' in toSettingsDoc({ ...full, hints: {} }).hints).toBe(false);
+  });
+
+  it('compares by content', () => {
+    expect(isEqualSettings(full, { ...full, hints: { todayOffered: true } })).toBe(true);
+    expect(isEqualSettings(full, { ...full, todayView: false })).toBe(false);
+    expect(isEqualSettings(full, { ...full, dailyCapacity: 9 })).toBe(false);
+    expect(isEqualSettings(full, { ...full, hints: {} })).toBe(false);
   });
 });

@@ -1,9 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
 import { motion, type MotionProps } from 'framer-motion';
-import { MoreHorizontal, Plus, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Plus, Sun, SunDim, Trash2 } from 'lucide-react';
 import { weekdayDate } from '../lib/dates';
 import { nextOccurrence, repeatPatch, repeatPhrase } from '../lib/recur';
 import { todayISO } from '../lib/views';
+import type { Task } from '../types';
 import {
   useColorSource,
   useEffectiveDifficulty,
@@ -35,6 +36,38 @@ type Props = {
   hideTrigger?: boolean;
 };
 
+/**
+ * "Plan for today" puts the task in Today without touching its due date; on a task that is
+ * there only because it was planned, "Remove from today" takes it out again. A task that is
+ * there because it is due (or overdue) is not Today's to give back: no item.
+ */
+function TodayAction({
+  id,
+  task,
+  act,
+}: {
+  id: string;
+  task: Task;
+  act: (fn: () => void) => () => void;
+}) {
+  const today = todayISO();
+  const planned = task.plannedFor !== null && task.plannedFor <= today;
+  const due = task.dueDate !== null && task.dueDate <= today;
+  if (planned && due) return null;
+  const plan = useTaskStore.getState().plan;
+  return planned ? (
+    <button type="button" className={styles.item} onClick={act(() => plan(id, null))}>
+      <SunDim size={16} strokeWidth={1.75} aria-hidden="true" />
+      <span>Remove from today</span>
+    </button>
+  ) : (
+    <button type="button" className={styles.item} onClick={act(() => plan(id, today))}>
+      <Sun size={16} strokeWidth={1.75} aria-hidden="true" />
+      <span>Plan for today</span>
+    </button>
+  );
+}
+
 /** The "more" button and its popover (a sheet on phones): difficulty, tags, due date, colour. */
 export function TaskMenu({
   id,
@@ -50,6 +83,7 @@ export function TaskMenu({
   const leaf = useIsLeaf(id);
   const sum = useEffectiveDifficulty(id);
   const colorSource = useColorSource(id);
+  const todayView = useTaskStore((s) => s.settings.todayView);
   const [ownOpen, setOwnOpen] = useState(false);
   const open = onOpenChange ? (controlledOpen ?? false) : ownOpen;
   const setOpen = onOpenChange ?? setOwnOpen;
@@ -144,6 +178,7 @@ export function TaskMenu({
         </div>
         <div className={styles.divider} role="separator" />
         <div className={styles.actions}>
+          {todayView && !task.done && <TodayAction id={id} task={task} act={act} />}
           <button type="button" className={styles.item} onClick={act(onAddSubtask)}>
             <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
             <span>Add subtask</span>

@@ -21,6 +21,7 @@ import { parseQuickAdd, SUPPORTS_REPEAT, tokenKey, type QuickToken } from '../li
 import { normalizeTag, normalizeTags, tagColor } from '../lib/tags';
 import { dueStatus, todayISO } from '../lib/views';
 import { useAllTags, useTaskStore } from '../store/tasks';
+import { useView } from '../store/ui';
 import type { Repeat } from '../types';
 import { DatePicker } from './DatePicker';
 import { DifficultyGlyph } from './DifficultyGlyph';
@@ -56,6 +57,7 @@ const PLACEHOLDER_FADE_MS = 160;
 export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const add = useTaskStore((s) => s.add);
   const existing = useAllTags();
+  const view = useView();
   const [value, setValue] = useState('');
   const [caret, setCaret] = useState(0);
   const [tags, setTags] = useState<string[]>([]);
@@ -194,6 +196,8 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
       tags: normalizeTags([...tags, ...quickTags]),
       dueDate,
       repeat,
+      // In Today a new task is planned for today, unless a due date already places it.
+      ...(view === 'today' && dueDate === null && { plannedFor: todayISO() }),
       ...(difficulty !== null && { difficulty }),
     });
     setValue('');

@@ -7,6 +7,7 @@ import {
   useTaskStore,
 } from './tasks';
 import { mkTask } from '../test/factories';
+import { DEFAULT_SETTINGS } from '../types';
 import { useUIStore } from './ui';
 
 const get = () => useTaskStore.getState();
@@ -32,13 +33,27 @@ describe('migrateTasksState', () => {
   it('adds tags, dueDate and history to v1 data', () => {
     const out = migrateTasksState({ tasks: { a: v1Task }, rootIds: ['a'] });
     // The old default blue meant "unset": it migrates to automatic (null).
-    expect(out.tasks.a).toEqual({ ...v1Task, color: null, tags: [], dueDate: null, repeat: null });
+    expect(out.tasks.a).toEqual({
+      ...v1Task,
+      color: null,
+      tags: [],
+      dueDate: null,
+      repeat: null,
+      plannedFor: null,
+    });
     expect(out.rootIds).toEqual(['a']);
     expect(out.history).toEqual([]);
   });
 
   it('is idempotent and keeps existing values', () => {
-    const v2 = { ...v1Task, color: '#C9B8F2', tags: ['x'], dueDate: '2026-01-01', repeat: null };
+    const v2 = {
+      ...v1Task,
+      color: '#C9B8F2',
+      tags: ['x'],
+      dueDate: '2026-01-01',
+      repeat: null,
+      plannedFor: null,
+    };
     const out = migrateTasksState({ tasks: { a: v2 }, rootIds: ['a'], history: [] });
     expect(out.tasks.a).toEqual(v2);
     expect(migrateTasksState(out)).toEqual(out);
@@ -50,6 +65,7 @@ describe('migrateTasksState', () => {
       rootIds: [],
       history: [],
       tagColors: {},
+      settings: DEFAULT_SETTINGS,
     });
   });
 });
@@ -201,7 +217,10 @@ describe('undo', () => {
     expect(get().undo?.label).toBe('Cleared history (1 entry)');
     get().undoLast();
     expect(get().history).toHaveLength(1);
-    get().replaceAll({ tasks: {}, rootIds: [], history: [], tagColors: {} }, 'Imported backup');
+    get().replaceAll(
+      { tasks: {}, rootIds: [], history: [], tagColors: {}, settings: DEFAULT_SETTINGS },
+      'Imported backup',
+    );
     expect(get().rootIds).toEqual([]);
     get().undoLast();
     expect(get().tasks[a]).toBeDefined();
@@ -266,7 +285,14 @@ describe('legacy local data', () => {
       JSON.stringify({ state: { tasks: { a: task }, rootIds: ['a'] }, version: 1 }),
     );
     const data = readLegacyLocalTasks();
-    expect(data?.tasks.a).toEqual({ ...task, color: null, tags: [], dueDate: null, repeat: null });
+    expect(data?.tasks.a).toEqual({
+      ...task,
+      color: null,
+      tags: [],
+      dueDate: null,
+      repeat: null,
+      plannedFor: null,
+    });
     expect(data?.rootIds).toEqual(['a']);
     clearLegacyLocalTasks();
     expect(localStorage.getItem('tasks-v1')).toBeNull();
@@ -402,7 +428,16 @@ describe('tag colours', () => {
   it('is replaced by an import (with undo) and applied by hydrate', () => {
     const s = useTaskStore.getState();
     s.setTagColor('a', '#C9B8F2');
-    s.replaceAll({ tasks: {}, rootIds: [], history: [], tagColors: { b: '#FFD3B6' } }, 'Imported');
+    s.replaceAll(
+      {
+        tasks: {},
+        rootIds: [],
+        history: [],
+        tagColors: { b: '#FFD3B6' },
+        settings: DEFAULT_SETTINGS,
+      },
+      'Imported',
+    );
     expect(useTaskStore.getState().tagColors).toEqual({ b: '#FFD3B6' });
     useTaskStore.getState().undoLast();
     expect(useTaskStore.getState().tagColors).toEqual({ a: '#C9B8F2' });
@@ -754,7 +789,16 @@ describe('completed tasks: delete, restore, repair', () => {
 
   it('replaceAll repairs imported done tasks too', () => {
     const task = { ...mkTask('x'), done: true, completedAt: 9 };
-    get().replaceAll({ tasks: { x: task }, rootIds: ['x'], history: [], tagColors: {} }, 'Import');
+    get().replaceAll(
+      {
+        tasks: { x: task },
+        rootIds: ['x'],
+        history: [],
+        tagColors: {},
+        settings: DEFAULT_SETTINGS,
+      },
+      'Import',
+    );
     expect(get().history.map((e) => e.taskId)).toEqual(['x']);
   });
 });
@@ -863,5 +907,135 @@ describe('rescheduling', () => {
       expect(get().tasks[a].dueDate).toBe('2026-10-20');
       expect(get().tasks[b].dueDate).toBe('2026-10-01');
     });
+  });
+});
+
+describe('settings', () => {
+  it('start at the defaults: Today off, capacity 8, no hints', () => {
+    expect(get().settings).toEqual({ todayView: false, dailyCapacity: 8, hints: {} });
+  });
+
+  it('are changed by a patch; hints merge instead of replacing', () => {
+    get().setSetting({ todayView: true });
+    get().setSetting({ dailyCapacity: 12 });
+    get().setSetting({ hints: { todayOffered: true } });
+    expect(get().settings).toEqual({
+      todayView: true,
+      dailyCapacity: 12,
+      hints: { todayOffered: true },
+    });
+  });
+
+  it('clamp the capacity to 1-50 and round it', () => {
+    get().setSetting({ dailyCapacity: 0 });
+    expect(get().settings.dailyCapacity).toBe(1);
+    get().setSetting({ dailyCapacity: 51 });
+    expect(get().settings.dailyCapacity).toBe(50);
+    get().setSetting({ dailyCapacity: 9.4 });
+    expect(get().settings.dailyCapacity).toBe(9);
+    get().setSetting({ dailyCapacity: NaN });
+    expect(get().settings.dailyCapacity).toBe(8);
+  });
+
+  it('keep their identity when nothing changes', () => {
+    const before = get().settings;
+    get().setSetting({ todayView: false, dailyCapacity: 8 });
+    get().setSetting({});
+    expect(get().settings).toBe(before);
+  });
+
+  it('are not content: no undo entry, and undo leaves them alone', () => {
+    const id = get().add({ title: 'A' });
+    get().setSetting({ todayView: true, dailyCapacity: 15 });
+    expect(get().undo).toBeNull();
+    get().remove(id);
+    get().undoLast();
+    expect(get().tasks[id]).toBeDefined();
+    expect(get().settings).toMatchObject({ todayView: true, dailyCapacity: 15 });
+  });
+
+  it('survive hydrate and replaceAll, and reset with the store', () => {
+    const settings = { todayView: true, dailyCapacity: 5, hints: { todayOffered: true } };
+    get().hydrate({ settings });
+    expect(get().settings).toBe(settings);
+    get().replaceAll(
+      { tasks: {}, rootIds: [], history: [], tagColors: {}, settings: DEFAULT_SETTINGS },
+      'Imported',
+    );
+    expect(get().settings).toEqual(DEFAULT_SETTINGS);
+    get().setSetting({ todayView: true });
+    resetTaskStore();
+    expect(get().settings).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('are migrated: absent means the defaults, garbage is repaired', () => {
+    expect(migrateTasksState({}).settings).toEqual(DEFAULT_SETTINGS);
+    expect(
+      migrateTasksState({ settings: { dailyCapacity: 99, todayView: true } }).settings,
+    ).toEqual({
+      todayView: true,
+      dailyCapacity: 50,
+      hints: {},
+    });
+  });
+});
+
+describe('planning', () => {
+  it('a new task is not planned; migration and add default plannedFor to null', () => {
+    const id = get().add({ title: 'A' });
+    expect(get().tasks[id].plannedFor).toBeNull();
+    expect(
+      migrateTasksState({ tasks: { x: { id: 'x' } }, rootIds: [] }).tasks.x.plannedFor,
+    ).toBeNull();
+    expect(
+      migrateTasksState({ tasks: { x: { id: 'x', plannedFor: 'soon' } }, rootIds: [] }).tasks.x
+        .plannedFor,
+    ).toBeNull();
+    expect(
+      migrateTasksState({ tasks: { x: { id: 'x', plannedFor: '2026-10-20' } }, rootIds: [] }).tasks
+        .x.plannedFor,
+    ).toBe('2026-10-20');
+  });
+
+  it('add can plan a task, and update can patch plannedFor', () => {
+    const id = get().add({ title: 'A', plannedFor: '2026-10-20' });
+    expect(get().tasks[id].plannedFor).toBe('2026-10-20');
+    get().update(id, { plannedFor: null });
+    expect(get().tasks[id].plannedFor).toBeNull();
+  });
+
+  it('plan sets plannedFor without touching the due date, with an undo', () => {
+    const id = get().add({ title: 'Pay rent', dueDate: '2026-10-31' });
+    get().plan(id, '2026-10-20');
+    expect(get().tasks[id]).toMatchObject({ plannedFor: '2026-10-20', dueDate: '2026-10-31' });
+    expect(get().undo?.label).toBe('Planned \u201cPay rent\u201d for today');
+    get().undoLast();
+    expect(get().tasks[id].plannedFor).toBeNull();
+  });
+
+  it('plan(null) takes a task out, with its own undo label', () => {
+    const id = get().add({ title: 'Pay rent', plannedFor: '2026-10-20' });
+    get().plan(id, null);
+    expect(get().tasks[id].plannedFor).toBeNull();
+    expect(get().undo?.label).toBe('Removed \u201cPay rent\u201d from today');
+  });
+
+  it('does nothing, and records no undo, when nothing changes or the task is gone', () => {
+    const id = get().add({ title: 'A' });
+    get().plan(id, null);
+    get().plan('nope', '2026-10-20');
+    expect(get().undo).toBeNull();
+  });
+
+  it('a repeating task\u2019s next occurrence is not planned', () => {
+    const id = get().add({
+      title: 'Water',
+      dueDate: '2026-10-20',
+      repeat: { every: 'day' },
+      plannedFor: '2026-10-20',
+    });
+    get().toggle(id);
+    const copy = Object.values(get().tasks).find((t) => t.spawnedFrom === id);
+    expect(copy?.plannedFor).toBeNull();
   });
 });

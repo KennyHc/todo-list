@@ -1,6 +1,6 @@
 import type { HistoryEntry } from '../lib/history';
 import type { PersistedTasks } from '../store/tasks';
-import type { Task } from '../types';
+import { DEFAULT_SETTINGS, type Settings, type Task } from '../types';
 
 export const mkTask = (id: string, over: Partial<Task> = {}): Task => ({
   id,
@@ -12,6 +12,7 @@ export const mkTask = (id: string, over: Partial<Task> = {}): Task => ({
   tags: [],
   dueDate: null,
   repeat: null,
+  plannedFor: null,
   parentId: null,
   childIds: [],
   createdAt: 1,
@@ -40,9 +41,11 @@ export const mkState = (
   rootIds: string[] = tasks.filter((t) => t.parentId === null).map((t) => t.id),
   history: HistoryEntry[] = [],
   tagColors: Record<string, string> = {},
+  settings: Settings = { ...DEFAULT_SETTINGS, hints: {} },
 ): PersistedTasks => ({
   tasks: Object.fromEntries(tasks.map((t) => [t.id, t])),
   rootIds,
   history,
   tagColors,
+  settings,
 });

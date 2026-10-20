@@ -119,6 +119,7 @@ const mkOld = (id: string): Task => ({
   tags: [],
   dueDate: null,
   repeat: null,
+  plannedFor: null,
   parentId: null,
   childIds: [],
   createdAt: 1,
@@ -208,10 +209,11 @@ describe('two clients, one account', () => {
     const first = await signedInDb(true);
     uid = first.uid;
     await setDoc(doc(first.db, `users/${uid}`), { rootIds: ['old'], schemaVersion: 3 });
-    const { repeat: _omit, ...legacy } = toTaskDoc({ ...mkOld('old') });
+    const { repeat: _omit, plannedFor: _omit2, ...legacy } = toTaskDoc({ ...mkOld('old') });
     await setDoc(doc(first.db, `users/${uid}/tasks/old`), legacy);
     const c = await client(first.app, first.db);
     expect(c.store.getState().tasks.old.repeat).toBeNull();
+    expect(c.store.getState().tasks.old.plannedFor).toBeNull();
   });
 
   it('syncs completion history and keeps untouched task identities on the receiver', async () => {
@@ -272,6 +274,61 @@ describe('two clients, one account', () => {
     a.store.getState().undoLast();
     await vi.waitFor(
       () => expect(b.store.getState().tagColors).toEqual({ work: '#C9B8F2', home: '#FFD3B6' }),
+      { timeout: 8000 },
+    );
+  });
+
+  it('syncs settings both ways, without touching undo, and plannedFor with the task', async () => {
+    const [a, b] = await pair();
+    a.store.getState().setSetting({ todayView: true, dailyCapacity: 12 });
+    await vi.waitFor(
+      () =>
+        expect(b.store.getState().settings).toEqual({
+          todayView: true,
+          dailyCapacity: 12,
+          hints: {},
+        }),
+      { timeout: 8000 },
+    );
+    expect(b.store.getState().undo).toBeNull();
+
+    b.store.getState().setSetting({ hints: { todayOffered: true } });
+    await vi.waitFor(
+      () => expect(a.store.getState().settings.hints).toEqual({ todayOffered: true }),
+      {
+        timeout: 8000,
+      },
+    );
+    // Toggling it off on one device turns it off on the other, and the capacity is kept.
+    a.store.getState().setSetting({ todayView: false });
+    await vi.waitFor(() => expect(b.store.getState().settings.todayView).toBe(false), {
+      timeout: 8000,
+    });
+    const meta = await getDoc(doc(a.db, 'users', uid));
+    expect(meta.data()?.settings).toEqual({
+      todayView: false,
+      dailyCapacity: 12,
+      hints: { todayOffered: true },
+    });
+
+    const id = a.store.getState().add({ title: 'Plan me', plannedFor: '2026-10-20' });
+    await vi.waitFor(() => expect(b.store.getState().tasks[id]?.plannedFor).toBe('2026-10-20'), {
+      timeout: 8000,
+    });
+    a.store.getState().plan(id, null);
+    await vi.waitFor(() => expect(b.store.getState().tasks[id]?.plannedFor).toBeNull(), {
+      timeout: 8000,
+    });
+  });
+
+  it('writes settings to a fresh account even before any task exists', async () => {
+    const [a] = await pair();
+    a.store.getState().setSetting({ dailyCapacity: 5 });
+    await vi.waitFor(
+      async () => {
+        const meta = await getDoc(doc(a.db, 'users', uid));
+        expect(meta.data()).toMatchObject({ settings: { dailyCapacity: 5 }, rootIds: [] });
+      },
       { timeout: 8000 },
     );
   });

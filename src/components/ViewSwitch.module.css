@@ -95,6 +95,18 @@
   }
 }
 
+/* Four views don't fit with every label on a phone: only the active one keeps its. */
+@media (max-width: 480px) {
+  .track[data-count='4'] .option:not(.active) {
+    width: 40px;
+    padding: 0;
+  }
+
+  .track[data-count='4'] .option:not(.active) .label {
+    display: none;
+  }
+}
+
 @media (hover: none) and (min-width: 481px) {
   .option::after {
     content: '';

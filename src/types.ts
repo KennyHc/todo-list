@@ -37,12 +37,37 @@ export type Task = {
   dueDate: string | null;
   /** Recurrence, or null for a one-off task. Only acts together with a due date. */
   repeat: Repeat | null;
+  /**
+   * Planned for a day, 'YYYY-MM-DD' (the Today view; only ever set to a "today"), or null. A
+   * task planned on an earlier day that is still open rolls over into the next Today.
+   */
+  plannedFor: string | null;
   /** On a spawned copy: the id of the task it was created from (used to avoid duplicates). */
   spawnedFrom?: string;
   parentId: string | null;
   childIds: string[];
   createdAt: number;
   completedAt?: number;
+};
+
+/** Per-user preferences, synced in the meta document's `settings` map. Not part of undo. */
+export type Settings = {
+  /** The opt-in Today view (daily plan sized to a capacity). */
+  todayView: boolean;
+  /** Points (difficulty) of work a day is sized to; an integer, MIN_CAPACITY..MAX_CAPACITY. */
+  dailyCapacity: number;
+  /** One-time hints already offered, so they never show again (on any device). */
+  hints: { todayOffered?: boolean };
+};
+
+export const MIN_CAPACITY = 1;
+export const MAX_CAPACITY = 50;
+export const DEFAULT_CAPACITY = 8;
+
+export const DEFAULT_SETTINGS: Settings = {
+  todayView: false,
+  dailyCapacity: DEFAULT_CAPACITY,
+  hints: {},
 };
 
 export type TaskTree = {

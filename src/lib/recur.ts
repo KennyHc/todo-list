@@ -198,6 +198,7 @@ export function spawnNextOccurrence(
       tags: [...source.tags],
       dueDate: root ? next : source.dueDate === null ? null : addDays(source.dueDate, shift),
       repeat: root ? repeat : source.repeat === null ? null : { ...source.repeat },
+      plannedFor: null,
       ...(root ? { spawnedFrom: id } : {}),
       parentId,
       childIds,

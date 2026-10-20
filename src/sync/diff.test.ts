@@ -71,3 +71,33 @@ describe('diffState', () => {
     expect(isEmptyDiff(diffState(prev, { ...prev, history: [h2, h1] }))).toBe(true);
   });
 });
+
+describe('diffState settings', () => {
+  const a = mkTask('a');
+  const prev = mkState([a]);
+
+  it('is clean for the same reference or equal content', () => {
+    expect(diffState(prev, { ...prev }).settingsChanged).toBe(false);
+    const copy = { ...prev, settings: { ...prev.settings, hints: { ...prev.settings.hints } } };
+    const diff = diffState(prev, copy);
+    expect(diff.settingsChanged).toBe(false);
+    expect(isEmptyDiff(diff)).toBe(true);
+  });
+
+  it('flags a changed toggle, capacity or hint by content', () => {
+    for (const settings of [
+      { ...prev.settings, todayView: true },
+      { ...prev.settings, dailyCapacity: 12 },
+      { ...prev.settings, hints: { todayOffered: true } },
+    ]) {
+      const diff = diffState(prev, { ...prev, settings });
+      expect(diff.settingsChanged).toBe(true);
+      expect(isEmptyDiff(diff)).toBe(false);
+    }
+  });
+
+  it('treats an unset hint and an explicit false the same', () => {
+    const next = { ...prev, settings: { ...prev.settings, hints: { todayOffered: false } } };
+    expect(diffState(prev, next).settingsChanged).toBe(false);
+  });
+});
