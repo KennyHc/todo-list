@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { db } from '../lib/firebase';
+import { db } from '../lib/firestore';
 import { useAuthStore } from '../store/auth';
 import { startSync } from './firestoreSync';
 

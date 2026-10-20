@@ -25,3 +25,6 @@ dist-ssr
 
 # Firebase CLI deploy cache
 .firebase/
+stats.html
+test-results
+playwright-report

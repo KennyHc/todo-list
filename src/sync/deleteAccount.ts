@@ -16,17 +16,26 @@ import {
   type DocumentReference,
   type Firestore,
 } from 'firebase/firestore';
-import { auth as defaultAuth, db as defaultDb, googleProvider } from '../lib/firebase';
+import { auth as defaultAuth, googleProvider } from '../lib/firebase';
+import { db as defaultDb } from '../lib/firestore';
 import { useAiDraft } from '../store/aiDraft';
 import { useImportDraft } from '../store/importDraft';
 import { resetTaskStore } from '../store/tasks';
+import {
+  clearDeletePending,
+  DELETE_PENDING_KEY,
+  session,
+  ACCOUNT_DELETED_KEY,
+} from './deletePending';
 import { startSync, stopActiveSync } from './firestoreSync';
 
-/** Set before a redirect re-authentication so the deletion resumes when the page comes back. */
-export const DELETE_PENDING_KEY = 'delete-pending';
-/** Set just before the post-deletion reload; the landing page shows a notice and clears it. */
-export const ACCOUNT_DELETED_KEY = 'account-deleted';
-export const ACCOUNT_DELETED_NOTICE = 'Your account and data were deleted.';
+export {
+  ACCOUNT_DELETED_KEY,
+  ACCOUNT_DELETED_NOTICE,
+  clearDeletePending,
+  DELETE_PENDING_KEY,
+  isDeletePending,
+} from './deletePending';
 
 const BATCH_LIMIT = 450;
 const MAX_PASSES = 3;
@@ -72,27 +81,6 @@ export type DeleteAccountOptions = {
 };
 
 const codeOf = (error: unknown) => (error as { code?: string } | null)?.code;
-
-const session = {
-  set(key: string, value: string | null) {
-    try {
-      if (value === null) sessionStorage.removeItem(key);
-      else sessionStorage.setItem(key, value);
-    } catch {
-      /* storage unavailable */
-    }
-  },
-  get(key: string): string | null {
-    try {
-      return sessionStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  },
-};
-
-export const isDeletePending = () => session.get(DELETE_PENDING_KEY) === '1';
-export const clearDeletePending = () => session.set(DELETE_PENDING_KEY, null);
 
 const CANCEL_CODES = new Set([
   'auth/popup-closed-by-user',

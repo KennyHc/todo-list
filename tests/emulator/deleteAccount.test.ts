@@ -23,7 +23,8 @@ import { toHistoryDoc, toTaskDoc } from '../../src/sync/schema';
 import type { Task } from '../../src/types';
 
 // The browser bootstrap needs IndexedDB and Vite env; this suite injects its own clients.
-vi.mock('../../src/lib/firebase', () => ({ auth: {}, db: {}, googleProvider: {} }));
+vi.mock('../../src/lib/firebase', () => ({ app: {}, auth: {}, googleProvider: {} }));
+vi.mock('../../src/lib/firestore', () => ({ db: {} }));
 
 import { deleteAccount } from '../../src/sync/deleteAccount';
 

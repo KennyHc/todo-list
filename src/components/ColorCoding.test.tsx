@@ -179,7 +179,7 @@ describe('tag colour management', () => {
     expect(useTaskStore.getState().tagColors).toEqual({});
   });
 
-  it('the Tag colours dialog lists tags with counts and edits their colours', () => {
+  it('the Tag colours dialog lists tags with counts and edits their colours', async () => {
     render(<App />);
     act(() => {
       const s = useTaskStore.getState();
@@ -188,7 +188,7 @@ describe('tag colour management', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Account' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Tag colours' }));
-    const dialog = screen.getByRole('dialog', { name: 'Tag colours' });
+    const dialog = await screen.findByRole('dialog', { name: 'Tag colours' });
     expect(within(dialog).getByText('2 tasks')).toBeInTheDocument();
     expect(within(dialog).getByText('1 task')).toBeInTheDocument();
 
@@ -207,12 +207,12 @@ describe('tag colour management', () => {
     );
   });
 
-  it('the filter popover has an Edit colours shortcut that opens the dialog', () => {
+  it('the filter popover has an Edit colours shortcut that opens the dialog', async () => {
     render(<App />);
     act(() => void useTaskStore.getState().add({ title: 'A', tags: ['work'] }));
     fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
     fireEvent.click(screen.getByRole('button', { name: 'Edit colours' }));
-    expect(screen.getByRole('dialog', { name: 'Tag colours' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Tag colours' })).toBeInTheDocument();
   });
 
   it('undoes a tag colour change from the toast', () => {

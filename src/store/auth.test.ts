@@ -19,7 +19,7 @@ vi.mock('firebase/auth', () => ({
     return () => {};
   },
 }));
-vi.mock('../sync/firestoreSync', () => ({
+vi.mock('../sync/syncControl', () => ({
   flushActiveSync: vi.fn(async () => {
     calls.push('flush');
   }),

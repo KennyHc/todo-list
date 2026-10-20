@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ACCOUNT_DELETED_KEY, ACCOUNT_DELETED_NOTICE } from '../sync/deleteAccount';
+import { ACCOUNT_DELETED_KEY, ACCOUNT_DELETED_NOTICE } from '../sync/deletePending';
 import { isInAppBrowser, useAuthStore } from '../store/auth';
 import { LandingPage } from './LandingPage';
 

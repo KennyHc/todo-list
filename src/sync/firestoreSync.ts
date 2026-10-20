@@ -35,6 +35,7 @@ import {
   type OrderedEntry,
 } from './schema';
 import { useSyncStore } from './status';
+import { registerSyncController } from './syncControl';
 import type { Task } from '../types';
 
 /*
@@ -479,3 +480,5 @@ export function startSync(uid: string, options: SyncOptions): () => void {
   active = handle;
   return stop;
 }
+
+registerSyncController({ flush: flushActiveSync, stop: stopActiveSync });

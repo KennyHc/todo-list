@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./sync/useCloudSync', () => ({ useCloudSync: vi.fn() }));
@@ -23,10 +23,14 @@ beforeEach(() => {
 });
 
 describe('AuthGate', () => {
-  it('starts cloud sync', () => {
+  it('starts cloud sync only once signed in', async () => {
     setAuth('signedOut');
-    render(<AuthGate />);
-    expect(useCloudSync).toHaveBeenCalled();
+    const { rerender } = render(<AuthGate />);
+    expect(useCloudSync).not.toHaveBeenCalled();
+    setAuth('signedIn');
+    rerender(<AuthGate />);
+    await screen.findByRole('status', { name: 'Loading' });
+    await waitFor(() => expect(useCloudSync).toHaveBeenCalled());
   });
 
   it('shows the splash while a returning user is loading', () => {
@@ -50,21 +54,23 @@ describe('AuthGate', () => {
     expect(screen.getByText('landing page')).toBeInTheDocument();
   });
 
-  it('shows the splash until the first sync finishes, then the app', () => {
+  it('shows the splash until the chunk and the first sync are ready, then the app', async () => {
     setAuth('signedIn');
     const { rerender } = render(<AuthGate />);
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    await waitFor(() => expect(useCloudSync).toHaveBeenCalled());
     expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
     expect(screen.queryByText('the app')).not.toBeInTheDocument();
     useSyncStore.setState({ syncStatus: 'ready' });
     rerender(<AuthGate />);
-    expect(screen.getByText('the app')).toBeInTheDocument();
+    expect(await screen.findByText('the app')).toBeInTheDocument();
   });
 
-  it('still shows the app when offline or after a sync error', () => {
+  it('still shows the app when offline or after a sync error', async () => {
     setAuth('signedIn');
     useSyncStore.setState({ syncStatus: 'offline' });
     const { rerender } = render(<AuthGate />);
-    expect(screen.getByText('the app')).toBeInTheDocument();
+    expect(await screen.findByText('the app')).toBeInTheDocument();
     useSyncStore.setState({ syncStatus: 'error' });
     rerender(<AuthGate />);
     expect(screen.getByText('the app')).toBeInTheDocument();

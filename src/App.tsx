@@ -1,21 +1,14 @@
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { AnimatedNumber } from './components/AnimatedNumber';
 import { DeadlineList } from './components/DeadlineList';
-import { CopyForAiDialog } from './components/CopyForAiDialog';
-import { DeleteAccountDialog } from './components/DeleteAccountDialog';
-import { ExportBackupDialog } from './components/ExportBackupDialog';
-import { ImportDialog } from './components/ImportDialog';
-import { ImportFromAiDialog } from './components/ImportFromAiDialog';
-import { CommandPalette } from './components/CommandPalette';
 import { EmptyState } from './components/EmptyState';
 import { MigrationToast } from './components/MigrationToast';
 import { NoticeToast } from './components/NoticeToast';
 import { HistoryList } from './components/HistoryList';
 import { ProgressRing } from './components/ProgressRing';
 import { SettingsPopover } from './components/SettingsPopover';
-import { ShortcutsSheet } from './components/ShortcutsSheet';
+import { LazyDialogs } from './components/LazyDialogs';
 import { FocusProxy } from './components/FocusProxy';
-import { TagColorsDialog } from './components/TagColorsDialog';
 import { TaskInput } from './components/TaskInput';
 import { TaskList } from './components/TaskList';
 import { UndoToast } from './components/UndoToast';
@@ -23,6 +16,7 @@ import { ViewToolbar } from './components/ViewToolbar';
 import { useHotkeys } from './hooks/useHotkeys';
 import { usePasteImport } from './hooks/usePasteImport';
 import { useAuthStore } from './store/auth';
+import { useSyncStore } from './sync/status';
 import { useUIStore } from './store/ui';
 import { useTaskStore, useTotals } from './store/tasks';
 import styles from './App.module.css';
@@ -39,6 +33,7 @@ function App() {
   const hasHistory = useTaskStore((s) => s.history.length > 0);
   const view = useUIStore((s) => s.view);
   const freshSignIn = useAuthStore((s) => s.freshSignIn);
+  const syncStatus = useSyncStore((s) => s.syncStatus);
   const { openDifficulty, done, total } = useTotals();
   useHotkeys();
   usePasteImport();
@@ -46,7 +41,7 @@ function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <main className={intro ? 'app intro' : 'app'}>
+      <main className={intro ? 'app intro' : 'app'} data-sync={syncStatus}>
         <header className={styles.header}>
           <div className={styles.heading}>
             <h1 className={styles.title}>Tasks</h1>
@@ -98,14 +93,7 @@ function App() {
       <UndoToast />
       <MigrationToast />
       <NoticeToast />
-      <CommandPalette />
-      <ShortcutsSheet />
-      <CopyForAiDialog />
-      <ImportFromAiDialog />
-      <ExportBackupDialog />
-      <DeleteAccountDialog />
-      <ImportDialog />
-      <TagColorsDialog />
+      <LazyDialogs />
       <FocusProxy />
     </MotionConfig>
   );

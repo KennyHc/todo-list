@@ -8,8 +8,8 @@ import {
 } from 'firebase/auth';
 import { create } from 'zustand';
 import { auth, googleProvider } from '../lib/firebase';
-import { clearDeletePending, isDeletePending, resumeDeleteAccount } from '../sync/deleteAccount';
-import { flushActiveSync, stopActiveSync } from '../sync/firestoreSync';
+import { clearDeletePending, isDeletePending } from '../sync/deletePending';
+import { flushActiveSync, stopActiveSync } from '../sync/syncControl';
 import { resetTaskStore } from './tasks';
 import { useUIStore } from './ui';
 
@@ -131,9 +131,13 @@ export function initAuth(): () => void {
       write(() => sessionStorage, REDIRECT_KEY, null);
       if (result?.user && isDeletePending()) {
         // Back from the re-authentication redirect that "Delete account" started: finish the job.
-        void resumeDeleteAccount().then((error) => {
-          if (error && error.code !== 'cancelled') useUIStore.getState().showNotice(error.message);
-        });
+        void import('../sync/deleteAccount')
+          .then((m) => m.resumeDeleteAccount())
+          .then((error) => {
+            if (error && error.code !== 'cancelled') {
+              useUIStore.getState().showNotice(error.message);
+            }
+          });
       } else if (result?.user) useAuthStore.setState({ freshSignIn: true });
       else clearDeletePending();
     })
