@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearLegacyLocalTasks,
   migrateTasksState,
@@ -31,13 +31,13 @@ describe('migrateTasksState', () => {
   it('adds tags, dueDate and history to v1 data', () => {
     const out = migrateTasksState({ tasks: { a: v1Task }, rootIds: ['a'] });
     // The old default blue meant "unset": it migrates to automatic (null).
-    expect(out.tasks.a).toEqual({ ...v1Task, color: null, tags: [], dueDate: null });
+    expect(out.tasks.a).toEqual({ ...v1Task, color: null, tags: [], dueDate: null, repeat: null });
     expect(out.rootIds).toEqual(['a']);
     expect(out.history).toEqual([]);
   });
 
   it('is idempotent and keeps existing values', () => {
-    const v2 = { ...v1Task, color: '#C9B8F2', tags: ['x'], dueDate: '2026-01-01' };
+    const v2 = { ...v1Task, color: '#C9B8F2', tags: ['x'], dueDate: '2026-01-01', repeat: null };
     const out = migrateTasksState({ tasks: { a: v2 }, rootIds: ['a'], history: [] });
     expect(out.tasks.a).toEqual(v2);
     expect(migrateTasksState(out)).toEqual(out);
@@ -265,7 +265,7 @@ describe('legacy local data', () => {
       JSON.stringify({ state: { tasks: { a: task }, rootIds: ['a'] }, version: 1 }),
     );
     const data = readLegacyLocalTasks();
-    expect(data?.tasks.a).toEqual({ ...task, color: null, tags: [], dueDate: null });
+    expect(data?.tasks.a).toEqual({ ...task, color: null, tags: [], dueDate: null, repeat: null });
     expect(data?.rootIds).toEqual(['a']);
     clearLegacyLocalTasks();
     expect(localStorage.getItem('tasks-v1')).toBeNull();
@@ -436,5 +436,172 @@ describe('migrateTasksState: v2 to v3', () => {
     });
     expect(once.tagColors).toEqual({ work: '#C9B8F2' });
     expect(migrateTasksState(once)).toEqual(once);
+  });
+});
+
+describe('recurring tasks', () => {
+  // Tue 20 Oct 2026, local time.
+  const NOW = new Date(2026, 9, 20, 10, 30);
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const sunday = { every: 'week', weekday: 0 } as const;
+  const copiesOf = (id: string) =>
+    Object.values(get().tasks).filter((task) => task.spawnedFrom === id);
+
+  it('completing a repeating task spawns exactly one next occurrence, right after it', () => {
+    const before = get().add({ title: 'Before' });
+    const id = get().add({
+      title: 'Water plants',
+      dueDate: '2026-10-18',
+      repeat: sunday,
+      afterId: before,
+    });
+    const after = get().add({ title: 'After' });
+    get().toggle(id);
+
+    const [copy] = copiesOf(id);
+    expect(copiesOf(id)).toHaveLength(1);
+    expect(copy).toMatchObject({
+      title: 'Water plants',
+      done: false,
+      dueDate: '2026-10-25',
+      repeat: sunday,
+    });
+    expect(get().tasks[id].done).toBe(true);
+    expect(get().rootIds).toEqual([before, id, copy.id, after]);
+  });
+
+  it('labels the undo "Completed “Water plants” · next on Sun"', () => {
+    const id = get().add({ title: 'Water plants', dueDate: '2026-10-18', repeat: sunday });
+    get().toggle(id);
+    expect(get().undo?.label).toBe('Completed “Water plants” · next on Sun');
+  });
+
+  it('logs one history entry for the completion, none for the copy', () => {
+    const id = get().add({ title: 'Water plants', dueDate: '2026-10-18', repeat: sunday });
+    get().toggle(id);
+    expect(get().history).toHaveLength(1);
+    expect(get().history[0]).toMatchObject({ taskId: id, title: 'Water plants', auto: false });
+  });
+
+  it('undo removes the copy and reopens the original', () => {
+    const id = get().add({ title: 'Water plants', dueDate: '2026-10-18', repeat: sunday });
+    get().toggle(id);
+    expect(Object.keys(get().tasks)).toHaveLength(2);
+    get().undoLast();
+    expect(Object.keys(get().tasks)).toEqual([id]);
+    expect(get().tasks[id].done).toBe(false);
+    expect(get().rootIds).toEqual([id]);
+    expect(get().history).toEqual([]);
+  });
+
+  it('does not spawn on plain tasks, tasks without a due date, or when reopening', () => {
+    const plain = get().add({ title: 'Plain', dueDate: '2026-10-18' });
+    const undated = get().add({ title: 'Undated' });
+    get().toggle(plain);
+    get().toggle(undated);
+    expect(Object.keys(get().tasks)).toHaveLength(2);
+
+    const rep = get().add({ title: 'Rep', dueDate: '2026-10-18', repeat: sunday });
+    get().toggle(rep); // done: one copy
+    expect(Object.keys(get().tasks)).toHaveLength(4);
+    get().toggle(rep); // reopen: no new copy, the existing one stays
+    expect(Object.keys(get().tasks)).toHaveLength(4);
+    expect(get().tasks[rep].done).toBe(false);
+    expect(copiesOf(rep)).toHaveLength(1);
+  });
+
+  it('a double toggle (done, undone, done) does not create a second copy for the same date', () => {
+    const id = get().add({ title: 'Water plants', dueDate: '2026-10-18', repeat: sunday });
+    get().toggle(id);
+    get().toggle(id);
+    get().toggle(id);
+    expect(get().tasks[id].done).toBe(true);
+    expect(copiesOf(id)).toHaveLength(1);
+    expect(Object.keys(get().tasks)).toHaveLength(2);
+  });
+
+  it('a parent that auto-completes through a cascade spawns', () => {
+    const parent = get().add({ title: 'Weekly review', dueDate: '2026-10-20', repeat: sunday });
+    const a = get().add({ title: 'A', parentId: parent });
+    const b = get().add({ title: 'B', parentId: parent });
+    get().toggle(a);
+    expect(copiesOf(parent)).toHaveLength(0);
+    get().toggle(b);
+    expect(get().tasks[parent].done).toBe(true);
+    const [copy] = copiesOf(parent);
+    expect(copy).toMatchObject({ title: 'Weekly review', done: false, dueDate: '2026-10-25' });
+    // The copy brings its own, undone subtasks.
+    expect(copy.childIds).toHaveLength(2);
+    expect(copy.childIds.every((c) => get().tasks[c].done === false)).toBe(true);
+    // History: A, B and the cascaded parent, once each.
+    expect(get().history.map((e) => e.title)).toEqual(['A', 'B', 'Weekly review']);
+  });
+
+  it('toggling a parent done spawns for the parent only, not again for repeating subtasks', () => {
+    const parent = get().add({ title: 'P', dueDate: '2026-10-20', repeat: { every: 'day' } });
+    const child = get().add({
+      title: 'C',
+      parentId: parent,
+      dueDate: '2026-10-20',
+      repeat: { every: 'day' },
+    });
+    get().toggle(parent);
+    expect(copiesOf(parent)).toHaveLength(1);
+    expect(copiesOf(child)).toHaveLength(0);
+    expect(Object.keys(get().tasks)).toHaveLength(4);
+  });
+
+  it('a repeating subtask leaves its next occurrence beside it, keeping the parent open', () => {
+    const parent = get().add({ title: 'Chores' });
+    const child = get().add({
+      title: 'Bins',
+      parentId: parent,
+      dueDate: '2026-10-20',
+      repeat: { every: 'week' },
+    });
+    get().toggle(child);
+    expect(get().tasks[child].done).toBe(true);
+    const [copy] = copiesOf(child);
+    expect(copy).toMatchObject({ parentId: parent, dueDate: '2026-10-27' });
+    expect(get().tasks[parent].childIds).toEqual([child, copy.id]);
+    expect(get().tasks[parent].done).toBe(false);
+    expect(get().history.map((e) => e.title)).toEqual(['Bins']);
+  });
+
+  it('records lastToggle for the original and leaves the copy undone', () => {
+    const id = get().add({ title: 'T', dueDate: '2026-10-20', repeat: { every: 'day' } });
+    get().toggle(id);
+    expect(get().lastToggle?.id).toBe(id);
+    expect(copiesOf(id)[0].dueDate).toBe('2026-10-21');
+  });
+
+  it('migrateTasksState defaults a missing or invalid repeat to null and keeps a valid one', () => {
+    const base = { id: 'a', title: 'A', difficulty: 1, done: false, collapsed: false };
+    const out = migrateTasksState({
+      tasks: {
+        a: { ...base, childIds: [], parentId: null, createdAt: 1 },
+        b: { ...base, id: 'b', repeat: { every: 'nope' }, childIds: [], parentId: null },
+        c: { ...base, id: 'c', repeat: { every: 'week', weekday: 2 }, spawnedFrom: 'a' },
+      },
+      rootIds: ['a', 'b', 'c'],
+    });
+    expect(out.tasks.a.repeat).toBeNull();
+    expect(out.tasks.b.repeat).toBeNull();
+    expect(out.tasks.c.repeat).toEqual({ every: 'week', weekday: 2 });
+    expect(out.tasks.c.spawnedFrom).toBe('a');
+    expect('spawnedFrom' in out.tasks.a).toBe(false);
+  });
+
+  it('update: setting and clearing repeat and due date', () => {
+    const id = get().add({ title: 'T', dueDate: '2026-10-22' });
+    get().update(id, { repeat: { every: 'day' } });
+    expect(get().tasks[id].repeat).toEqual({ every: 'day' });
+    get().update(id, { dueDate: null });
+    expect(get().tasks[id]).toMatchObject({ dueDate: null, repeat: null });
   });
 });

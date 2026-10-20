@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { parseQuickAdd, tokenKey, type QuickAddOptions } from './quickAdd';
+import { parseQuickAdd, parseRepeatPhrase, tokenKey, type QuickAddOptions } from './quickAdd';
+import { firstOccurrence } from './recur';
+import { todayISO } from './views';
 
 // Tue 20 Oct 2026 (local time).
 const TUE = new Date(2026, 9, 20, 10, 30);
@@ -369,5 +371,42 @@ describe('real-world titles', () => {
       title: 'Buy a gift for mum',
       dueDate: '2026-10-21',
     });
+  });
+});
+
+describe('repeat phrases and the first occurrence', () => {
+  it('parseRepeatPhrase reads a whole string that is just a repeat', () => {
+    expect(parseRepeatPhrase('daily')).toEqual({ every: 'day' });
+    expect(parseRepeatPhrase(' Weekdays ')).toEqual({ every: 'weekday' });
+    expect(parseRepeatPhrase('weekly')).toEqual({ every: 'week' });
+    expect(parseRepeatPhrase('monthly')).toEqual({ every: 'month' });
+    expect(parseRepeatPhrase('every day')).toEqual({ every: 'day' });
+    expect(parseRepeatPhrase('Every   Monday')).toEqual({ every: 'week', weekday: 1 });
+    expect(parseRepeatPhrase('every sun')).toEqual({ every: 'week', weekday: 0 });
+  });
+
+  it('parseRepeatPhrase rejects anything else', () => {
+    for (const text of [
+      '',
+      'every',
+      'sometimes',
+      'gym every monday',
+      'every second day',
+      'daily!',
+    ]) {
+      expect(parseRepeatPhrase(text), text).toBeNull();
+    }
+  });
+
+  it('the parser dates a dateless repeat exactly as firstOccurrence does, on every weekday', () => {
+    const phrases = ['daily', 'weekdays', 'weekly', 'monthly', 'every sunday', 'every friday'];
+    for (let d = 19; d <= 25; d++) {
+      const now = at(2026, 10, d);
+      for (const phrase of phrases) {
+        const r = parseQuickAdd(`Thing ${phrase}`, { now, locale: US });
+        expect(r.repeat, phrase).not.toBeNull();
+        expect(r.dueDate, `${phrase} on ${d}`).toBe(firstOccurrence(r.repeat!, todayISO(now)));
+      }
+    }
   });
 });

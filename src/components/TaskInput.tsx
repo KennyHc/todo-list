@@ -10,13 +10,15 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Calendar, Plus, Repeat, Tag, X } from 'lucide-react';
+import { Calendar, Plus, Repeat as RepeatIcon, Tag, X } from 'lucide-react';
 import { useIsTouch } from '../hooks/useIsTouch';
 import { dueLabel } from '../lib/dates';
+import { firstOccurrence } from '../lib/recur';
 import { parseQuickAdd, SUPPORTS_REPEAT, tokenKey, type QuickToken } from '../lib/quickAdd';
 import { normalizeTag, normalizeTags, tagColor } from '../lib/tags';
 import { dueStatus, todayISO } from '../lib/views';
 import { useAllTags, useTaskStore } from '../store/tasks';
+import type { Repeat } from '../types';
 import { DatePicker } from './DatePicker';
 import { DifficultyGlyph } from './DifficultyGlyph';
 import { Popover } from './Popover';
@@ -39,7 +41,7 @@ const CHIP_SHOWN = { opacity: 1, scale: 1 };
 const PLACEHOLDERS = [
   'Add a task…',
   'Pay rent tomorrow #home',
-  ...(SUPPORTS_REPEAT ? ['Gym every monday'] : []),
+  'Gym every monday',
   'Draft report fri !3',
 ];
 const PLACEHOLDER_EVERY_MS = 4000;
@@ -52,6 +54,8 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const [caret, setCaret] = useState(0);
   const [tags, setTags] = useState<string[]>([]);
   const [due, setDue] = useState<string | null>(null);
+  /** A repeat picked from the toolbar; it wins over one typed in the text. */
+  const [pickedRepeat, setPickedRepeat] = useState<Repeat | null>(null);
   const [focused, setFocused] = useState(false);
   const [panel, setPanel] = useState<Panel>(null);
   const [active, setActive] = useState(0);
@@ -80,6 +84,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
     [value, ignored],
   );
   const allTags = useMemo(() => normalizeTags([...tags, ...parsed.tags]), [tags, parsed.tags]);
+  const repeat = pickedRepeat ?? parsed.repeat;
 
   const reduceMotion = useReducedMotion();
   const cycling = focused && value === '' && !reduceMotion;
@@ -108,6 +113,16 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const dateToken = parsed.tokens.find((t) => t.kind === 'date');
   const difficultyToken = parsed.tokens.find((t) => t.kind === 'difficulty');
   const repeatToken = parsed.tokens.find((t) => t.kind === 'repeat');
+  /**
+   * The due date the task gets: the picked date, then a date typed in the text, then (for a
+   * repeat) its first occurrence. A repeat from the text already got that from the parser; one
+   * picked from the toolbar overrides it, so the first occurrence is worked out again.
+   */
+  const dueDate =
+    due ??
+    (pickedRepeat === null || dateToken !== undefined
+      ? parsed.dueDate
+      : firstOccurrence(pickedRepeat, todayISO()));
   const tagTokens = parsed.tokens.filter((t) => t.kind === 'tag');
 
   const before = value.slice(0, caret);
@@ -151,13 +166,13 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   };
 
   const submit = () => {
-    const { title, tags: quickTags, dueDate, difficulty } = parsed;
+    const { title, tags: quickTags, difficulty } = parsed;
     if (!title) return;
-    // parsed.repeat is recognised too, but tasks can't store it yet (NewTask has no such field).
     add({
       title,
       tags: normalizeTags([...tags, ...quickTags]),
-      dueDate: due ?? dueDate,
+      dueDate,
+      repeat,
       ...(difficulty !== null && { difficulty }),
     });
     setValue('');
@@ -165,6 +180,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
     setCaret(0);
     setTags([]);
     setDue(null);
+    setPickedRepeat(null);
     setPanel(null);
   };
 
@@ -198,7 +214,14 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
     if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false);
   };
 
-  const showToolbar = focused || value !== '' || tags.length > 0 || due !== null || panel !== null;
+  const showToolbar =
+    focused ||
+    value !== '' ||
+    tags.length > 0 ||
+    due !== null ||
+    pickedRepeat !== null ||
+    panel !== null;
+  const toolbarDue = due ?? (pickedRepeat !== null ? dueDate : null);
 
   return (
     <div className={styles.composer} onFocus={() => setFocused(true)} onBlur={onBlur}>
@@ -308,7 +331,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
                     />
                   </motion.li>
                 )}
-                {SUPPORTS_REPEAT && repeatToken && (
+                {SUPPORTS_REPEAT && repeatToken && repeat && (
                   <motion.li
                     key="repeat"
                     className={styles.chipItem}
@@ -318,8 +341,12 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
                     transition={CHIP_FADE}
                   >
                     <QuickChip
-                      icon={<Repeat size={12} strokeWidth={1.75} aria-hidden="true" />}
+                      icon={<RepeatIcon size={12} strokeWidth={1.75} aria-hidden="true" />}
                       label={repeatToken.label}
+                      muted={pickedRepeat !== null}
+                      title={
+                        pickedRepeat !== null ? 'The repeat you picked is used instead' : undefined
+                      }
                       removeLabel={`Don't treat "${repeatToken.raw}" as a repeat`}
                       onRemove={() => ignore(repeatToken)}
                     />
@@ -372,7 +399,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
                 {tags.length > 0 && <span className={styles.count}>{tags.length}</span>}
               </button>
 
-              <span className={`${styles.dateGroup} ${due ? styles.toolSet : ''}`}>
+              <span className={`${styles.dateGroup} ${toolbarDue ? styles.toolSet : ''}`}>
                 <button
                   ref={dateBtnRef}
                   type="button"
@@ -381,15 +408,22 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
                   aria-expanded={panel === 'date'}
                   onClick={() => setPanel(panel === 'date' ? null : 'date')}
                 >
-                  <Calendar size={13} strokeWidth={1.75} aria-hidden="true" />
-                  <span>{due ? dueLabel(due) : 'Due date'}</span>
+                  {pickedRepeat ? (
+                    <RepeatIcon size={13} strokeWidth={1.75} aria-hidden="true" />
+                  ) : (
+                    <Calendar size={13} strokeWidth={1.75} aria-hidden="true" />
+                  )}
+                  <span>{toolbarDue ? dueLabel(toolbarDue) : 'Due date'}</span>
                 </button>
-                {due && (
+                {toolbarDue && (
                   <button
                     type="button"
                     className={styles.clear}
                     aria-label="Clear due date"
-                    onClick={() => setDue(null)}
+                    onClick={() => {
+                      setDue(null);
+                      setPickedRepeat(null);
+                    }}
                   >
                     <X size={12} strokeWidth={2} aria-hidden="true" />
                   </button>
@@ -415,10 +449,19 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
         onClose={closePanel}
         anchorRef={dateBtnRef}
         label="Due date"
-        width={252}
+        width={288}
         sheetOnMobile={false}
       >
-        <DatePicker value={due} onChange={setDue} onPicked={closePanel} />
+        <DatePicker
+          value={toolbarDue}
+          onChange={(date) => {
+            setDue(date);
+            if (date === null) setPickedRepeat(null);
+          }}
+          onPicked={closePanel}
+          repeat={pickedRepeat}
+          onRepeatChange={setPickedRepeat}
+        />
       </Popover>
     </div>
   );

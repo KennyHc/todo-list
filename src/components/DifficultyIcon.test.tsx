@@ -83,7 +83,7 @@ describe('task menu', () => {
     });
     const menu = openMenu('Parent');
     expect(within(menu).getByText('Difficulty is the sum of subtasks (Σ 5)')).toBeInTheDocument();
-    expect(within(menu).queryByRole('radiogroup')).not.toBeInTheDocument();
+    expect(within(menu).queryByRole('radiogroup', { name: /Difficulty/ })).not.toBeInTheDocument();
   });
 
   it('adds a subtask from the menu', () => {

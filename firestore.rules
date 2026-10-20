@@ -12,13 +12,26 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uid;
     }
 
+    // `repeat` is absent, null, or { every, weekday?, anchorDay? }: `every` one of day, weekday,
+    // week, month; `weekday` an int 0-6; `anchorDay` an int 1-31; no other keys.
+    function validRepeat(r) {
+      return r == null
+        || (r is map
+          && r.keys().hasOnly(['every', 'weekday', 'anchorDay'])
+          && r.every in ['day', 'weekday', 'week', 'month']
+          && (!('weekday' in r) || (r.weekday is int && r.weekday >= 0 && r.weekday <= 6))
+          && (!('anchorDay' in r) || (r.anchorDay is int && r.anchorDay >= 1 && r.anchorDay <= 31)));
+    }
+
     function validTask(id) {
       let t = request.resource.data;
       return t.id == id
         && t.title is string && t.title.size() <= 500
         && t.difficulty is int && t.difficulty >= 1 && t.difficulty <= 5
         && t.tags is list && t.tags.size() <= 20
-        && t.done is bool;
+        && t.done is bool
+        && (!('repeat' in t) || validRepeat(t.repeat))
+        && (!('spawnedFrom' in t) || t.spawnedFrom is string);
     }
 
     // users/{uid} is the meta document: rootIds, tagColors (a map, tag -> hex), schemaVersion,

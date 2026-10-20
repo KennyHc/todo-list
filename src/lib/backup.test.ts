@@ -14,6 +14,7 @@ describe('backup', () => {
         parentId: null,
         tags: [],
         dueDate: null,
+        repeat: null,
         difficulty: 1,
         color: null,
         createdAt: 1000,
@@ -27,6 +28,7 @@ describe('backup', () => {
         parentId: '1',
         tags: ['work'],
         dueDate: '2026-10-20',
+        repeat: null,
         difficulty: 2,
         color: null,
         createdAt: 2000,
@@ -126,6 +128,7 @@ describe('backup', () => {
             parentId: null,
             tags: [],
             dueDate: null,
+            repeat: null,
             difficulty: 1,
             color: null,
             createdAt: 1000,
@@ -153,6 +156,7 @@ describe('backup', () => {
             parentId: '999',
             tags: [],
             dueDate: null,
+            repeat: null,
             difficulty: 1,
             color: null,
             createdAt: 1000,
@@ -180,6 +184,7 @@ describe('backup', () => {
             parentId: null,
             tags: [],
             dueDate: null,
+            repeat: null,
             difficulty: 1,
             color: null,
             createdAt: 1000,
@@ -201,6 +206,7 @@ describe('backup', () => {
       parentId: null,
       tags: ['work'],
       dueDate: null,
+      repeat: null,
       difficulty: 1,
       color: '#A9C6F5',
       createdAt: 1,
@@ -247,6 +253,45 @@ describe('backup', () => {
         JSON.stringify({ app: 'tasks', version: 4, tasks: {}, rootIds: [], history: [] }),
       );
       expect(result).toEqual({ ok: false, error: 'not-a-backup' });
+    });
+  });
+
+  describe('repeat', () => {
+    it('serializes repeat and spawnedFrom and reads them back', () => {
+      const data = {
+        ...sampleData,
+        tasks: {
+          ...sampleData.tasks,
+          '2': {
+            ...sampleData.tasks['2'],
+            repeat: { every: 'week', weekday: 1 },
+            spawnedFrom: '1',
+          },
+        },
+      } as PersistedTasks;
+      const result = parseBackup(serializeBackup(data));
+      expect(result.ok && result.data.tasks['2']).toMatchObject({
+        repeat: { every: 'week', weekday: 1 },
+        spawnedFrom: '1',
+      });
+      expect(result.ok && result.data.tasks['1'].repeat).toBeNull();
+    });
+
+    it('accepts older backups without the field (repeat becomes null) and ignores a bad one', () => {
+      const old: Record<string, unknown> = { ...sampleData.tasks['1'], childIds: [] };
+      delete old.repeat;
+      const text = JSON.stringify({
+        app: 'tasks',
+        version: 3,
+        tasks: { '1': old, '3': { ...old, id: '3', repeat: { every: 'fortnight' } } },
+        rootIds: ['1', '3'],
+        history: [],
+      });
+      const result = parseBackup(text);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.tasks['1'].repeat).toBeNull();
+      expect(result.data.tasks['3'].repeat).toBeNull();
     });
   });
 });

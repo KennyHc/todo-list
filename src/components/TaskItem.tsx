@@ -396,7 +396,11 @@ function TaskItemInner({ id, depth, flat = false, guides = '', drag }: Props) {
                           )}
                           {task.dueDate !== null && (
                             <span className={styles.due}>
-                              <DuePill dueDate={task.dueDate} done={task.done} />
+                              <DuePill
+                                dueDate={task.dueDate}
+                                done={task.done}
+                                repeat={task.repeat}
+                              />
                             </span>
                           )}
                         </span>

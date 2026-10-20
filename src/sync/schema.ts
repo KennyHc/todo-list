@@ -1,5 +1,7 @@
 import { normalizeTagColors, normalizeTaskColor } from '../lib/colors';
 import type { HistoryEntry } from '../lib/history';
+import { normalizeRepeat } from '../lib/recur';
+import { sameRepeat } from '../lib/tree';
 import type { Difficulty, Task } from '../types';
 
 /** Plain-data helpers for the Firestore documents. No Firebase imports: unit-testable. */
@@ -7,6 +9,8 @@ import type { Difficulty, Task } from '../types';
 /**
  * 3: task `color` may be null ("automatic") and the meta document carries `tagColors`.
  * Version 2 documents stay readable: their default blue decodes to null.
+ * Tasks may also carry `repeat` (a map, or null) and `spawnedFrom`; both are optional on read,
+ * so there is no version bump.
  */
 export const SCHEMA_VERSION = 3;
 
@@ -31,6 +35,8 @@ export function isEqualTask(a: Task, b: Task): boolean {
       a.done === b.done &&
       a.collapsed === b.collapsed &&
       a.dueDate === b.dueDate &&
+      sameRepeat(a.repeat, b.repeat) &&
+      a.spawnedFrom === b.spawnedFrom &&
       a.parentId === b.parentId &&
       a.createdAt === b.createdAt &&
       a.completedAt === b.completedAt &&
@@ -83,10 +89,12 @@ export function toTaskDoc(task: Task): Record<string, unknown> {
     collapsed: task.collapsed,
     tags: task.tags,
     dueDate: task.dueDate,
+    repeat: task.repeat,
     parentId: task.parentId,
     childIds: task.childIds,
     createdAt: task.createdAt,
   };
+  if (task.spawnedFrom !== undefined) doc.spawnedFrom = task.spawnedFrom;
   if (task.completedAt !== undefined) doc.completedAt = task.completedAt;
   return doc;
 }
@@ -104,10 +112,12 @@ export function fromTaskDoc(id: string, data: unknown): Task | null {
     collapsed: data.collapsed === true,
     tags: strings(data.tags),
     dueDate: typeof data.dueDate === 'string' ? data.dueDate : null,
+    repeat: normalizeRepeat(data.repeat),
     parentId: typeof data.parentId === 'string' ? data.parentId : null,
     childIds: strings(data.childIds),
     createdAt: num(data.createdAt),
   };
+  if (typeof data.spawnedFrom === 'string') task.spawnedFrom = data.spawnedFrom;
   if (typeof data.completedAt === 'number') task.completedAt = data.completedAt;
   return task;
 }

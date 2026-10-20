@@ -92,10 +92,50 @@ describe('quick add in the composer', () => {
     expect(tasks()[0].difficulty).toBe(1);
   });
 
-  it('does not consume repeat phrases until repeats are supported', () => {
+  it('"Gym every monday" creates a weekly task due next Monday', () => {
     render(<TaskInput />);
-    submit(type('Gym every monday'));
-    expect(tasks()[0]).toMatchObject({ title: 'Gym every monday', dueDate: null });
+    const input = type('Gym every monday');
+    expect(within(chips()!).getByText('Every Monday')).toBeInTheDocument();
+    submit(input);
+    expect(tasks()).toHaveLength(1);
+    expect(tasks()[0]).toMatchObject({
+      title: 'Gym',
+      dueDate: '2026-10-26',
+      repeat: { every: 'week', weekday: 1 },
+    });
+  });
+
+  it('dismissing the repeat chip keeps the phrase in the title and sets no repeat', () => {
+    render(<TaskInput />);
+    const input = type('Gym every monday');
+    fireEvent.click(screen.getByRole('button', { name: /Don't treat "every monday" as a repeat/ }));
+    submit(input);
+    expect(tasks()[0]).toMatchObject({ title: 'Gym every monday', repeat: null });
+  });
+
+  it('a repeat picked in the toolbar sets the first occurrence as the due date', () => {
+    render(<TaskInput />);
+    const input = type('Water plants');
+    fireEvent.click(screen.getByRole('button', { name: /Due date/ }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Weekdays' }));
+    submit(input);
+    expect(tasks()[0]).toMatchObject({
+      title: 'Water plants',
+      dueDate: '2026-10-20',
+      repeat: { every: 'weekday' },
+    });
+  });
+
+  it('a picked repeat wins over a typed one, and clearing the date clears it', () => {
+    render(<TaskInput />);
+    const input = type('Gym every monday');
+    fireEvent.click(screen.getByRole('button', { name: /Due date/ }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Monthly' }));
+    submit(input);
+    expect(tasks()[0]).toMatchObject({
+      dueDate: '2026-10-20',
+      repeat: { every: 'month' },
+    });
   });
 
   it('can dismiss a tag chip, leaving #tag in the title', () => {
@@ -131,6 +171,10 @@ describe('placeholder', () => {
     });
     expect(input).toHaveAttribute('placeholder', 'Pay rent tomorrow #home');
     expect(input).toHaveAttribute('aria-label', 'New task');
+    act(() => {
+      vi.advanceTimersByTime(4000 + 200);
+    });
+    expect(input).toHaveAttribute('placeholder', 'Gym every monday');
     act(() => {
       vi.advanceTimersByTime(4000 + 200);
     });

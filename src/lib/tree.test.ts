@@ -784,3 +784,46 @@ describe('limits mirrored from firestore.rules', () => {
     expect(updated.tasks[id].title).toHaveLength(MAX_TITLE_LENGTH);
   });
 });
+
+describe('repeat in the tree logic', () => {
+  it('addTask defaults repeat to null and stores a copy of the given one', () => {
+    const plain = addTask(emptyTree(), { title: 'a' });
+    expect(plain.tree.tasks[plain.id].repeat).toBeNull();
+    const repeat = { every: 'week', weekday: 1 } as const;
+    const withRepeat = addTask(emptyTree(), { title: 'b', dueDate: '2026-10-26', repeat });
+    expect(withRepeat.tree.tasks[withRepeat.id].repeat).toEqual(repeat);
+    expect(withRepeat.tree.tasks[withRepeat.id].repeat).not.toBe(repeat);
+  });
+
+  it('updateTask sets the repeat, and an equal repeat is a no-op', () => {
+    const { tree, id } = addTask(emptyTree(), { title: 'a', dueDate: '2026-10-26' });
+    const next = updateTask(tree, id, { repeat: { every: 'day' } });
+    expect(next.tasks[id].repeat).toEqual({ every: 'day' });
+    expect(updateTask(next, id, { repeat: { every: 'day' } })).toBe(next);
+    expect(updateTask(next, id, { repeat: null }).tasks[id].repeat).toBeNull();
+  });
+
+  it('clearing the due date also clears the repeat', () => {
+    const { tree, id } = addTask(emptyTree(), {
+      title: 'a',
+      dueDate: '2026-10-26',
+      repeat: { every: 'week' },
+    });
+    const next = updateTask(tree, id, { dueDate: null });
+    expect(next.tasks[id]).toMatchObject({ dueDate: null, repeat: null });
+    // Unless the same patch says otherwise.
+    const kept = updateTask(tree, id, { dueDate: null, repeat: { every: 'week' } });
+    expect(kept.tasks[id].repeat).toEqual({ every: 'week' });
+  });
+
+  it('moving the due date drops a monthly anchor, which belonged to the old date', () => {
+    const { tree, id } = addTask(emptyTree(), {
+      title: 'a',
+      dueDate: '2026-02-28',
+      repeat: { every: 'month', anchorDay: 31 },
+    });
+    const next = updateTask(tree, id, { dueDate: '2026-03-15' });
+    expect(next.tasks[id].repeat).toEqual({ every: 'month' });
+    expect(tree.tasks[id].repeat).toEqual({ every: 'month', anchorDay: 31 });
+  });
+});

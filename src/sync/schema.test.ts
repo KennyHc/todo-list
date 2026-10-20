@@ -89,3 +89,52 @@ describe('tagColors', () => {
     expect(isEqualTagColors({ a: '#fff' }, {})).toBe(false);
   });
 });
+
+describe('repeat and spawnedFrom in task docs', () => {
+  it('round-trips a repeat, null, and spawnedFrom', () => {
+    for (const repeat of [
+      null,
+      { every: 'day' },
+      { every: 'weekday' },
+      { every: 'week' },
+      { every: 'week', weekday: 4 },
+      { every: 'month' },
+      { every: 'month', anchorDay: 31 },
+    ] as const) {
+      const t = mkTask('a', { dueDate: '2026-10-20', repeat });
+      expect(fromTaskDoc('a', toTaskDoc(t))).toEqual(t);
+    }
+    const copy = mkTask('b', { repeat: { every: 'day' }, spawnedFrom: 'a' });
+    expect(fromTaskDoc('b', toTaskDoc(copy))).toEqual(copy);
+  });
+
+  it('writes repeat as null (not undefined) and omits an unset spawnedFrom', () => {
+    const doc = toTaskDoc(mkTask('a'));
+    expect(doc.repeat).toBeNull();
+    expect('spawnedFrom' in doc).toBe(false);
+  });
+
+  it('decodes a missing or invalid repeat to null', () => {
+    expect(fromTaskDoc('a', {})?.repeat).toBeNull();
+    expect(fromTaskDoc('a', { repeat: null })?.repeat).toBeNull();
+    for (const repeat of [
+      'weekly',
+      7,
+      [],
+      { every: 'year' },
+      { every: 'week', weekday: 9 },
+      { every: 'month', anchorDay: 40 },
+    ]) {
+      expect(fromTaskDoc('a', { repeat })?.repeat, JSON.stringify(repeat)).toBeNull();
+    }
+    expect(fromTaskDoc('a', { spawnedFrom: 4 })?.spawnedFrom).toBeUndefined();
+  });
+
+  it('isEqualTask notices repeat and spawnedFrom', () => {
+    const t = mkTask('a', { repeat: { every: 'week' } });
+    expect(isEqualTask(t, { ...t, repeat: { every: 'week' } })).toBe(true);
+    expect(isEqualTask(t, { ...t, repeat: { every: 'day' } })).toBe(false);
+    expect(isEqualTask(t, { ...t, repeat: null })).toBe(false);
+    expect(isEqualTask(t, { ...t, spawnedFrom: 'x' })).toBe(false);
+  });
+});

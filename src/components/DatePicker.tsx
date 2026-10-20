@@ -1,5 +1,7 @@
 import { addDays } from '../lib/dates';
+import type { Repeat } from '../types';
 import { todayISO } from '../lib/views';
+import { RepeatPicker } from './RepeatPicker';
 import styles from './DatePicker.module.css';
 
 type Props = {
@@ -7,6 +9,9 @@ type Props = {
   onChange: (date: string | null) => void;
   /** Called after a quick pick, so a popover can close itself. */
   onPicked?: () => void;
+  /** With `onRepeatChange`, a Repeat control follows the date choices. */
+  repeat?: Repeat | null;
+  onRepeatChange?: (repeat: Repeat | null) => void;
 };
 
 const QUICK = [
@@ -16,7 +21,7 @@ const QUICK = [
 ] as const;
 
 /** Quick picks plus a native date input. */
-export function DatePicker({ value, onChange, onPicked }: Props) {
+export function DatePicker({ value, onChange, onPicked, repeat = null, onRepeatChange }: Props) {
   const today = todayISO();
   return (
     <div className={styles.picker}>
@@ -46,6 +51,12 @@ export function DatePicker({ value, onChange, onPicked }: Props) {
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value || null)}
       />
+      {onRepeatChange && (
+        <>
+          <p className={styles.sub}>Repeat</p>
+          <RepeatPicker value={repeat} onChange={onRepeatChange} />
+        </>
+      )}
       {value !== null && (
         <button
           type="button"

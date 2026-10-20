@@ -8,6 +8,7 @@ import { toggleDelay } from '../lib/cascade';
 import { effectiveColor } from '../lib/colorResolve';
 import { isHexColor, isSafeTagKey, normalizeTagColors, normalizeTaskColor } from '../lib/colors';
 import { normalizeTag } from '../lib/tags';
+import { nextLabel, normalizeRepeat, spawnNextOccurrence } from '../lib/recur';
 import { applyHistory, diffCompletions, type HistoryEntry } from '../lib/history';
 import {
   addTask,
@@ -29,7 +30,7 @@ import {
   type NewTask,
   type TaskPatch,
 } from '../lib/tree';
-import { allTags, deadlineList, visibleTreeIds } from '../lib/views';
+import { allTags, deadlineList, todayISO, visibleTreeIds } from '../lib/views';
 import type { ColorSource } from '../lib/colorResolve';
 import type { Task, TaskTree } from '../types';
 
@@ -95,7 +96,7 @@ export type PersistedTasks = Pick<TaskStore, 'tasks' | 'rootIds' | 'history' | '
 /**
  * v1 -> v2: every task gains `tags: []` and `dueDate: null`, and the store gains an empty
  * `history`. v2 -> v3: the old default blue (which meant "unset") becomes `color: null`
- * ("automatic"), and the store gains `tagColors`. Idempotent, so it also tolerates partially
+ * ("automatic"), and the store gains `tagColors`. Tasks also gain `repeat` (missing -> null). Idempotent, so it also tolerates partially
  * migrated data.
  */
 export function migrateTasksState(persisted: unknown): PersistedTasks {
@@ -107,7 +108,9 @@ export function migrateTasksState(persisted: unknown): PersistedTasks {
       color: normalizeTaskColor(task.color),
       tags: task.tags ?? [],
       dueDate: task.dueDate ?? null,
+      repeat: normalizeRepeat(task.repeat),
     };
+    if (typeof task.spawnedFrom !== 'string') delete tasks[id].spawnedFrom;
   }
   return {
     tasks,
@@ -183,15 +186,42 @@ export const createTaskStore = () =>
       const state = get();
       const before = treeOf(state);
       const now = Date.now();
-      const after = toggleDone(before, id, now);
-      if (after === before) return;
+      const toggled = toggleDone(before, id, now);
+      if (toggled === before) return;
+
+      // Repeating tasks that just became done (the one toggled, its subtasks, or a parent that
+      // auto-completed) leave their next occurrence behind, inside this same update and undo.
+      let after = toggled;
+      const spawned = new Map<string, string>();
+      if (toggled.tasks[id]?.done) {
+        const affected = [id, ...getDescendants(before, id), ...getAncestors(before, id)];
+        const becameDone = (taskId: string) =>
+          before.tasks[taskId] !== undefined &&
+          !before.tasks[taskId].done &&
+          toggled.tasks[taskId].done &&
+          toggled.tasks[taskId].repeat !== null &&
+          toggled.tasks[taskId].dueDate !== null;
+        const candidates = new Set(affected.filter(becameDone));
+        for (const taskId of candidates) {
+          // A repeating ancestor's copy already carries this subtask along.
+          if (getAncestors(toggled, taskId).some((a) => candidates.has(a))) continue;
+          const result = spawnNextOccurrence(after, taskId, now);
+          if (!result) continue;
+          after = result.tree;
+          spawned.set(taskId, result.newId);
+        }
+      }
+
       const diff = diffCompletions(before, after, id, now, state.tagColors);
       const history = applyHistory(state.history, diff);
       const title = state.tasks[id]?.title ?? '';
+      const next = spawned.has(id) ? after.tasks[spawned.get(id)!].dueDate : null;
       const label =
         diff.completed.length > 1
           ? `Completed ${diff.completed.length} tasks`
-          : `${after.tasks[id]?.done ? 'Completed' : 'Reopened'} \u201c${title}\u201d`;
+          : `${toggled.tasks[id]?.done ? 'Completed' : 'Reopened'} \u201c${title}\u201d${
+              next === null ? '' : ` \u00b7 ${nextLabel(next, todayISO(new Date(now)))}`
+            }`;
       set({
         tasks: after.tasks,
         rootIds: after.rootIds,

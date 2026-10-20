@@ -1,5 +1,7 @@
-import { MAX_TITLE_LENGTH, type Difficulty, type Task, type TaskTree } from '../types';
+import { MAX_TITLE_LENGTH, type Difficulty, type Repeat, type Task, type TaskTree } from '../types';
 import type { PersistedTasks } from '../store/tasks';
+import { parseRepeatPhrase } from './quickAdd';
+import { firstOccurrence, repeatWord } from './recur';
 import { normalizeTags } from './tags';
 import { addTask, effectiveDifficulty, progress, sortedChildIds, toggleDone } from './tree';
 import { dueStatus, todayISO } from './views';
@@ -17,6 +19,8 @@ export type AiTask = {
   progress?: string;
   tags?: string[];
   due?: string;
+  /** "daily", "weekdays", "weekly", "monthly" or "every monday". */
+  repeat?: string;
   dueStatus?: 'overdue' | 'today' | 'soon';
   completedAt?: string;
   subtasks?: AiTask[];
@@ -63,6 +67,7 @@ export function toAiJson(
     if (task.tags.length > 0) out.tags = task.tags;
     if (task.dueDate !== null) {
       out.due = task.dueDate;
+      if (task.repeat !== null) out.repeat = repeatWord(task.repeat);
       const status = task.done ? null : dueStatus(task.dueDate, today);
       if (status !== null && status !== 'later') out.dueStatus = status;
     }
@@ -168,6 +173,7 @@ export function buildImportPrompt(
     '- At most 3 levels deep.',
     '- "tags": optional, lowercase, without "#".',
     `- "due": optional YYYY-MM-DD, only if implied by my goal, relative to today (${today}).`,
+    '- "repeat": optional, one of "daily", "weekdays", "weekly", "monthly" or "every monday" (any weekday).',
     '- Leave out optional keys you do not need. No other keys, no prose, no code fences.',
     '',
     'Example:',
@@ -197,6 +203,7 @@ export type AiImportTask = {
   difficulty: Difficulty;
   tags: string[];
   due?: string;
+  repeat?: Repeat;
   done?: boolean;
   subtasks: AiImportTask[];
 };
@@ -346,6 +353,7 @@ function normalize(root: unknown): { tasks: AiImportTask[]; count: number; warni
   let cappedCount = 0;
   let tooDeep = 0;
   const badDates: string[] = [];
+  const badRepeats: string[] = [];
 
   const visit = (raw: unknown, depth: number): AiImportTask | null => {
     let obj: Record<string, unknown>;
@@ -383,6 +391,12 @@ function normalize(root: unknown): { tasks: AiImportTask[]; count: number; warni
       if (due) task.due = due;
       else badDates.push(task.title);
     }
+    const rawRepeat = pick(obj, ['repeat']);
+    if (rawRepeat !== undefined && rawRepeat !== '') {
+      const repeat = typeof rawRepeat === 'string' ? parseRepeatPhrase(rawRepeat) : null;
+      if (repeat) task.repeat = repeat;
+      else badRepeats.push(task.title);
+    }
     if (obj.done === true) task.done = true;
 
     const rawSubs = pick(obj, SUBTASK_KEYS);
@@ -408,6 +422,11 @@ function normalize(root: unknown): { tasks: AiImportTask[]; count: number; warni
     warnings.push(`Removed an invalid date on “${title}”`);
   }
   if (badDates.length > 3) warnings.push(`Removed ${badDates.length - 3} more invalid dates`);
+  for (const title of badRepeats.slice(0, 3)) {
+    warnings.push(`Removed an unrecognised repeat on \u201c${title}\u201d`);
+  }
+  if (badRepeats.length > 3)
+    warnings.push(`Removed ${badRepeats.length - 3} more unrecognised repeats`);
   if (tooDeep > 0) {
     warnings.push(
       `Skipped ${n(tooDeep, 'item', 'items')} nested deeper than ${MAX_IMPORT_DEPTH} levels`,
@@ -452,6 +471,7 @@ export function appendAiTasks(
 ): { tree: TaskTree; ids: string[]; count: number } {
   const parentId = opts.parentId ?? null;
   const now = opts.now ?? Date.now();
+  const today = todayISO(new Date(now));
   if (parentId !== null && !tree.tasks[parentId]) return { tree, ids: [], count: 0 };
 
   let current = tree;
@@ -468,7 +488,9 @@ export function appendAiTasks(
         difficulty: task.difficulty,
         color,
         tags: task.tags,
-        dueDate: task.due ?? null,
+        // A repeat needs a due date: without one the first occurrence is used.
+        dueDate: task.due ?? (task.repeat ? firstOccurrence(task.repeat, today) : null),
+        repeat: task.repeat ?? null,
       },
       now,
     );

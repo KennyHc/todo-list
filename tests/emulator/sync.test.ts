@@ -118,6 +118,7 @@ const mkOld = (id: string): Task => ({
   collapsed: false,
   tags: [],
   dueDate: null,
+  repeat: null,
   parentId: null,
   childIds: [],
   createdAt: 1,
@@ -173,6 +174,44 @@ describe('two clients, one account', () => {
     a.store.getState().remove(parent);
     await vi.waitFor(() => expect(titles(b)).toEqual(['From B']), { timeout: 8000 });
     expect(b.store.getState().rootIds).toEqual([fromB]);
+  });
+
+  it('delivers a repeating task intact, and the copy spawned by completing it', async () => {
+    const [a, b] = await pair();
+    const repeat = { every: 'week', weekday: 0 } as const;
+    const id = a.store.getState().add({ title: 'Water plants', dueDate: '2026-10-18', repeat });
+    await vi.waitFor(() => expect(b.store.getState().tasks[id]?.repeat).toEqual(repeat), {
+      timeout: 8000,
+    });
+    expect(b.store.getState().tasks[id]).toEqual(a.store.getState().tasks[id]);
+
+    a.store.getState().toggle(id);
+    const copyOf = (c: Client) =>
+      Object.values(c.store.getState().tasks).find((t) => t.spawnedFrom === id);
+    await vi.waitFor(() => expect(copyOf(b)).toBeDefined(), { timeout: 8000 });
+    const copy = copyOf(a)!;
+    expect(copyOf(b)).toEqual(copy);
+    expect(copy).toMatchObject({ done: false, repeat, spawnedFrom: id });
+    expect(copy.dueDate).not.toBe('2026-10-18');
+    expect(b.store.getState().rootIds).toEqual([id, copy.id]);
+    expect(b.store.getState().tasks[id].done).toBe(true);
+
+    // Undoing on A removes the copy on B and reopens the original.
+    a.store.getState().undoLast();
+    await vi.waitFor(() => expect(copyOf(b)).toBeUndefined(), { timeout: 8000 });
+    await vi.waitFor(() => expect(b.store.getState().tasks[id].done).toBe(false), {
+      timeout: 8000,
+    });
+  });
+
+  it('decodes a task document without repeat (written by an older client) as null', async () => {
+    const first = await signedInDb(true);
+    uid = first.uid;
+    await setDoc(doc(first.db, `users/${uid}`), { rootIds: ['old'], schemaVersion: 3 });
+    const { repeat: _omit, ...legacy } = toTaskDoc({ ...mkOld('old') });
+    await setDoc(doc(first.db, `users/${uid}/tasks/old`), legacy);
+    const c = await client(first.app, first.db);
+    expect(c.store.getState().tasks.old.repeat).toBeNull();
   });
 
   it('syncs completion history and keeps untouched task identities on the receiver', async () => {

@@ -35,6 +35,7 @@ const task = (id: string, over: Record<string, unknown> = {}) => ({
   collapsed: false,
   tags: ['a'],
   dueDate: null,
+  repeat: null,
   parentId: null,
   childIds: [],
   createdAt: 1,
@@ -178,6 +179,49 @@ describe('task validation', () => {
     await assertFails(setDoc(doc(alice(), 'users/alice'), { tagColors: 'x' }, { merge: true }));
     // Someone else's meta stays off limits.
     await assertFails(setDoc(doc(bob(), 'users/alice'), { rootIds: [], tagColors: {} }));
+  });
+
+  it('accepts a missing, null or well-formed repeat', async () => {
+    const { repeat: _omit, ...legacy } = task('t1');
+    await assertSucceeds(write(legacy)); // documents written before repeats existed
+    await assertSucceeds(write(task('t1', { repeat: null })));
+    for (const every of ['day', 'weekday', 'week', 'month']) {
+      await assertSucceeds(write(task('t1', { repeat: { every } })));
+    }
+    await assertSucceeds(write(task('t1', { repeat: { every: 'week', weekday: 0 } })));
+    await assertSucceeds(write(task('t1', { repeat: { every: 'week', weekday: 6 } })));
+    await assertSucceeds(write(task('t1', { repeat: { every: 'month', anchorDay: 1 } })));
+    await assertSucceeds(write(task('t1', { repeat: { every: 'month', anchorDay: 31 } })));
+    await assertSucceeds(write(task('t1', { spawnedFrom: 't0' })));
+  });
+
+  it('rejects a malformed repeat or spawnedFrom', async () => {
+    for (const repeat of [
+      'weekly',
+      7,
+      true,
+      [],
+      ['day'],
+      {},
+      { every: 'year' },
+      { every: 'Day' },
+      { every: 3 },
+      { every: null },
+      { weekday: 1 },
+      { every: 'week', weekday: 7 },
+      { every: 'week', weekday: -1 },
+      { every: 'week', weekday: 1.5 },
+      { every: 'week', weekday: '1' },
+      { every: 'week', weekday: null },
+      { every: 'month', anchorDay: 0 },
+      { every: 'month', anchorDay: 32 },
+      { every: 'month', anchorDay: 2.5 },
+      { every: 'day', extra: 1 },
+    ]) {
+      await assertFails(write(task('t1', { repeat })));
+    }
+    await assertFails(write(task('t1', { spawnedFrom: 5 })));
+    await assertFails(write(task('t1', { spawnedFrom: null })));
   });
 
   it('accepts tasks with a null (automatic) colour or an explicit one', async () => {

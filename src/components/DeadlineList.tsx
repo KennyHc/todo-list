@@ -9,6 +9,7 @@ import { TaskItem } from './TaskItem';
 import styles from './DeadlineList.module.css';
 
 const HEADER = 'section:';
+const isHeader = (key: string) => key.startsWith(HEADER);
 
 /** Task ids in deadline order, with a section header key ('section:overdue') before each group. */
 function sectionKeys(state: TaskStore, tag: string | null): string[] {
@@ -30,14 +31,16 @@ export function DeadlineList() {
   const tag = useUIStore((s) => s.tagFilter);
   // Headers and ids settle as one list, so a just-completed task keeps its place (and its
   // section) until the strike animation has played.
-  const shown = useSettledOrder(useTaskStore(useShallow((s) => sectionKeys(s, tag))));
+  const shown = useSettledOrder(useTaskStore(useShallow((s) => sectionKeys(s, tag))), 700, {
+    isAnchor: isHeader,
+  });
 
   return (
     <LayoutGroup>
       <ul className={styles.list}>
         <AnimatePresence initial={false}>
           {shown.map((key) =>
-            key.startsWith(HEADER) ? (
+            isHeader(key) ? (
               <motion.li
                 key={key}
                 className={styles.header}

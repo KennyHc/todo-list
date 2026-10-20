@@ -1,0 +1,50 @@
+/* A compact segmented control: one track; the chosen segment takes the accent, like the date picks. */
+.group {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.seg {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--t-fast),
+    color var(--t-fast),
+    box-shadow var(--t-fast);
+}
+
+.seg:hover {
+  color: var(--text);
+}
+
+.seg[aria-checked='true'] {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  color: var(--accent-ink);
+}
+
+.seg:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+@media (max-width: 480px), (hover: none) {
+  .seg {
+    height: 36px;
+    font-size: 13px;
+  }
+}

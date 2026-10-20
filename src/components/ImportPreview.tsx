@@ -45,7 +45,7 @@ export function ImportPreview({ tasks, warnings }: { tasks: AiImportTask[]; warn
             {task.tags.slice(0, 2).map((tag) => (
               <TagChip key={tag} tag={tag} hash />
             ))}
-            {task.due && <DuePill dueDate={task.due} done={task.done} />}
+            {task.due && <DuePill dueDate={task.due} done={task.done} repeat={task.repeat} />}
             <span className={styles.badge} title="Difficulty">
               {sumDifficulty(task)}
             </span>

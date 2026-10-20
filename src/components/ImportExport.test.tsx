@@ -21,6 +21,7 @@ const restored: PersistedTasks = {
       parentId: null,
       tags: [],
       dueDate: null,
+      repeat: null,
       difficulty: 1,
       color: null,
       createdAt: 1000,

@@ -34,6 +34,11 @@ const dayHeaderFormat = new Intl.DateTimeFormat(undefined, {
   month: 'short',
   day: 'numeric',
 });
+const weekdayDateFormat = new Intl.DateTimeFormat(undefined, {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+});
 const timeFormat = new Intl.DateTimeFormat(undefined, {
   hour: '2-digit',
   minute: '2-digit',
@@ -50,6 +55,9 @@ export function dueLabel(dueDate: string, today: string = todayISO()): string {
   const sameYear = date.getFullYear() === parseISO(today).getFullYear();
   return (sameYear ? shortDate : longDate).format(date);
 }
+
+/** "Sun, Oct 25". */
+export const weekdayDate = (iso: string): string => weekdayDateFormat.format(parseISO(iso));
 
 /** "Today", "Yesterday", otherwise "Mon, Oct 12". */
 export function dayHeader(timestamp: number, now: Date = new Date()): string {

@@ -395,3 +395,109 @@ describe('appendAiTasks', () => {
     expect(progress(out.tree, q.id)).toEqual({ done: 1, total: 2 });
   });
 });
+
+describe('repeat in the AI formats', () => {
+  it('exports repeat words next to the due date', () => {
+    const state = mkState(
+      [
+        mkTask('a', { title: 'Weekly', dueDate: '2026-10-21', repeat: { every: 'week' } }),
+        mkTask('b', {
+          title: 'Mondays',
+          dueDate: '2026-10-26',
+          repeat: { every: 'week', weekday: 1 },
+        }),
+        mkTask('c', { title: 'Days', dueDate: '2026-10-20', repeat: { every: 'day' } }),
+        mkTask('d', { title: 'Work days', dueDate: '2026-10-20', repeat: { every: 'weekday' } }),
+        mkTask('e', { title: 'Monthly', dueDate: '2026-11-01', repeat: { every: 'month' } }),
+        mkTask('f', { title: 'Plain', dueDate: '2026-10-21' }),
+      ],
+      ['a', 'b', 'c', 'd', 'e', 'f'],
+    );
+    const out = toAiJson(state, { includeCompleted: false, now: NOW });
+    const byTitle = Object.fromEntries(out.tasks.map((t) => [t.title, t]));
+    expect(byTitle.Weekly.repeat).toBe('weekly');
+    expect(byTitle.Mondays.repeat).toBe('every monday');
+    expect(byTitle.Days.repeat).toBe('daily');
+    expect(byTitle['Work days'].repeat).toBe('weekdays');
+    expect(byTitle.Monthly.repeat).toBe('monthly');
+    expect('repeat' in byTitle.Plain).toBe(false);
+  });
+
+  it('mentions the optional repeat key in a single rule of the import prompt', () => {
+    const lines = buildImportPrompt('x', { now: NOW })
+      .split('\n')
+      .filter((l) => l.includes('"repeat"'));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(/^- "repeat": optional/);
+  });
+
+  it('parses daily, weekdays, weekly, monthly and "every monday"', () => {
+    const json = JSON.stringify({
+      tasks: [
+        { title: 'a', repeat: 'daily' },
+        { title: 'b', repeat: 'weekdays' },
+        { title: 'c', repeat: 'weekly', due: '2026-10-21' },
+        { title: 'd', repeat: 'Monthly' },
+        { title: 'e', repeat: 'every monday' },
+        { title: 'f' },
+      ],
+    });
+    const result = parseAiImport(json);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.tasks.map((t) => t.repeat)).toEqual([
+      { every: 'day' },
+      { every: 'weekday' },
+      { every: 'week' },
+      { every: 'month' },
+      { every: 'week', weekday: 1 },
+      undefined,
+    ]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('warns about a repeat it cannot read and drops it', () => {
+    const result = parseAiImport(
+      JSON.stringify({
+        tasks: [
+          { title: 'a', repeat: 'every blue moon' },
+          { title: 'b', repeat: 3 },
+        ],
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.tasks.every((t) => t.repeat === undefined)).toBe(true);
+    expect(result.warnings).toHaveLength(2);
+    expect(result.warnings[0]).toMatch(/unrecognised repeat on .a./);
+  });
+
+  it('applies repeats on import, giving a dateless one its first occurrence', () => {
+    const tasks: AiImportTask[] = [
+      {
+        title: 'Gym',
+        difficulty: 1,
+        tags: [],
+        repeat: { every: 'week', weekday: 1 },
+        subtasks: [],
+      },
+      {
+        title: 'Rent',
+        difficulty: 1,
+        tags: [],
+        due: '2026-11-01',
+        repeat: { every: 'month' },
+        subtasks: [],
+      },
+      { title: 'Plain', difficulty: 1, tags: [], subtasks: [] },
+    ];
+    // Tue 20 Oct 2026.
+    const { tree, ids } = appendAiTasks(emptyTree(), tasks, { now: NOW.getTime() + DAY });
+    expect(tree.tasks[ids[0]]).toMatchObject({
+      dueDate: '2026-10-26',
+      repeat: { every: 'week', weekday: 1 },
+    });
+    expect(tree.tasks[ids[1]]).toMatchObject({ dueDate: '2026-11-01', repeat: { every: 'month' } });
+    expect(tree.tasks[ids[2]]).toMatchObject({ dueDate: null, repeat: null });
+  });
+});

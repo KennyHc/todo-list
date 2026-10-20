@@ -1,4 +1,6 @@
+import type { Repeat } from '../types';
 import { addDays, daysBetween } from './dates';
+import { firstOccurrence } from './recur';
 import { normalizeTags, TAG_TOKEN } from './tags';
 import { todayISO } from './views';
 
@@ -34,10 +36,8 @@ import { todayISO } from './views';
  *   the text instead (a tag-only input still gives an empty title, as before).
  */
 
-export type QuickRepeat = {
-  every: 'day' | 'weekday' | 'week' | 'month';
-  weekday?: number /* 0=Sun..6 */;
-};
+/** What the parser recognises is exactly what tasks store. */
+export type QuickRepeat = Repeat;
 export type QuickToken = {
   kind: 'tag' | 'date' | 'difficulty' | 'repeat';
   start: number;
@@ -62,8 +62,8 @@ export type QuickAddOptions = {
   repeats?: boolean;
 };
 
-/** Flip once the store can keep a repeat; until then the composer neither shows nor consumes it. */
-export const SUPPORTS_REPEAT = false;
+/** The composer recognises repeats and creates repeating tasks. */
+export const SUPPORTS_REPEAT = true;
 
 export const tokenKey = (t: Pick<QuickToken, 'start' | 'raw'>): string => `${t.start}:${t.raw}`;
 
@@ -192,6 +192,37 @@ function repeatLabel(r: QuickRepeat): string {
   return { day: 'Daily', weekday: 'Every weekday', week: 'Weekly', month: 'Monthly' }[r.every];
 }
 
+/** The repeat phrase starting at word `i` (words lowercased), and how many words it spans. */
+function matchRepeat(cores: readonly string[], i: number): { n: number; repeat: Repeat } | null {
+  const c0 = cores[i];
+  if (c0 === 'daily') return { n: 1, repeat: { every: 'day' } };
+  if (c0 === 'weekdays') return { n: 1, repeat: { every: 'weekday' } };
+  if (c0 === 'weekly') return { n: 1, repeat: { every: 'week' } };
+  if (c0 === 'monthly') return { n: 1, repeat: { every: 'month' } };
+  if (c0 !== 'every' || i + 1 >= cores.length) return null;
+  const c1 = cores[i + 1];
+  if (c1 === 'day') return { n: 2, repeat: { every: 'day' } };
+  if (c1 === 'weekday') return { n: 2, repeat: { every: 'weekday' } };
+  if (c1 === 'week') return { n: 2, repeat: { every: 'week' } };
+  if (c1 === 'month') return { n: 2, repeat: { every: 'month' } };
+  if (c1 in WEEKDAYS) return { n: 2, repeat: { every: 'week', weekday: WEEKDAYS[c1] } };
+  return null;
+}
+
+/**
+ * Parses a whole string that is nothing but a repeat phrase ("daily", "weekdays", "weekly",
+ * "monthly", "every monday", "every week", ...), as the AI import writes it. Null otherwise.
+ */
+export function parseRepeatPhrase(text: string): Repeat | null {
+  const cores = text
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w !== '');
+  const hit = matchRepeat(cores, 0);
+  return hit && hit.n === cores.length ? hit.repeat : null;
+}
+
 export function parseQuickAdd(text: string, opts: QuickAddOptions = {}): QuickAdd {
   const now = opts.now ?? new Date();
   const ignore = opts.ignore ?? new Set<string>();
@@ -238,24 +269,13 @@ export function parseQuickAdd(text: string, opts: QuickAddOptions = {}): QuickAd
   };
 
   for (let i = 0; i < W; i++) {
-    const c0 = words[i].core;
-    let hit: { n: number; repeat: QuickRepeat } | null = null;
-    if (c0 === 'daily') hit = { n: 1, repeat: { every: 'day' } };
-    else if (c0 === 'weekdays') hit = { n: 1, repeat: { every: 'weekday' } };
-    else if (c0 === 'weekly') hit = { n: 1, repeat: { every: 'week' } };
-    else if (c0 === 'monthly') hit = { n: 1, repeat: { every: 'month' } };
-    else if (c0 === 'every' && seqOk(i, 2)) {
-      const c1 = words[i + 1].core;
-      if (c1 === 'day') hit = { n: 2, repeat: { every: 'day' } };
-      else if (c1 === 'weekday') hit = { n: 2, repeat: { every: 'weekday' } };
-      else if (c1 === 'week') hit = { n: 2, repeat: { every: 'week' } };
-      else if (c1 === 'month') hit = { n: 2, repeat: { every: 'month' } };
-      else if (c1 in WEEKDAYS) hit = { n: 2, repeat: { every: 'week', weekday: WEEKDAYS[c1] } };
-    }
-    if (hit) {
-      repeatFound.push({ i, ...hit });
-      for (let k = 0; k < hit.n; k++) masked[i + k] = true;
-    }
+    const hit = matchRepeat(
+      words.map((w) => w.core),
+      i,
+    );
+    if (!hit || (hit.n > 1 && !seqOk(i, hit.n))) continue;
+    repeatFound.push({ i, ...hit });
+    for (let k = 0; k < hit.n; k++) masked[i + k] = true;
   }
 
   const tokens: QuickToken[] = [];
@@ -450,11 +470,7 @@ export function parseQuickAdd(text: string, opts: QuickAddOptions = {}): QuickAd
   }
   const tags = normalizeTags(found);
 
-  if (repeat && !dateTokenAdded) {
-    if (repeat.weekday !== undefined) dueDate = plainWeekday(repeat.weekday);
-    else if (repeat.every === 'weekday') dueDate = dow >= 1 && dow <= 5 ? today : plainWeekday(1);
-    else dueDate = today;
-  }
+  if (repeat && !dateTokenAdded) dueDate = firstOccurrence(repeat, today);
 
   tokens.sort((a, b) => a.start - b.start);
   const title = buildTitle(text, tokens);

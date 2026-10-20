@@ -406,7 +406,11 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
                         </span>
                         {row.path && <span className={styles.path}>{row.path}</span>}
                         {row.task.dueDate !== null && (
-                          <DuePill dueDate={row.task.dueDate} done={row.task.done} />
+                          <DuePill
+                            dueDate={row.task.dueDate}
+                            done={row.task.done}
+                            repeat={row.task.repeat}
+                          />
                         )}
                       </>
                     ) : (

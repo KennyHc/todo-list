@@ -11,6 +11,7 @@ const task = (id: string, parentId: string | null, childIds: string[] = []): Tas
   collapsed: false,
   tags: [],
   dueDate: null,
+  repeat: null,
   parentId,
   childIds,
   createdAt: 0,
