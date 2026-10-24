@@ -7,7 +7,7 @@ import {
   useTaskStore,
 } from './tasks';
 import { mkTask } from '../test/factories';
-import { DEFAULT_SETTINGS } from '../types';
+import { DEFAULT_SETTINGS, MAX_NOTES_LENGTH } from '../types';
 import { useUIStore } from './ui';
 
 const get = () => useTaskStore.getState();
@@ -40,6 +40,7 @@ describe('migrateTasksState', () => {
       dueDate: null,
       repeat: null,
       plannedFor: null,
+      startDate: null,
     });
     expect(out.rootIds).toEqual(['a']);
     expect(out.history).toEqual([]);
@@ -53,6 +54,7 @@ describe('migrateTasksState', () => {
       dueDate: '2026-01-01',
       repeat: null,
       plannedFor: null,
+      startDate: null,
     };
     const out = migrateTasksState({ tasks: { a: v2 }, rootIds: ['a'], history: [] });
     expect(out.tasks.a).toEqual(v2);
@@ -292,6 +294,7 @@ describe('legacy local data', () => {
       dueDate: null,
       repeat: null,
       plannedFor: null,
+      startDate: null,
     });
     expect(data?.rootIds).toEqual(['a']);
     clearLegacyLocalTasks();
@@ -1037,5 +1040,138 @@ describe('planning', () => {
     get().toggle(id);
     const copy = Object.values(get().tasks).find((t) => t.spawnedFrom === id);
     expect(copy?.plannedFor).toBeNull();
+  });
+});
+
+describe('notes', () => {
+  it('migration drops blank or invalid notes, keeps real ones and defaults startDate', () => {
+    const out = migrateTasksState({
+      tasks: {
+        a: { id: 'a', notes: '  ' },
+        b: { id: 'b', notes: 7 },
+        c: { id: 'c', notes: 'keep\nme' },
+        d: { id: 'd', startDate: 'later' },
+        e: { id: 'e', startDate: '2026-11-01' },
+      },
+      rootIds: [],
+    }).tasks;
+    expect('notes' in out.a).toBe(false);
+    expect('notes' in out.b).toBe(false);
+    expect(out.c.notes).toBe('keep\nme');
+    expect(out.a.startDate).toBeNull();
+    expect(out.d.startDate).toBeNull();
+    expect(out.e.startDate).toBe('2026-11-01');
+  });
+
+  it('setNotes saves, labels and undoes', () => {
+    const id = get().add({ title: 'Call Sam' });
+    get().setNotes(id, 'ask about the roof\nand the gutters');
+    expect(get().tasks[id].notes).toBe('ask about the roof\nand the gutters');
+    expect(get().undo?.label).toBe('Added note to \u201cCall Sam\u201d');
+    get().setNotes(id, 'ask about the roof');
+    expect(get().undo?.label).toBe('Edited note on \u201cCall Sam\u201d');
+    get().undoLast();
+    expect(get().tasks[id].notes).toBe('ask about the roof\nand the gutters');
+  });
+
+  it('an empty save removes the note, and undo brings it back', () => {
+    const id = get().add({ title: 'Call Sam', notes: 'hello' });
+    get().setNotes(id, '   ');
+    expect('notes' in get().tasks[id]).toBe(false);
+    expect(get().undo?.label).toBe('Removed note from \u201cCall Sam\u201d');
+    get().undoLast();
+    expect(get().tasks[id].notes).toBe('hello');
+  });
+
+  it('records no undo when nothing changes or the task is gone', () => {
+    const id = get().add({ title: 'A', notes: 'same' });
+    get().setNotes(id, 'same');
+    get().setNotes('nope', 'x');
+    const plain = get().add({ title: 'B' });
+    get().setNotes(plain, '');
+    expect(get().undo).toBeNull();
+  });
+
+  it('is clamped like a title', () => {
+    const id = get().add({ title: 'A' });
+    get().setNotes(id, 'x'.repeat(MAX_NOTES_LENGTH + 100));
+    expect(get().tasks[id].notes).toHaveLength(MAX_NOTES_LENGTH);
+  });
+
+  it('update can patch notes too (and a blank one removes them)', () => {
+    const id = get().add({ title: 'A' });
+    get().update(id, { notes: 'hi' });
+    expect(get().tasks[id].notes).toBe('hi');
+    get().update(id, { notes: '' });
+    expect('notes' in get().tasks[id]).toBe(false);
+  });
+});
+
+describe('startDate', () => {
+  it('a new task starts now; add and update can set it', () => {
+    const id = get().add({ title: 'A' });
+    expect(get().tasks[id].startDate).toBeNull();
+    const later = get().add({ title: 'B', startDate: '2026-11-01' });
+    expect(get().tasks[later].startDate).toBe('2026-11-01');
+    get().update(later, { startDate: null });
+    expect(get().tasks[later].startDate).toBeNull();
+  });
+
+  it('hideUntil sets the date without touching the due date, with an undo', () => {
+    const id = get().add({ title: 'Pay rent', dueDate: '2026-10-31' });
+    get().hideUntil(id, '2026-10-26');
+    expect(get().tasks[id]).toMatchObject({ startDate: '2026-10-26', dueDate: '2026-10-31' });
+    expect(get().undo?.label).toMatch(/^Hid \u201cPay rent\u201d until \w{3}, Oct 26$/);
+    get().undoLast();
+    expect(get().tasks[id].startDate).toBeNull();
+  });
+
+  it('hideUntil(null) shows it again, with its own label', () => {
+    const id = get().add({ title: 'Pay rent', startDate: '2026-10-26' });
+    get().hideUntil(id, null);
+    expect(get().tasks[id].startDate).toBeNull();
+    expect(get().undo?.label).toBe('Showing \u201cPay rent\u201d now');
+    get().undoLast();
+    expect(get().tasks[id].startDate).toBe('2026-10-26');
+  });
+
+  it('records no undo when nothing changes or the task is gone', () => {
+    const id = get().add({ title: 'A' });
+    get().hideUntil(id, null);
+    get().hideUntil('nope', '2026-10-26');
+    expect(get().undo).toBeNull();
+  });
+
+  it('a repeating task\u2019s next occurrence keeps its notes and shifts its start date', () => {
+    const id = get().add({
+      title: 'Water',
+      dueDate: '2026-10-20',
+      repeat: { every: 'week' },
+      startDate: '2026-10-13',
+      notes: 'use the can',
+    });
+    get().toggle(id);
+    const copy = Object.values(get().tasks).find((t) => t.spawnedFrom === id);
+    expect(copy).toMatchObject({
+      dueDate: '2026-10-27',
+      startDate: '2026-10-20',
+      notes: 'use the can',
+    });
+  });
+
+  it('restoring from History brings back a task with its notes and start date', () => {
+    const id = get().add({ title: 'Done thing', notes: 'n', startDate: '2026-01-01' });
+    get().toggle(id);
+    const entry = get().history[0];
+    get().restoreFromHistory(entry.id);
+    expect(get().tasks[id]).toMatchObject({ done: false, notes: 'n', startDate: '2026-01-01' });
+  });
+
+  it('toggling a hidden parent and its progress counts ignore the start date', () => {
+    const p = get().add({ title: 'P' });
+    const a = get().add({ title: 'a', parentId: p, difficulty: 2 });
+    get().add({ title: 'b', parentId: p, difficulty: 3, startDate: '2999-01-01' });
+    get().toggle(a);
+    expect(get().tasks[p].done).toBe(false);
   });
 });

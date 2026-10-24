@@ -18,9 +18,9 @@ import {
   type MotionProps,
   type TargetAndTransition,
 } from 'framer-motion';
-import { CalendarClock, ChevronRight, GripVertical, Plus, Trash2 } from 'lucide-react';
+import { CalendarClock, ChevronRight, GripVertical, Plus, StickyNote, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
-import type { DeadlineBucket } from '../lib/dates';
+import { startsLabel, type DeadlineBucket } from '../lib/dates';
 import { popDelays } from '../hooks/useCompletionHold';
 import { useIsPhone } from '../hooks/useMediaQuery';
 import { useIsTouch } from '../hooks/useIsTouch';
@@ -28,8 +28,14 @@ import { addSubtask } from '../lib/addSubtask';
 import { splitTitleLinks } from '../lib/links';
 import { ignoreTextEntry } from '../lib/textEntry';
 import { primeKeyboard } from '../lib/focusProxy';
-import { getAncestors, getDescendants } from '../lib/tree';
-import { isContextOnly, neighborAfterRemoval, taskPath, visibleOrder } from '../lib/views';
+import { getAncestors, getDescendants, hiddenUntilStart } from '../lib/tree';
+import {
+  isContextOnly,
+  neighborAfterRemoval,
+  taskPath,
+  todayISO,
+  visibleOrder,
+} from '../lib/views';
 import {
   useColorSource,
   useEffectiveColor,
@@ -52,6 +58,7 @@ import { LinkChip } from './LinkChip';
 import { RescheduleMenu } from './RescheduleMenu';
 import { Sparks } from './Sparks';
 import { TagChip } from './TagChip';
+import { TaskNote, type NoteMode } from './TaskNote';
 import { TaskMenu } from './TaskMenu';
 import { StrikeText } from './StrikeText';
 import { SwipeRow } from './SwipeRow';
@@ -214,7 +221,15 @@ function TaskItemInner({
   const dimmed = useTaskStore(
     (s) => !flat && tagFilter !== null && isContextOnly(s, id, tagFilter),
   );
+  const showUpcoming = useUIStore((s) => s.showUpcoming);
+  // Only in the Tree, with "Show" pressed on its footer: a task that starts later (or sits under
+  // one) is dimmed, and its own row says when it starts.
+  const upcoming = useTaskStore(
+    (s) => showUpcoming && !flat && hiddenUntilStart(s, id, todayISO()),
+  );
   const path = useTaskStore(useShallow((s) => (flat ? taskPath(s, id) : NO_PATH)));
+  /** The note under the title: shut, shown read-only (links as chips) or being edited. */
+  const [noteMode, setNoteMode] = useState<NoteMode>('closed');
   // Phones carry no ⋯ on the row: the title editor's ⋯ opens the options sheet instead.
   const [menuOpen, setMenuOpen] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -311,6 +326,7 @@ function TaskItemInner({
             tag: ui.tagFilter,
             completedCollapsed: ui.completedCollapsed,
             completedShowAll: ui.completedShowAll,
+            showUpcoming: ui.showUpcoming,
           });
           ui.setFocusedId(
             neighborAfterRemoval(order, id, new Set([id, ...getDescendants(tasks, id)])),
@@ -389,7 +405,12 @@ function TaskItemInner({
   const { text: linkless, links } = splitTitleLinks(task.title);
   const shownTitle = linkless === '' ? task.title : linkless;
   const chipLinks = linkless === '' ? [] : [...new Set(links)].slice(0, MAX_LINKS_SHOWN);
-  const hasTail = showDue || !!reason || chipLinks.length > 0 || task.tags.length > 0;
+  const today = todayISO();
+  const startsLater = upcoming && task.startDate !== null && task.startDate > today;
+  const hasNote = task.notes !== undefined;
+  const noteOpen = noteMode === 'edit' || (noteMode === 'read' && hasNote);
+  const hasTail =
+    showDue || !!reason || startsLater || hasNote || chipLinks.length > 0 || task.tags.length > 0;
   const hasMeta = hasTail || (flat && path.length > 0);
   const tagLimit = phone ? MAX_TAGS_SHOWN_PHONE : MAX_TAGS_SHOWN;
   const shownTags = task.tags.slice(0, tagLimit);
@@ -397,6 +418,11 @@ function TaskItemInner({
   const edit = () => {
     primeKeyboard();
     useTaskStore.getState().setEditingId(id);
+  };
+  // Menus close themselves before calling this; the editor takes the keyboard the tap primed.
+  const editNote = () => {
+    primeKeyboard();
+    setNoteMode('edit');
   };
 
   const chevron = (
@@ -479,9 +505,10 @@ function TaskItemInner({
             >
               <motion.div
                 ref={rowRef}
-                className={`${styles.row} ${task.done ? styles.rowDone : ''} ${editing ? styles.rowEditing : ''} ${focused ? styles.rowFocused : ''}`}
+                className={`${styles.row} ${task.done ? styles.rowDone : ''} ${editing || noteMode === 'edit' ? styles.rowEditing : ''} ${focused ? styles.rowFocused : ''}`}
                 data-meta={hasMeta || undefined}
                 data-dim={dimmed || undefined}
+                data-upcoming={upcoming || undefined}
                 data-focused={focused || undefined}
                 data-over={over || undefined}
                 data-row-color={color ?? undefined}
@@ -496,7 +523,7 @@ function TaskItemInner({
                   // A click on the row itself (not a button, input or link inside it) focuses it.
                   if (
                     (e.target as Element).closest(
-                      'button, input, a, [role="checkbox"], [role="radio"]',
+                      'button, input, textarea, a, [role="checkbox"], [role="radio"]',
                     )
                   ) {
                     return;
@@ -585,6 +612,11 @@ function TaskItemInner({
                                 {reason}
                               </span>
                             )}
+                            {startsLater && task.startDate !== null && (
+                              <span className={styles.starts} title={`Starts ${task.startDate}`}>
+                                {startsLabel(task.startDate, today)}
+                              </span>
+                            )}
                             {showDue && task.dueDate !== null && (
                               <DuePill
                                 dueDate={task.dueDate}
@@ -592,6 +624,18 @@ function TaskItemInner({
                                 repeat={task.repeat}
                                 display={dueDisplay}
                               />
+                            )}
+                            {hasNote && (
+                              <button
+                                type="button"
+                                className={styles.noteBtn}
+                                aria-label={noteOpen ? 'Hide note' : 'Show note'}
+                                aria-expanded={noteOpen}
+                                data-swipe-through
+                                onClick={() => setNoteMode(noteOpen ? 'closed' : 'read')}
+                              >
+                                <StickyNote size={14} strokeWidth={1.75} aria-hidden="true" />
+                              </button>
                             )}
                             {chipLinks.map((href) => (
                               <LinkChip key={href} href={href} />
@@ -617,6 +661,17 @@ function TaskItemInner({
                       <div className={styles.crumb}>{path.join(' › ')}</div>
                     )}
                   </div>
+                  <AnimatePresence initial={false}>
+                    {noteOpen && (
+                      <TaskNote
+                        key="note"
+                        id={id}
+                        notes={task.notes}
+                        mode={noteMode as 'read' | 'edit'}
+                        onMode={setNoteMode}
+                      />
+                    )}
+                  </AnimatePresence>
                 </div>
                 <div className={styles.meta}>
                   {/* Hover actions sit to the left of the trailing cluster, overlaying the row's
@@ -646,6 +701,7 @@ function TaskItemInner({
                         buttonClassName={styles.iconBtn}
                         motionProps={iconMotion}
                         onAddSubtask={addChild}
+                        onNote={editNote}
                         onDelete={requestDelete}
                       />
                       {/* Touch has the menu and swipe-to-delete; the row stays quiet. */}
@@ -697,6 +753,7 @@ function TaskItemInner({
                     buttonClassName={styles.iconBtn}
                     motionProps={iconMotion}
                     onAddSubtask={addChild}
+                    onNote={editNote}
                     onDelete={requestDelete}
                     open={menuOpen}
                     onOpenChange={setMenuOpen}

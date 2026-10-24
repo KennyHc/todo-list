@@ -12,10 +12,19 @@ type Props = {
   /** With `onRepeatChange`, a Repeat control follows the date choices. */
   repeat?: Repeat | null;
   onRepeatChange?: (repeat: Repeat | null) => void;
+  /** What the date input is called for assistive tech (the picker is also used for start dates). */
+  inputLabel?: string;
 };
 
 /** Quick picks plus a native date input. */
-export function DatePicker({ value, onChange, onPicked, repeat = null, onRepeatChange }: Props) {
+export function DatePicker({
+  value,
+  onChange,
+  onPicked,
+  repeat = null,
+  onRepeatChange,
+  inputLabel = 'Due date',
+}: Props) {
   const today = todayISO();
   return (
     <div className={styles.picker}>
@@ -38,7 +47,7 @@ export function DatePicker({ value, onChange, onPicked, repeat = null, onRepeatC
       <input
         type="date"
         className={styles.date}
-        aria-label="Due date"
+        aria-label={inputLabel}
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value || null)}
       />

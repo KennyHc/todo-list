@@ -24,6 +24,8 @@ type UIState = {
   completedCollapsed: boolean;
   /** Its "Show all" is pressed (otherwise only the first few rows show). Not persisted. */
   completedShowAll: boolean;
+  /** The Tree view shows the tasks that start later, dimmed, inline. Not persisted. */
+  showUpcoming: boolean;
   /** The row the keyboard acts on. Not persisted. */
   focusedId: string | null;
   /** Whether the tag filter popover is open, so a hotkey can open it. Not persisted. */
@@ -48,6 +50,7 @@ type UIState = {
   setTagFilter: (tag: string | null) => void;
   setCompletedCollapsed: (collapsed: boolean) => void;
   setCompletedShowAll: (showAll: boolean) => void;
+  setShowUpcoming: (show: boolean) => void;
   setFocusedId: (id: string | null) => void;
   setFilterOpen: (open: boolean) => void;
   setPaletteOpen: (open: boolean) => void;
@@ -71,6 +74,7 @@ export const useUIStore = create<UIState>()(
       tagFilter: null,
       completedCollapsed: false,
       completedShowAll: false,
+      showUpcoming: false,
       focusedId: null,
       filterOpen: false,
       paletteOpen: false,
@@ -86,6 +90,7 @@ export const useUIStore = create<UIState>()(
       setTagFilter: (tagFilter) => set({ tagFilter }),
       setCompletedCollapsed: (completedCollapsed) => set({ completedCollapsed }),
       setCompletedShowAll: (completedShowAll) => set({ completedShowAll }),
+      setShowUpcoming: (showUpcoming) => set({ showUpcoming }),
       setFocusedId: (focusedId) => set({ focusedId }),
       setFilterOpen: (filterOpen) => set({ filterOpen }),
       setPaletteOpen: (paletteOpen) => set({ paletteOpen }),

@@ -155,7 +155,10 @@ export function repeatWord(repeat: Repeat): string {
  * the new tree and the copy's id. The copy has a new id, the same title, tags, difficulty, colour,
  * repeat and parent, is undone and expanded, and is due `nextOccurrence(...)`. Its subtree is
  * deep-copied with new ids, all undone and without due dates, except that a subtask with its own
- * due date keeps it, shifted by the same number of days as the parent's due date.
+ * due date keeps it, shifted by the same number of days as the parent's due date. Notes are
+ * copied. A start date is shifted by that same number of days (on the copy and its subtasks), so
+ * "starts a week before it is due" keeps meaning that; a task has a due date to spawn at all,
+ * so there is always something to shift by.
  *
  * Returns null when there is nothing to spawn: no such task, no repeat, no due date, or a copy of
  * this occurrence already exists (a task with `spawnedFrom === id` and the same due date), so
@@ -199,6 +202,8 @@ export function spawnNextOccurrence(
       dueDate: root ? next : source.dueDate === null ? null : addDays(source.dueDate, shift),
       repeat: root ? repeat : source.repeat === null ? null : { ...source.repeat },
       plannedFor: null,
+      startDate: source.startDate === null ? null : addDays(source.startDate, shift),
+      ...(source.notes !== undefined ? { notes: source.notes } : {}),
       ...(root ? { spawnedFrom: id } : {}),
       parentId,
       childIds,

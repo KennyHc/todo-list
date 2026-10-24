@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resetTaskStore, useTaskStore } from '../store/tasks';
 import { backupFilename, parseBackup, serializeBackup } from './backup';
 import type { PersistedTasks } from '../store/tasks';
-import { DEFAULT_SETTINGS } from '../types';
+import { DEFAULT_SETTINGS, MAX_NOTES_LENGTH } from '../types';
 
 describe('backup', () => {
   const sampleData: PersistedTasks = {
@@ -18,6 +18,7 @@ describe('backup', () => {
         dueDate: null,
         repeat: null,
         plannedFor: null,
+        startDate: null,
         difficulty: 1,
         color: null,
         createdAt: 1000,
@@ -33,6 +34,7 @@ describe('backup', () => {
         dueDate: '2026-10-20',
         repeat: null,
         plannedFor: null,
+        startDate: null,
         difficulty: 2,
         color: null,
         createdAt: 2000,
@@ -339,5 +341,72 @@ describe('backup', () => {
       expect(result.data.tasks['1'].repeat).toBeNull();
       expect(result.data.tasks['3'].repeat).toBeNull();
     });
+  });
+});
+
+describe('backup: notes and start dates', () => {
+  const task = (over: Record<string, unknown> = {}) => ({
+    id: '1',
+    title: 'Task',
+    done: false,
+    collapsed: false,
+    childIds: [],
+    parentId: null,
+    tags: [],
+    dueDate: null,
+    repeat: null,
+    plannedFor: null,
+    difficulty: 1,
+    color: null,
+    createdAt: 1000,
+    ...over,
+  });
+  const file = (tasks: Record<string, unknown>) =>
+    JSON.stringify({ app: 'tasks', version: 3, tasks, rootIds: Object.keys(tasks), history: [] });
+
+  it('round-trips both fields', () => {
+    const data: PersistedTasks = {
+      tasks: {
+        '1': {
+          ...(task() as unknown as PersistedTasks['tasks'][string]),
+          notes: 'Remember\nthe milk',
+          startDate: '2026-11-01',
+        },
+      },
+      rootIds: ['1'],
+      history: [],
+      tagColors: {},
+      settings: { ...DEFAULT_SETTINGS, hints: {} },
+    };
+    const json = JSON.parse(serializeBackup(data));
+    expect(json.tasks['1']).toMatchObject({ notes: 'Remember\nthe milk', startDate: '2026-11-01' });
+    const result = parseBackup(serializeBackup(data));
+    expect(result.ok && result.data.tasks['1']).toMatchObject({
+      notes: 'Remember\nthe milk',
+      startDate: '2026-11-01',
+    });
+  });
+
+  it('reads an old backup (neither field) as no notes and no start date', () => {
+    const result = parseBackup(file({ '1': task() }));
+    if (!result.ok) throw new Error(result.error);
+    expect(result.data.tasks['1'].startDate).toBeNull();
+    expect('notes' in result.data.tasks['1']).toBe(false);
+  });
+
+  it('repairs bad values: a bad start date becomes null, blank or non-string notes vanish', () => {
+    const result = parseBackup(
+      file({
+        '1': task({ startDate: 'soon', notes: '   ' }),
+        '2': task({ id: '2', startDate: 20261101, notes: 5 }),
+        '3': task({ id: '3', notes: 'x'.repeat(MAX_NOTES_LENGTH + 5) }),
+      }),
+    );
+    if (!result.ok) throw new Error(result.error);
+    for (const id of ['1', '2']) {
+      expect(result.data.tasks[id].startDate).toBeNull();
+      expect('notes' in result.data.tasks[id]).toBe(false);
+    }
+    expect(result.data.tasks['3'].notes).toHaveLength(MAX_NOTES_LENGTH);
   });
 });

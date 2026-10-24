@@ -1,5 +1,6 @@
 import type { TaskTree } from '../types';
 import { addDays, parseISO, weekdayDate } from './dates';
+import { hiddenUntilStart } from './tree';
 import { dueStatus } from './views';
 
 export type PickKey = 'today' | 'tomorrow' | 'weekend' | 'nextWeek';
@@ -49,9 +50,14 @@ export const pickDateLabel = (date: string): string => weekdayDate(date);
 export const rescheduleLabel = (title: string, date: string | null): string =>
   date === null ? `Removed date from “${title}”` : `Moved “${title}” to ${pickDateLabel(date)}`;
 
+/** The undo toast text for hiding a task until a date (or, with null, showing it now). */
+export const hideUntilLabel = (title: string, date: string | null): string =>
+  date === null ? `Showing “${title}” now` : `Hid “${title}” until ${pickDateLabel(date)}`;
+
 /**
  * Ids of the open tasks whose due date has passed. With a tag, only tasks carrying that tag
- * (what a tag-filtered list shows as matches).
+ * (what a tag-filtered list shows as matches). Tasks that have not started yet are hidden, so
+ * they are not counted.
  */
 export function overdueIds(tree: TaskTree, today: string, tag: string | null = null): string[] {
   return Object.values(tree.tasks)
@@ -59,7 +65,8 @@ export function overdueIds(tree: TaskTree, today: string, tag: string | null = n
       (task) =>
         !task.done &&
         dueStatus(task.dueDate, today) === 'overdue' &&
-        (tag === null || task.tags.includes(tag)),
+        (tag === null || task.tags.includes(tag)) &&
+        !hiddenUntilStart(tree, task.id, today),
     )
     .map((task) => task.id);
 }

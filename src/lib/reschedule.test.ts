@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Task, TaskTree } from '../types';
 import {
+  hideUntilLabel,
   nextMondayDate,
   overdueIds,
   overdueMoveLabel,
@@ -91,6 +92,7 @@ const task = (id: string, patch: Partial<Task>): Task => ({
   dueDate: null,
   repeat: null,
   plannedFor: null,
+  startDate: null,
   ...patch,
 });
 
@@ -111,5 +113,28 @@ describe('overdueIds', () => {
   });
   it('can be limited to a tag', () => {
     expect(overdueIds(tree, TUE, 'home')).toEqual(['lateTag']);
+  });
+});
+
+describe('start dates', () => {
+  it('overdueIds leaves out tasks that have not started (and their subtasks)', () => {
+    const list = [
+      task('a', { dueDate: '2026-10-10' }),
+      task('b', { dueDate: '2026-10-10', startDate: '2026-10-26', childIds: ['c'] }),
+      task('c', { dueDate: '2026-10-11', parentId: 'b' }),
+    ];
+    const tree: TaskTree = {
+      rootIds: ['a', 'b'],
+      tasks: Object.fromEntries(list.map((t) => [t.id, t])),
+    };
+    expect(overdueIds(tree, '2026-10-20')).toEqual(['a']);
+    expect(overdueIds(tree, '2026-10-26')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('labels hiding a task and showing it again', () => {
+    expect(hideUntilLabel('Pay rent', '2026-10-26')).toBe(
+      `Hid “Pay rent” until ${pickDateLabel('2026-10-26')}`,
+    );
+    expect(hideUntilLabel('Pay rent', null)).toBe('Showing “Pay rent” now');
   });
 });

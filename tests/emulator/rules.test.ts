@@ -36,6 +36,7 @@ const task = (id: string, over: Record<string, unknown> = {}) => ({
   tags: ['a'],
   dueDate: null,
   plannedFor: null,
+  startDate: null,
   repeat: null,
   parentId: null,
   childIds: [],
@@ -247,6 +248,42 @@ describe('task validation', () => {
       '2026-10-20\n',
     ]) {
       await assertFails(write(task('t1', { plannedFor })));
+    }
+  });
+
+  it('accepts a missing, null or well-formed startDate', async () => {
+    const { startDate: _omit, ...legacy } = task('t1', { startDate: null });
+    await assertSucceeds(write(legacy)); // documents written before "hide until"
+    await assertSucceeds(write(task('t1', { startDate: null })));
+    await assertSucceeds(write(task('t1', { startDate: '2026-11-01' })));
+  });
+
+  it('rejects a startDate that is not a date string', async () => {
+    for (const startDate of [
+      5,
+      true,
+      [],
+      {},
+      '',
+      'monday',
+      '2026-1-5',
+      '20261101',
+      '2026-11-01T10:00',
+      ' 2026-11-01',
+      '2026-11-01\n',
+    ]) {
+      await assertFails(write(task('t1', { startDate })));
+    }
+  });
+
+  it('accepts missing notes and notes up to 5000 characters, and rejects the rest', async () => {
+    await assertSucceeds(write(task('t1'))); // no notes key
+    await assertSucceeds(write(task('t1', { notes: 'line 1\nline 2' })));
+    await assertSucceeds(write(task('t1', { notes: '' })));
+    await assertSucceeds(write(task('t1', { notes: 'x'.repeat(5000) })));
+    await assertFails(write(task('t1', { notes: 'x'.repeat(5001) })));
+    for (const notes of [5, true, null, [], {}]) {
+      await assertFails(write(task('t1', { notes })));
     }
   });
 

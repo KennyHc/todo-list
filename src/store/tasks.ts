@@ -11,7 +11,7 @@ import { normalizeTag } from '../lib/tags';
 import { isISODate } from '../lib/dates';
 import { applySettingsPatch, normalizeSettings, type SettingsPatch } from '../lib/settings';
 import { nextLabel, normalizeRepeat, spawnNextOccurrence } from '../lib/recur';
-import { overdueIds, overdueMoveLabel, rescheduleLabel } from '../lib/reschedule';
+import { hideUntilLabel, overdueIds, overdueMoveLabel, rescheduleLabel } from '../lib/reschedule';
 import {
   applyHistory,
   diffCompletions,
@@ -29,6 +29,7 @@ import {
   indentTask,
   isLeaf,
   moveTask,
+  normalizeNotes,
   outdentTask,
   progress,
   sortedChildIds,
@@ -77,6 +78,15 @@ type TaskActions = {
   plan: (id: string, plannedFor: string | null) => void;
   /** Changes preferences. Synced, but neither undoable nor part of an undo snapshot. */
   setSetting: (patch: SettingsPatch) => void;
+  /**
+   * Sets a task's notes ('' or blank removes them) and records an undo. Edits to notes go
+   * through here (rather than `update`) so Undo takes them back.
+   */
+  setNotes: (id: string, notes: string) => void;
+  /**
+   * Hides a task (and its subtree) until a date, or with null shows it now, and records an undo.
+   */
+  hideUntil: (id: string, startDate: string | null) => void;
   /** Sets (or, with null, clears) a due date and records an undo ("Moved \u201cX\u201d to Sat, Oct 24"). */
   reschedule: (id: string, dueDate: string | null) => void;
   /**
@@ -138,8 +148,8 @@ export type PersistedTasks = Pick<
  * `history`. v2 -> v3: the old default blue (which meant "unset") becomes `color: null`
  * ("automatic"), and the store gains `tagColors`. Tasks also gain `repeat` (missing -> null).
  * Done tasks without a History entry get one. Idempotent, so it also tolerates partially
- * migrated data. Tasks gain `plannedFor` (missing -> null) and the store `settings` (missing ->
- * the defaults).
+ * migrated data. Tasks gain `plannedFor` and `startDate` (missing -> null), lose a blank `notes`,
+ * and the store gains `settings` (missing -> the defaults).
  */
 export function migrateTasksState(persisted: unknown): PersistedTasks {
   const old = (persisted ?? {}) as Partial<Record<keyof PersistedTasks, unknown>>;
@@ -152,8 +162,12 @@ export function migrateTasksState(persisted: unknown): PersistedTasks {
       dueDate: task.dueDate ?? null,
       repeat: normalizeRepeat(task.repeat),
       plannedFor: isISODate(task.plannedFor) ? task.plannedFor : null,
+      startDate: isISODate(task.startDate) ? task.startDate : null,
     };
     if (typeof task.spawnedFrom !== 'string') delete tasks[id].spawnedFrom;
+    const notes = normalizeNotes(task.notes);
+    if (notes === undefined) delete tasks[id].notes;
+    else tasks[id].notes = notes;
   }
   const data = {
     tasks,
@@ -258,6 +272,26 @@ export const createTaskStore = () =>
     setSetting: (patch) => {
       const settings = applySettingsPatch(get().settings, patch);
       if (settings !== get().settings) set({ settings });
+    },
+    setNotes: (id, notes) => {
+      const state = get();
+      const task = state.tasks[id];
+      if (!task) return;
+      const after = updateTask(treeOf(state), id, { notes });
+      if (after.tasks === state.tasks) return;
+      const label =
+        after.tasks[id].notes === undefined
+          ? `Removed note from \u201c${task.title}\u201d`
+          : `${task.notes === undefined ? 'Added note to' : 'Edited note on'} \u201c${task.title}\u201d`;
+      set({ ...after, undo: undoEntry(state, label) });
+    },
+    hideUntil: (id, startDate) => {
+      const state = get();
+      const task = state.tasks[id];
+      if (!task) return;
+      const after = updateTask(treeOf(state), id, { startDate });
+      if (after.tasks === state.tasks) return;
+      set({ ...after, undo: undoEntry(state, hideUntilLabel(task.title, startDate)) });
     },
     reschedule: (id, dueDate) => {
       const state = get();

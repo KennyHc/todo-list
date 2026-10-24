@@ -501,3 +501,82 @@ describe('repeat in the AI formats', () => {
     expect(tree.tasks[ids[2]]).toMatchObject({ dueDate: null, repeat: null });
   });
 });
+
+describe('start dates and notes in the AI formats', () => {
+  const state = mkState(
+    [
+      mkTask('a', { title: 'Later', startDate: '2026-11-01', dueDate: '2026-11-30' }),
+      mkTask('b', { title: 'Started', startDate: '2026-10-01' }),
+      mkTask('c', { title: 'Noted', notes: 'Ask Sam\nhttps://x.test' }),
+      mkTask('d', { title: 'Plain' }),
+    ],
+    ['a', 'b', 'c', 'd'],
+  );
+
+  it('exports a start date that is still ahead as "starts", next to "due"', () => {
+    const out = toAiJson(state, { includeCompleted: false, now: NOW });
+    const byTitle = Object.fromEntries(out.tasks.map((t) => [t.title, t]));
+    expect(byTitle.Later).toMatchObject({ starts: '2026-11-01', due: '2026-11-30' });
+    // Once started, it says nothing more.
+    expect('starts' in byTitle.Started).toBe(false);
+    expect('starts' in byTitle.Plain).toBe(false);
+  });
+
+  it('exports notes as given', () => {
+    const out = toAiJson(state, { includeCompleted: false, now: NOW });
+    expect(out.tasks.find((t) => t.title === 'Noted')?.notes).toBe('Ask Sam\nhttps://x.test');
+    expect('notes' in out.tasks.find((t) => t.title === 'Plain')!).toBe(false);
+  });
+
+  it('mentions the optional keys once each in the import prompt', () => {
+    const lines = buildImportPrompt('x', { now: NOW }).split('\n');
+    expect(lines.filter((l) => l.includes('"starts"'))).toHaveLength(1);
+    expect(lines.filter((l) => l.startsWith('- "notes"'))).toHaveLength(1);
+  });
+
+  it('parses starts (and its aliases) and notes, and warns about a bad date', () => {
+    const result = parseAiImport(
+      JSON.stringify({
+        tasks: [
+          { title: 'a', starts: '2026-11-01', notes: '  line 1\nline 2  ' },
+          { title: 'b', start: '2026-11-02' },
+          { title: 'c', startDate: '2026-11-03', notes: '   ' },
+          { title: 'd', starts: '11/04' },
+        ],
+      }),
+    );
+    if (!result.ok) throw new Error(result.error);
+    const [a, b, c, d] = result.tasks;
+    expect(a).toMatchObject({ starts: '2026-11-01', notes: 'line 1\nline 2' });
+    expect(b.starts).toBe('2026-11-02');
+    expect(c.starts).toBe('2026-11-03');
+    expect('notes' in c).toBe(false);
+    expect('starts' in d).toBe(false);
+    expect(result.warnings).toEqual(['Removed an invalid date on \u201cd\u201d']);
+  });
+
+  it('applies starts and notes when the tasks are added', () => {
+    const { tree, ids } = appendAiTasks(emptyTree(), [
+      {
+        title: 'a',
+        difficulty: 1,
+        tags: [],
+        starts: '2026-11-01',
+        notes: 'hello',
+        subtasks: [],
+      },
+    ]);
+    expect(tree.tasks[ids[0]]).toMatchObject({ startDate: '2026-11-01', notes: 'hello' });
+  });
+
+  it('round-trips through export and import', () => {
+    const out = toAiJson(state, { includeCompleted: false, now: NOW });
+    const result = parseAiImport(JSON.stringify(out));
+    if (!result.ok) throw new Error(result.error);
+    expect(result.tasks.find((t) => t.title === 'Later')).toMatchObject({
+      starts: '2026-11-01',
+      due: '2026-11-30',
+    });
+    expect(result.tasks.find((t) => t.title === 'Noted')?.notes).toBe('Ask Sam\nhttps://x.test');
+  });
+});

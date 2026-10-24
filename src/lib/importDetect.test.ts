@@ -17,6 +17,7 @@ const data: PersistedTasks = {
       dueDate: null,
       repeat: null,
       plannedFor: null,
+      startDate: null,
       difficulty: 1,
       color: null,
       createdAt: 1000,
@@ -72,6 +73,22 @@ describe('detectImport', () => {
     const r = detectImport('hello there');
     expect(r.kind).toBe('error');
     expect(r.kind === 'error' && r.error).toMatch(/Couldn.t find any JSON/);
+  });
+
+  it('keeps notes and start dates in a backup, and reads an AI reply that has them', () => {
+    const noted = {
+      ...data,
+      tasks: { a: { ...data.tasks.a, notes: 'a note', startDate: '2026-11-01' } },
+    };
+    expect(detectImport(serializeBackup(noted))).toMatchObject({
+      kind: 'backup',
+      data: { tasks: { a: { notes: 'a note', startDate: '2026-11-01' } } },
+    });
+    const ai = '{ "tasks": [ { "title": "One", "starts": "2026-11-01", "notes": "hi" } ] }';
+    expect(detectImport(ai)).toMatchObject({
+      kind: 'ai',
+      tasks: [{ title: 'One', starts: '2026-11-01', notes: 'hi' }],
+    });
   });
 
   it('treats blank input as empty', () => {

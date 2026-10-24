@@ -4,6 +4,7 @@ export type Difficulty = 1 | 2 | 3 | 4 | 5;
 export const MAX_DIFFICULTY = 5;
 /** Limits mirrored in firestore.rules; the data layer clamps to them so writes are never rejected. */
 export const MAX_TITLE_LENGTH = 500;
+export const MAX_NOTES_LENGTH = 5000;
 export const MAX_TAGS = 20;
 
 /**
@@ -42,6 +43,14 @@ export type Task = {
    * task planned on an earlier day that is still open rolls over into the next Today.
    */
   plannedFor: string | null;
+  /**
+   * Hidden until this day, 'YYYY-MM-DD' (local), or null. While it is after today the task is
+   * left out of the Tree, By deadline and Today views, with its whole subtree; the data is
+   * untouched and it shows by itself on that day.
+   */
+  startDate: string | null;
+  /** Plain-text, multi-line notes. Absent when there are none (never an empty string). */
+  notes?: string;
   /** On a spawned copy: the id of the task it was created from (used to avoid duplicates). */
   spawnedFrom?: string;
   parentId: string | null;

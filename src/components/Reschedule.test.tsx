@@ -48,8 +48,9 @@ describe('Reschedule menu', () => {
       `This weekend${pickDateLabel('2026-10-24')}`,
       `Next week${pickDateLabel('2026-10-26')}`,
       'Pick date…',
+      'Hide until…',
     ]);
-    // Nothing to remove yet.
+    // Nothing to remove or show yet.
     expect(within(dialog).queryByRole('menuitem', { name: 'Remove date' })).toBeNull();
   });
 

@@ -120,6 +120,7 @@ const mkOld = (id: string): Task => ({
   dueDate: null,
   repeat: null,
   plannedFor: null,
+  startDate: null,
   parentId: null,
   childIds: [],
   createdAt: 1,
@@ -209,11 +210,37 @@ describe('two clients, one account', () => {
     const first = await signedInDb(true);
     uid = first.uid;
     await setDoc(doc(first.db, `users/${uid}`), { rootIds: ['old'], schemaVersion: 3 });
-    const { repeat: _omit, plannedFor: _omit2, ...legacy } = toTaskDoc({ ...mkOld('old') });
+    const {
+      repeat: _omit,
+      plannedFor: _omit2,
+      startDate: _omit3,
+      ...legacy
+    } = toTaskDoc({ ...mkOld('old') });
     await setDoc(doc(first.db, `users/${uid}/tasks/old`), legacy);
     const c = await client(first.app, first.db);
     expect(c.store.getState().tasks.old.repeat).toBeNull();
     expect(c.store.getState().tasks.old.plannedFor).toBeNull();
+    expect(c.store.getState().tasks.old.startDate).toBeNull();
+    expect(c.store.getState().tasks.old.notes).toBeUndefined();
+  });
+
+  it('syncs notes and start dates with the task, and removing a note removes it everywhere', async () => {
+    const [a, b] = await pair();
+    const id = a.store.getState().add({ title: 'Renew', startDate: '2026-11-01', notes: 'form 7' });
+    await vi.waitFor(
+      () =>
+        expect(b.store.getState().tasks[id]).toMatchObject({
+          startDate: '2026-11-01',
+          notes: 'form 7',
+        }),
+      { timeout: 8000 },
+    );
+    a.store.getState().setNotes(id, '');
+    a.store.getState().hideUntil(id, null);
+    await vi.waitFor(() => expect(b.store.getState().tasks[id]?.startDate).toBeNull(), {
+      timeout: 8000,
+    });
+    expect('notes' in b.store.getState().tasks[id]).toBe(false);
   });
 
   it('syncs completion history and keeps untouched task identities on the receiver', async () => {

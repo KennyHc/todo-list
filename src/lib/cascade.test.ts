@@ -13,6 +13,7 @@ const task = (id: string, parentId: string | null, childIds: string[] = []): Tas
   dueDate: null,
   repeat: null,
   plannedFor: null,
+  startDate: null,
   parentId,
   childIds,
   createdAt: 0,

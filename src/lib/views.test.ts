@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { mkState, mkTask } from '../test/factories';
 import type { TaskTree } from '../types';
 import { addTask, emptyTree, toggleDone, updateTask } from './tree';
 import {
@@ -9,6 +10,8 @@ import {
   neighborAfterRemoval,
   taskPath,
   todayISO,
+  treeRows,
+  upcomingCount,
   visibleOrder,
   visibleTreeIds,
 } from './views';
@@ -297,5 +300,94 @@ describe('neighborAfterRemoval', () => {
 
   it('returns null for an unknown id', () => {
     expect(neighborAfterRemoval(order, 'zzz')).toBeNull();
+  });
+});
+
+describe('start dates in the lists', () => {
+  const TODAY = '2026-10-20';
+  const LATER = '2026-10-26';
+  const tree = mkState([
+    mkTask('a'),
+    mkTask('p', { childIds: ['c1', 'c2'], startDate: LATER }),
+    mkTask('c1', { parentId: 'p', childIds: ['g'], dueDate: '2026-10-21' }),
+    mkTask('g', { parentId: 'c1' }),
+    mkTask('c2', { parentId: 'p' }),
+    mkTask('q', { childIds: ['r'] }),
+    mkTask('r', { parentId: 'q', startDate: LATER }),
+    mkTask('s', { startDate: TODAY }),
+    mkTask('t', { startDate: '2026-10-01' }),
+    mkTask('u', { startDate: LATER, done: true, completedAt: 5 }),
+  ]);
+
+  it('treeRows leaves out a not-started task with its whole subtree', () => {
+    expect(treeRows(tree, null, { today: TODAY })).toEqual(['a', 'q', 's', 't']);
+  });
+
+  it('a start date of today or earlier shows normally; nothing is cleared', () => {
+    expect(treeRows(tree, null, { today: LATER })).toEqual([
+      'a',
+      'p',
+      'c1',
+      'g',
+      'c2',
+      'q',
+      'r',
+      's',
+      't',
+    ]);
+    expect(tree.tasks.p.startDate).toBe(LATER);
+  });
+
+  it('showUpcoming brings them back in tree order', () => {
+    expect(treeRows(tree, null, { today: TODAY, showUpcoming: true })).toEqual([
+      'a',
+      'p',
+      'c1',
+      'g',
+      'c2',
+      'q',
+      'r',
+      's',
+      't',
+    ]);
+  });
+
+  it('deadlineList leaves them out too (subtree included), but not done tasks', () => {
+    expect(deadlineList(tree, { tag: null }, TODAY)).toEqual(['a', 'q', 's', 't', 'u']);
+    expect(deadlineList(tree, { tag: null }, LATER)).toContain('c1');
+  });
+
+  it('visibleOrder follows both views, with showUpcoming for the tree', () => {
+    const opts = { tag: null, completedShowAll: true };
+    expect(visibleOrder(tree, { ...opts, view: 'tree' }, TODAY)).toEqual(['a', 'q', 's', 't']);
+    expect(visibleOrder(tree, { ...opts, view: 'tree', showUpcoming: true }, TODAY)).toHaveLength(
+      9,
+    );
+    expect(visibleOrder(tree, { ...opts, view: 'deadline' }, TODAY)).not.toContain('c1');
+  });
+
+  describe('upcomingCount', () => {
+    it('counts only the topmost hidden tasks, not their descendants', () => {
+      // p (with three descendants) and r; the done one is not counted.
+      expect(upcomingCount(tree, TODAY)).toBe(2);
+    });
+
+    it('is zero when nothing is hidden, and when the date has come', () => {
+      expect(upcomingCount(mkState([mkTask('a'), mkTask('b', { startDate: TODAY })]), TODAY)).toBe(
+        0,
+      );
+      expect(upcomingCount(tree, LATER)).toBe(0);
+    });
+
+    it('respects the tag filter and skips tasks under a done parent', () => {
+      const tagged = mkState([
+        mkTask('a', { startDate: LATER, tags: ['x'] }),
+        mkTask('b', { startDate: LATER, tags: ['y'] }),
+        mkTask('d', { done: true, childIds: ['e'] }),
+        mkTask('e', { parentId: 'd', startDate: LATER, done: true }),
+      ]);
+      expect(upcomingCount(tagged, TODAY)).toBe(2);
+      expect(upcomingCount(tagged, TODAY, 'x')).toBe(1);
+    });
   });
 });

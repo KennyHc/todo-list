@@ -28,6 +28,11 @@ service cloud.firestore {
       return p == null || (p is string && p.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'));
     }
 
+    // `startDate` (hidden until) is absent, null, or a 'YYYY-MM-DD' string, like `dueDate`.
+    function validStartDate(d) {
+      return d == null || (d is string && d.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'));
+    }
+
     // `settings`, if present, is a map; its `dailyCapacity`, if present, an int from 1 to 50.
     function validSettings(s) {
       return s is map
@@ -44,6 +49,8 @@ service cloud.firestore {
         && t.done is bool
         && (!('repeat' in t) || validRepeat(t.repeat))
         && (!('plannedFor' in t) || validPlannedFor(t.plannedFor))
+        && (!('startDate' in t) || validStartDate(t.startDate))
+        && (!('notes' in t) || (t.notes is string && t.notes.size() <= 5000))
         && (!('spawnedFrom' in t) || t.spawnedFrom is string);
     }
 

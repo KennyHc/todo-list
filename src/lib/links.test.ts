@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linkHost, splitTitleLinks } from './links';
+import { linkHost, splitNoteLinks, splitTitleLinks } from './links';
 
 describe('splitTitleLinks', () => {
   it('returns the title untouched when there is no link', () => {
@@ -76,5 +76,26 @@ describe('linkHost', () => {
   it('is the hostname without www', () => {
     expect(linkHost('https://www.github.com/a/b')).toBe('github.com');
     expect(linkHost('http://sub.example.org:8080/x')).toBe('sub.example.org');
+  });
+});
+
+describe('splitNoteLinks', () => {
+  it("keeps the lines, pulling each line's links out of its text", () => {
+    expect(
+      splitNoteLinks('Call first\nhttps://a.test/x\n\nsee https://b.test and https://b.test.'),
+    ).toEqual([
+      { text: 'Call first', links: [] },
+      { text: '', links: ['https://a.test/x'] },
+      { text: '', links: [] },
+      { text: 'see and.', links: ['https://b.test'] },
+    ]);
+  });
+
+  it('handles Windows line endings and an empty note', () => {
+    expect(splitNoteLinks('a\r\nb')).toEqual([
+      { text: 'a', links: [] },
+      { text: 'b', links: [] },
+    ]);
+    expect(splitNoteLinks('')).toEqual([{ text: '', links: [] }]);
   });
 });

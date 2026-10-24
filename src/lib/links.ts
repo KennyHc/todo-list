@@ -49,6 +49,17 @@ export function splitTitleLinks(title: string): { text: string; links: string[] 
   return { text, links };
 }
 
+/**
+ * A note's lines, each split like a title: its text with links removed, and its links in order.
+ * Line breaks are kept, since notes are multi-line; a blank line is `{ text: '', links: [] }`.
+ */
+export function splitNoteLinks(notes: string): { text: string; links: string[] }[] {
+  return notes.split(/\r?\n/).map((line) => {
+    const { text, links } = splitTitleLinks(line);
+    return { text, links: [...new Set(links)] };
+  });
+}
+
 /** "github.com": the host without a leading www. */
 export function linkHost(url: string): string {
   try {

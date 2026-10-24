@@ -251,10 +251,10 @@ describe('repeat', () => {
   });
 
   it('an explicit date wins over the first occurrence', () => {
-    const r = run('Gym every monday from oct 30', R);
+    const r = run('Gym every monday by oct 30', R);
     expect(r.repeat).toEqual({ every: 'week', weekday: 1 });
     expect(r.dueDate).toBe('2026-10-30');
-    expect(r.title).toBe('Gym from');
+    expect(r.title).toBe('Gym');
   });
 
   it('weekday repeats start next Monday on a weekend', () => {
@@ -408,5 +408,157 @@ describe('repeat phrases and the first occurrence', () => {
         expect(r.dueDate, `${phrase} on ${d}`).toBe(firstOccurrence(r.repeat!, todayISO(now)));
       }
     }
+  });
+});
+
+describe('start dates', () => {
+  it.each([
+    ['Renew passport from nov 1', 'Renew passport', '2026-11-01'],
+    ['Renew passport starting nov 1', 'Renew passport', '2026-11-01'],
+    ['Renew passport start nov 1', 'Renew passport', '2026-11-01'],
+    ['Renew passport after nov 1', 'Renew passport', '2026-11-01'],
+    ['Renew passport FROM Nov 1', 'Renew passport', '2026-11-01'],
+    ['from nov 1 renew passport', 'renew passport', '2026-11-01'],
+    ['Plan trip from tomorrow', 'Plan trip', '2026-10-21'],
+    ['Plan trip from next monday', 'Plan trip', '2026-10-26'],
+    ['Plan trip from next week', 'Plan trip', '2026-10-26'],
+    ['Plan trip from in 3 days', 'Plan trip', '2026-10-23'],
+    ['Plan trip from 2026-12-01', 'Plan trip', '2026-12-01'],
+    ['Plan trip from 24 oct', 'Plan trip', '2026-10-24'],
+    ['Plan trip from 24th of october', 'Plan trip', '2026-10-24'],
+    ['Plan trip from 12/25', 'Plan trip', '2026-12-25'],
+    ['Plan trip from 25.12.2026', 'Plan trip', '2026-12-25'],
+    ['Plan trip from oct 24, 2027', 'Plan trip', '2027-10-24'],
+    // an ambiguous form counts after these cue words, like after "on" or "by"
+    ['Gym from mon', 'Gym', '2026-10-26'],
+    ['Gym after fri', 'Gym', '2026-10-23'],
+  ])('%s: starts on the date, which leaves the title', (input, title, start) => {
+    const r = run(input);
+    expect(r).toMatchObject({ title, startDate: start, dueDate: null });
+    expect(r.tokens).toHaveLength(1);
+    expect(r.tokens[0]).toMatchObject({ kind: 'start' });
+  });
+
+  it('labels the chip with the weekday and date', () => {
+    expect(run('x from mon oct 26').tokens[0].label).toBe('Starts Mon, Oct 26');
+    expect(run('x from nov 1').tokens[0].label).toBe('Starts Sun, Nov 1');
+    expect(run('x from nov 1 2027').tokens[0].label).toBe('Starts Mon, Nov 1, 2027');
+    expect(run('x from nov 1', { locale: 'en-GB' }).tokens[0].label).toBe('Starts Sun 1 Nov');
+  });
+
+  it('records the span of the cue and the date for the token', () => {
+    const r = run('Renew passport from nov 1 now');
+    expect(r.tokens[0]).toMatchObject({ kind: 'start', raw: 'from nov 1', start: 15, end: 25 });
+    expect(r.title).toBe('Renew passport now');
+  });
+
+  it('coexists with a due date in either order', () => {
+    const a = run('Renew passport from nov 1 by nov 30');
+    expect(a).toMatchObject({
+      title: 'Renew passport',
+      startDate: '2026-11-01',
+      dueDate: '2026-11-30',
+    });
+    expect(a.tokens.map((t) => t.kind)).toEqual(['start', 'date']);
+    const b = run('Renew passport due nov 30 starting nov 1');
+    expect(b).toMatchObject({
+      title: 'Renew passport',
+      startDate: '2026-11-01',
+      dueDate: '2026-11-30',
+    });
+    expect(b.tokens.map((t) => t.kind)).toEqual(['date', 'start']);
+    const c = run('Renew passport from nov 1 tomorrow #admin !2');
+    expect(c).toMatchObject({
+      title: 'Renew passport',
+      startDate: '2026-11-01',
+      dueDate: '2026-10-21',
+      tags: ['admin'],
+      difficulty: 2,
+    });
+  });
+
+  it('the last start phrase wins and the earlier one stays in the title', () => {
+    const r = run('x from nov 1 from nov 8');
+    expect(r.startDate).toBe('2026-11-08');
+    expect(r.title).toBe('x from nov 1');
+    expect(r.tokens).toHaveLength(1);
+  });
+
+  it('dismissing the start chip leaves the phrase in the title and no start date', () => {
+    const first = run('Renew from nov 1');
+    const r = run('Renew from nov 1', { ignore: new Set([tokenKey(first.tokens[0])]) });
+    expect(r).toMatchObject({ title: 'Renew from nov 1', startDate: null, dueDate: null });
+    expect(r.tokens).toEqual([]);
+  });
+
+  it('dismissing the last one falls back to the one before', () => {
+    const first = run('x from nov 1 from nov 8');
+    const r = run('x from nov 1 from nov 8', { ignore: new Set([tokenKey(first.tokens[0])]) });
+    expect(r.startDate).toBe('2026-11-01');
+    expect(r.title).toBe('x from nov 8');
+  });
+
+  it('a start date with a repeat: the repeat still sets the first due date', () => {
+    const r = run('Gym every monday from oct 30');
+    expect(r).toMatchObject({
+      title: 'Gym',
+      startDate: '2026-10-30',
+      dueDate: '2026-10-26',
+      repeat: { every: 'week', weekday: 1 },
+    });
+  });
+
+  it('a start date alone is not a due date, and an input of only that keeps its text', () => {
+    expect(run('Taxes from nov 1').dueDate).toBeNull();
+    const only = run('from nov 1');
+    expect(only).toMatchObject({ title: 'from nov 1', startDate: null, dueDate: null });
+    expect(only.tokens).toEqual([]);
+  });
+
+  it('a tag does not stop the date after the cue being found', () => {
+    const r = run('Taxes #money from nov 1');
+    expect(r).toMatchObject({ title: 'Taxes', tags: ['money'], startDate: '2026-11-01' });
+  });
+
+  describe('no false positives', () => {
+    it.each([
+      'from home',
+      'Work from home tomorrow',
+      'from 5 to 6',
+      'Open 9 from 5 to 6',
+      'start the car',
+      'Start fresh',
+      'starting point',
+      'after lunch',
+      'Call after work',
+      'Gift from mum',
+      'Learn from mistakes',
+      'Email from John',
+      'Read the start of chapter 3',
+      'after 3 weeks',
+      'from 10 apples',
+      'from may',
+      'start in time',
+      'Buy 1/2 cup after',
+    ])('%s stays in the title', (input) => {
+      const r = run(input);
+      expect(r.startDate).toBeNull();
+      expect(r.tokens.filter((t) => t.kind === 'start')).toEqual([]);
+      if (!/tomorrow/.test(input)) expect(r.title).toBe(input);
+    });
+
+    it('a due phrase after a plain "from" word is just a due date', () => {
+      const r = run('Work from home tomorrow');
+      expect(r).toMatchObject({ title: 'Work from home', dueDate: '2026-10-21', startDate: null });
+    });
+
+    it('an impossible date after the cue matches nothing', () => {
+      expect(run('x from feb 30')).toMatchObject({ title: 'x from feb 30', startDate: null });
+      expect(run('x from 31/02')).toMatchObject({ startDate: null });
+    });
+
+    it('a cue separated from the date by punctuation does not count', () => {
+      expect(run('x from, nov 1')).toMatchObject({ startDate: null, dueDate: '2026-11-01' });
+    });
   });
 });

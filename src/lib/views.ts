@@ -1,6 +1,6 @@
 import type { TaskTree } from '../types';
 import { todayList } from './today';
-import { getAncestors, getDescendants } from './tree';
+import { getAncestors, getDescendants, hiddenUntilStart, notStarted } from './tree';
 
 export type DueStatus = 'overdue' | 'today' | 'soon' | 'later';
 
@@ -45,10 +45,19 @@ export function visibleTreeIds(tree: TaskTree, tag: string | null): Set<string> 
  * Every task (parents and subtasks alike, hierarchy ignored), optionally filtered by tag: the
  * open ones with a due date (soonest first), then the open ones without (oldest first), then
  * the done ones, most recently completed first (the Completed section). Ties keep the tree's
- * insertion order.
+ * insertion order. Open tasks that have not started yet (their own start date or an ancestor's
+ * is after `today`) are left out.
  */
-export function deadlineList(tree: TaskTree, { tag }: { tag: string | null }): string[] {
-  const tasks = Object.values(tree.tasks).filter((task) => tag === null || task.tags.includes(tag));
+export function deadlineList(
+  tree: TaskTree,
+  { tag }: { tag: string | null },
+  today: string = todayISO(),
+): string[] {
+  const tasks = Object.values(tree.tasks).filter(
+    (task) =>
+      (tag === null || task.tags.includes(tag)) &&
+      (task.done || !hiddenUntilStart(tree, task.id, today)),
+  );
   const dated = tasks
     .filter((t) => !t.done && t.dueDate !== null)
     .sort((a, b) => (a.dueDate! < b.dueDate! ? -1 : a.dueDate! > b.dueDate! ? 1 : 0));
@@ -103,20 +112,45 @@ export function isContextOnly(tree: TaskTree, id: string, tag: string): boolean 
 /**
  * The Tree view's rows in display order: open tasks only (a done task, and with it its whole
  * subtree, belongs to History), skipping collapsed subtrees and anything the tag filter hides.
+ * A task that has not started yet takes its subtree with it, unless `showUpcoming` is on.
  */
-export function treeRows(tree: TaskTree, tag: string | null): string[] {
+export function treeRows(
+  tree: TaskTree,
+  tag: string | null,
+  { today = todayISO(), showUpcoming = false }: { today?: string; showUpcoming?: boolean } = {},
+): string[] {
   const visible = visibleTreeIds(tree, tag);
   const out: string[] = [];
   const walk = (ids: string[]) => {
     for (const id of ids) {
       const task = tree.tasks[id];
       if (!task || task.done || (visible && !visible.has(id))) continue;
+      if (!showUpcoming && notStarted(task, today)) continue;
       out.push(id);
       if (!task.collapsed) walk(task.childIds);
     }
   };
   walk(tree.rootIds);
   return out;
+}
+
+/**
+ * How many open tasks are hidden by a start date the Tree view could show: the topmost ones
+ * only (the descendants of a hidden task are not counted again), under the tag filter.
+ */
+export function upcomingCount(tree: TaskTree, today: string, tag: string | null = null): number {
+  const visible = visibleTreeIds(tree, tag);
+  let count = 0;
+  const walk = (ids: string[]) => {
+    for (const id of ids) {
+      const task = tree.tasks[id];
+      if (!task || task.done || (visible && !visible.has(id))) continue;
+      if (notStarted(task, today)) count += 1;
+      else walk(task.childIds);
+    }
+  };
+  walk(tree.rootIds);
+  return count;
 }
 
 /**
@@ -132,23 +166,25 @@ export function visibleOrder(
     tag,
     completedCollapsed = false,
     completedShowAll = false,
+    showUpcoming = false,
   }: {
     view: 'today' | 'tree' | 'deadline' | 'history';
     tag: string | null;
     completedCollapsed?: boolean;
     completedShowAll?: boolean;
+    showUpcoming?: boolean;
   },
   today: string = todayISO(),
 ): string[] {
   if (view === 'history') return [];
   if (view === 'today') return todayList(tree, today, tag);
   if (view === 'deadline') {
-    const all = deadlineList(tree, { tag });
+    const all = deadlineList(tree, { tag }, today);
     const open = all.filter((id) => !tree.tasks[id].done);
     const done = all.filter((id) => tree.tasks[id].done);
     return [...open, ...completedShown(done, completedCollapsed, completedShowAll)];
   }
-  return treeRows(tree, tag);
+  return treeRows(tree, tag, { today, showUpcoming });
 }
 
 /** The row to focus once `id` (and everything in `removed`) is gone: the next one, else the previous. */

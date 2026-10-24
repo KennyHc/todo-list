@@ -142,6 +142,7 @@ const orderOf = (ui: ReturnType<typeof useUIStore.getState>) => ({
   tag: ui.tagFilter,
   completedCollapsed: ui.completedCollapsed,
   completedShowAll: ui.completedShowAll,
+  showUpcoming: ui.showUpcoming,
 });
 
 const asElement = (target: EventTarget | null) => (target instanceof Element ? target : null);

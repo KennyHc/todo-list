@@ -3,7 +3,14 @@ import type { PersistedTasks } from '../store/tasks';
 import { parseRepeatPhrase } from './quickAdd';
 import { firstOccurrence, repeatWord } from './recur';
 import { normalizeTags } from './tags';
-import { addTask, effectiveDifficulty, progress, sortedChildIds, toggleDone } from './tree';
+import {
+  addTask,
+  effectiveDifficulty,
+  normalizeNotes,
+  progress,
+  sortedChildIds,
+  toggleDone,
+} from './tree';
 import { dueStatus, todayISO } from './views';
 
 // ---------------------------------------------------------------------------
@@ -19,9 +26,12 @@ export type AiTask = {
   progress?: string;
   tags?: string[];
   due?: string;
+  /** Hidden until this day, 'YYYY-MM-DD'; absent once it has passed or when there is none. */
+  starts?: string;
   /** "daily", "weekdays", "weekly", "monthly" or "every monday". */
   repeat?: string;
   dueStatus?: 'overdue' | 'today' | 'soon';
+  notes?: string;
   completedAt?: string;
   subtasks?: AiTask[];
 };
@@ -71,6 +81,9 @@ export function toAiJson(
       const status = task.done ? null : dueStatus(task.dueDate, today);
       if (status !== null && status !== 'later') out.dueStatus = status;
     }
+    // Only a start that is still ahead says anything; one in the past is just history.
+    if (task.startDate !== null && task.startDate > today) out.starts = task.startDate;
+    if (task.notes !== undefined) out.notes = task.notes;
     if (task.done && task.completedAt !== undefined) {
       out.completedAt = todayISO(new Date(task.completedAt));
     }
@@ -173,6 +186,8 @@ export function buildImportPrompt(
     '- At most 3 levels deep.',
     '- "tags": optional, lowercase, without "#".',
     `- "due": optional YYYY-MM-DD, only if implied by my goal, relative to today (${today}).`,
+    '- "starts": optional YYYY-MM-DD: the task stays hidden until that day. Only if my goal says it cannot start before then.',
+    '- "notes": optional plain text with details for the task.',
     '- "repeat": optional, one of "daily", "weekdays", "weekly", "monthly" or "every monday" (any weekday).',
     '- Leave out optional keys you do not need. No other keys, no prose, no code fences.',
     '',
@@ -203,6 +218,8 @@ export type AiImportTask = {
   difficulty: Difficulty;
   tags: string[];
   due?: string;
+  starts?: string;
+  notes?: string;
   repeat?: Repeat;
   done?: boolean;
   subtasks: AiImportTask[];
@@ -317,6 +334,7 @@ function parseTags(raw: unknown): string[] {
 const SUBTASK_KEYS = ['subtasks', 'children', 'items', 'subTasks', 'sub_tasks'];
 const TITLE_KEYS = ['title', 'name', 'task'];
 const DUE_KEYS = ['due', 'deadline', 'dueDate', 'due_date'];
+const START_KEYS = ['starts', 'start', 'startDate', 'start_date'];
 
 export function parseAiImport(text: string): AiParseResult {
   let sawCandidate = false;
@@ -391,6 +409,14 @@ function normalize(root: unknown): { tasks: AiImportTask[]; count: number; warni
       if (due) task.due = due;
       else badDates.push(task.title);
     }
+    const rawStart = pick(obj, START_KEYS);
+    if (rawStart !== undefined && rawStart !== '') {
+      const starts = validDate(rawStart);
+      if (starts) task.starts = starts;
+      else badDates.push(task.title);
+    }
+    const notes = normalizeNotes(typeof obj.notes === 'string' ? obj.notes.trim() : obj.notes);
+    if (notes !== undefined) task.notes = notes;
     const rawRepeat = pick(obj, ['repeat']);
     if (rawRepeat !== undefined && rawRepeat !== '') {
       const repeat = typeof rawRepeat === 'string' ? parseRepeatPhrase(rawRepeat) : null;
@@ -491,6 +517,8 @@ export function appendAiTasks(
         // A repeat needs a due date: without one the first occurrence is used.
         dueDate: task.due ?? (task.repeat ? firstOccurrence(task.repeat, today) : null),
         repeat: task.repeat ?? null,
+        startDate: task.starts ?? null,
+        notes: task.notes,
       },
       now,
     );

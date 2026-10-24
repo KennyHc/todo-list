@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mkEntry, mkTask } from '../test/factories';
+import { MAX_NOTES_LENGTH } from '../types';
 import {
   fromHistoryDoc,
   fromTaskDoc,
@@ -208,5 +209,57 @@ describe('settings', () => {
     expect(isEqualSettings(full, { ...full, todayView: false })).toBe(false);
     expect(isEqualSettings(full, { ...full, dailyCapacity: 9 })).toBe(false);
     expect(isEqualSettings(full, { ...full, hints: {} })).toBe(false);
+  });
+});
+
+describe('startDate', () => {
+  it('round-trips a date and a null', () => {
+    const hidden = mkTask('a', { startDate: '2026-11-01' });
+    expect(toTaskDoc(hidden).startDate).toBe('2026-11-01');
+    expect(fromTaskDoc('a', toTaskDoc(hidden))).toEqual(hidden);
+    expect(toTaskDoc(mkTask('b')).startDate).toBeNull();
+    expect(fromTaskDoc('b', toTaskDoc(mkTask('b')))?.startDate).toBeNull();
+  });
+
+  it('decodes a missing or invalid value to null', () => {
+    expect(fromTaskDoc('a', {})?.startDate).toBeNull();
+    for (const startDate of [5, true, [], {}, '', 'monday', '2026-1-5', '20261101']) {
+      expect(fromTaskDoc('a', { startDate })?.startDate, JSON.stringify(startDate)).toBeNull();
+    }
+  });
+
+  it('is noticed by isEqualTask', () => {
+    const t = mkTask('a', { startDate: '2026-11-01' });
+    expect(isEqualTask(t, { ...t })).toBe(true);
+    expect(isEqualTask(t, { ...t, startDate: null })).toBe(false);
+    expect(isEqualTask(t, { ...t, startDate: '2026-11-02' })).toBe(false);
+  });
+});
+
+describe('notes', () => {
+  it('round-trips, and the key is omitted when there are none', () => {
+    const noted = mkTask('a', { notes: 'line 1\nline 2 https://x.test' });
+    expect(toTaskDoc(noted).notes).toBe('line 1\nline 2 https://x.test');
+    expect(fromTaskDoc('a', toTaskDoc(noted))).toEqual(noted);
+    expect('notes' in toTaskDoc(mkTask('b'))).toBe(false);
+    expect('notes' in fromTaskDoc('b', toTaskDoc(mkTask('b')))!).toBe(false);
+  });
+
+  it('decodes a missing, blank or non-string value to no notes, and clamps a long one', () => {
+    for (const notes of [undefined, '', '   \n', 5, true, [], {}, null]) {
+      expect('notes' in fromTaskDoc('a', { notes })!, JSON.stringify(notes)).toBe(false);
+    }
+    expect(fromTaskDoc('a', { notes: 'x'.repeat(MAX_NOTES_LENGTH + 10) })?.notes).toHaveLength(
+      MAX_NOTES_LENGTH,
+    );
+  });
+
+  it('is noticed by isEqualTask', () => {
+    const t = mkTask('a', { notes: 'hi' });
+    expect(isEqualTask(t, { ...t })).toBe(true);
+    expect(isEqualTask(t, { ...t, notes: 'hello' })).toBe(false);
+    const without = mkTask('a');
+    expect(isEqualTask(t, without)).toBe(false);
+    expect(isEqualTask(without, { ...without })).toBe(true);
   });
 });

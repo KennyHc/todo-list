@@ -30,7 +30,8 @@ type Props = {
 const GAP = 6;
 const MARGIN = 8;
 
-type Pos = { top: number; left: number; flipped: boolean };
+/** `maxHeight` is set only when the panel fits on neither side and has to scroll. */
+type Pos = { top: number; left: number; flipped: boolean; maxHeight?: number };
 
 function PopoverPanel({
   onClose,
@@ -57,19 +58,22 @@ function PopoverPanel({
       if (!anchor || !panel) return;
       const a = anchor.getBoundingClientRect();
       const w = panel.offsetWidth;
-      const h = panel.offsetHeight;
+      // The natural height, even while a max-height from an earlier pass is clipping it.
+      const h = panel.scrollHeight + panel.offsetHeight - panel.clientHeight;
       const vw = document.documentElement.clientWidth;
       const vh = window.innerHeight;
       let left = align === 'end' ? a.right - w : a.left;
       left = Math.max(MARGIN, Math.min(left, vw - w - MARGIN));
-      let top = a.bottom + GAP;
-      let flipped = false;
-      if (top + h > vh - MARGIN && a.top - GAP - h >= MARGIN) {
-        top = a.top - GAP - h;
-        flipped = true;
-      }
+      const below = vh - MARGIN - (a.bottom + GAP);
+      const above = a.top - GAP - MARGIN;
+      // Below if it fits, else above if that fits, else the roomier side, scrolling inside it.
+      const flipped = h > below && (h <= above || above > below);
+      const maxHeight = h <= (flipped ? above : below) ? undefined : flipped ? above : below;
+      const top = flipped ? a.top - GAP - (maxHeight ?? h) : a.bottom + GAP;
       setPos((p) =>
-        p.top === top && p.left === left && p.flipped === flipped ? p : { top, left, flipped },
+        p.top === top && p.left === left && p.flipped === flipped && p.maxHeight === maxHeight
+          ? p
+          : { top, left, flipped, maxHeight },
       );
     };
     place();
@@ -181,6 +185,7 @@ function PopoverPanel({
     top: pos.top,
     left: pos.left,
     width,
+    maxHeight: pos.maxHeight,
     transformOrigin: `${pos.flipped ? 'bottom' : 'top'} ${align === 'end' ? 'right' : 'left'}`,
   };
 

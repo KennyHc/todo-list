@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, type MotionProps } from 'framer-motion';
-import { MoreHorizontal, Plus, Sun, SunDim, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, MoreHorizontal, Plus, StickyNote, Sun, SunDim, Trash2 } from 'lucide-react';
 import { weekdayDate } from '../lib/dates';
 import { nextOccurrence, repeatPatch, repeatPhrase } from '../lib/recur';
 import { todayISO } from '../lib/views';
@@ -25,6 +25,8 @@ type Props = {
   buttonClassName: string;
   motionProps: MotionProps;
   onAddSubtask: () => void;
+  /** Opens the row's note editor (the menu has closed by then). */
+  onNote: () => void;
   onDelete: () => void;
   /**
    * Controlled open state, for a menu opened from somewhere else (the phone's title editor has
@@ -74,6 +76,7 @@ export function TaskMenu({
   buttonClassName,
   motionProps,
   onAddSubtask,
+  onNote,
   onDelete,
   open: controlledOpen,
   onOpenChange,
@@ -87,8 +90,14 @@ export function TaskMenu({
   const [ownOpen, setOwnOpen] = useState(false);
   const open = onOpenChange ? (controlledOpen ?? false) : ownOpen;
   const setOpen = onOpenChange ?? setOwnOpen;
+  /** The "Hide until…" date picker is open in place of the actions. */
+  const [hiding, setHiding] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const close = useCallback(() => setOpen(false), [setOpen]);
+  // Reopens on the actions, not on the date picker.
+  useEffect(() => {
+    if (!open) setHiding(false);
+  }, [open]);
   if (!task) return null;
 
   const update = useTaskStore.getState().update;
@@ -178,19 +187,57 @@ export function TaskMenu({
         </div>
         <div className={styles.divider} role="separator" />
         <div className={styles.actions}>
-          {todayView && !task.done && <TodayAction id={id} task={task} act={act} />}
-          <button type="button" className={styles.item} onClick={act(onAddSubtask)}>
-            <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
-            <span>Add subtask</span>
-          </button>
-          <button
-            type="button"
-            className={`${styles.item} ${styles.danger}`}
-            onClick={act(onDelete)}
-          >
-            <Trash2 size={16} strokeWidth={1.75} aria-hidden="true" />
-            <span>Delete</span>
-          </button>
+          {hiding ? (
+            <>
+              <h3 className={styles.heading}>Hide until</h3>
+              <DatePicker
+                inputLabel="Hide until"
+                value={task.startDate}
+                onChange={(date) => {
+                  // Typing a year passes through 0002, 0020, ...: wait for a real one.
+                  if (date === null || date >= '1000-01-01') {
+                    close();
+                    useTaskStore.getState().hideUntil(id, date);
+                  }
+                }}
+                onPicked={close}
+              />
+            </>
+          ) : (
+            <>
+              {todayView && !task.done && <TodayAction id={id} task={task} act={act} />}
+              <button type="button" className={styles.item} onClick={act(onAddSubtask)}>
+                <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
+                <span>Add subtask</span>
+              </button>
+              <button type="button" className={styles.item} onClick={act(onNote)}>
+                <StickyNote size={16} strokeWidth={1.75} aria-hidden="true" />
+                <span>{task.notes === undefined ? 'Add note' : 'Edit note'}</span>
+              </button>
+              <button type="button" className={styles.item} onClick={() => setHiding(true)}>
+                <EyeOff size={16} strokeWidth={1.75} aria-hidden="true" />
+                <span>Hide until{'…'}</span>
+              </button>
+              {task.startDate !== null && (
+                <button
+                  type="button"
+                  className={styles.item}
+                  onClick={act(() => useTaskStore.getState().hideUntil(id, null))}
+                >
+                  <Eye size={16} strokeWidth={1.75} aria-hidden="true" />
+                  <span>Show now</span>
+                </button>
+              )}
+              <button
+                type="button"
+                className={`${styles.item} ${styles.danger}`}
+                onClick={act(onDelete)}
+              >
+                <Trash2 size={16} strokeWidth={1.75} aria-hidden="true" />
+                <span>Delete</span>
+              </button>
+            </>
+          )}
         </div>
       </Popover>
     </>

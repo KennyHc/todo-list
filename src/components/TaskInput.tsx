@@ -11,17 +11,17 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Calendar, Plus, Repeat as RepeatIcon, Tag, X } from 'lucide-react';
+import { Calendar, Hourglass, Plus, Repeat as RepeatIcon, Tag, X } from 'lucide-react';
 import { useIsTouch } from '../hooks/useIsTouch';
 import { useKeyboardInset } from '../hooks/useKeyboardInset';
 import { useIsPhone } from '../hooks/useMediaQuery';
-import { dueLabel } from '../lib/dates';
+import { dueLabel, weekdayDate } from '../lib/dates';
 import { firstOccurrence } from '../lib/recur';
 import { parseQuickAdd, SUPPORTS_REPEAT, tokenKey, type QuickToken } from '../lib/quickAdd';
 import { normalizeTag, normalizeTags, tagColor } from '../lib/tags';
 import { dueStatus, todayISO } from '../lib/views';
 import { useAllTags, useTaskStore } from '../store/tasks';
-import { useView } from '../store/ui';
+import { useUIStore, useView } from '../store/ui';
 import type { Repeat } from '../types';
 import { DatePicker } from './DatePicker';
 import { DifficultyGlyph } from './DifficultyGlyph';
@@ -134,6 +134,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const ignore = (...tokens: QuickToken[]) =>
     setIgnored((prev) => new Set([...prev, ...tokens.map(tokenKey)]));
   const dateToken = parsed.tokens.find((t) => t.kind === 'date');
+  const startToken = parsed.tokens.find((t) => t.kind === 'start');
   const difficultyToken = parsed.tokens.find((t) => t.kind === 'difficulty');
   const repeatToken = parsed.tokens.find((t) => t.kind === 'repeat');
   /**
@@ -168,6 +169,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const hasChips =
     previewTags.length > 0 ||
     (dateToken !== undefined && parsed.dueDate !== null) ||
+    (startToken !== undefined && parsed.startDate !== null) ||
     difficultyToken !== undefined ||
     (SUPPORTS_REPEAT && repeatToken !== undefined);
 
@@ -189,17 +191,24 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   };
 
   const submit = () => {
-    const { title, tags: quickTags, difficulty } = parsed;
+    const { title, tags: quickTags, difficulty, startDate } = parsed;
     if (!title) return;
+    const later = startDate !== null && startDate > todayISO();
     add({
       title,
       tags: normalizeTags([...tags, ...quickTags]),
       dueDate,
+      startDate,
       repeat,
-      // In Today a new task is planned for today, unless a due date already places it.
-      ...(view === 'today' && dueDate === null && { plannedFor: todayISO() }),
+      // In Today a new task is planned for today, unless a due date already places it or it
+      // starts later (planning it would only make it roll in as "From today" once it starts).
+      ...(view === 'today' && dueDate === null && !later && { plannedFor: todayISO() }),
       ...(difficulty !== null && { difficulty }),
     });
+    // A task that starts later leaves the lists; say so, so it doesn't look like it vanished.
+    if (later) {
+      useUIStore.getState().showNotice(`Hidden until ${weekdayDate(startDate)}`);
+    }
     setValue('');
     setIgnored(new Set());
     setCaret(0);
@@ -341,6 +350,24 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
                         title={due !== null ? 'The due date you picked is used instead' : undefined}
                         removeLabel={`Don't treat "${dateToken.raw}" as a due date`}
                         onRemove={() => ignore(dateToken)}
+                      />
+                    </motion.li>
+                  )}
+                  {startToken && parsed.startDate && (
+                    <motion.li
+                      key="start"
+                      className={styles.chipItem}
+                      initial={CHIP_HIDDEN}
+                      animate={CHIP_SHOWN}
+                      exit={CHIP_HIDDEN}
+                      transition={CHIP_FADE}
+                    >
+                      <QuickChip
+                        icon={<Hourglass size={12} strokeWidth={1.75} aria-hidden="true" />}
+                        label={startToken.label}
+                        title="Hidden until this day"
+                        removeLabel={`Don't treat "${startToken.raw}" as a start date`}
+                        onRemove={() => ignore(startToken)}
                       />
                     </motion.li>
                   )}

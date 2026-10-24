@@ -3,7 +3,7 @@ import type { HistoryEntry } from '../lib/history';
 import { isISODate } from '../lib/dates';
 import { normalizeRepeat } from '../lib/recur';
 import { isEqualSettings, normalizeSettings } from '../lib/settings';
-import { sameRepeat } from '../lib/tree';
+import { normalizeNotes, sameRepeat } from '../lib/tree';
 import type { Difficulty, Settings, Task } from '../types';
 
 /** Plain-data helpers for the Firestore documents. No Firebase imports: unit-testable. */
@@ -12,8 +12,8 @@ import type { Difficulty, Settings, Task } from '../types';
  * 3: task `color` may be null ("automatic") and the meta document carries `tagColors`.
  * Version 2 documents stay readable: their default blue decodes to null.
  * Tasks may also carry `repeat` (a map, or null) and `spawnedFrom`; both are optional on read,
- * so there is no version bump. So are `plannedFor` on tasks (a date, or null) and `settings`
- * on the meta document (a map).
+ * so there is no version bump. So are `plannedFor` and `startDate` on tasks (a date, or null),
+ * `notes` (a string, absent when there are none) and `settings` on the meta document (a map).
  */
 export const SCHEMA_VERSION = 3;
 
@@ -39,6 +39,8 @@ export function isEqualTask(a: Task, b: Task): boolean {
       a.collapsed === b.collapsed &&
       a.dueDate === b.dueDate &&
       a.plannedFor === b.plannedFor &&
+      a.startDate === b.startDate &&
+      a.notes === b.notes &&
       sameRepeat(a.repeat, b.repeat) &&
       a.spawnedFrom === b.spawnedFrom &&
       a.parentId === b.parentId &&
@@ -90,7 +92,7 @@ export const fromSettings = normalizeSettings;
 /** The `settings` map as written: only known keys, `hints` without unset flags. */
 export const toSettingsDoc = (settings: Settings): Settings => normalizeSettings(settings);
 
-/** Document body for a task. `completedAt` is omitted (not undefined) when unset. */
+/** Document body for a task. `completedAt`, `spawnedFrom` and `notes` are omitted when unset. */
 export function toTaskDoc(task: Task): Record<string, unknown> {
   const doc: Record<string, unknown> = {
     id: task.id,
@@ -102,12 +104,14 @@ export function toTaskDoc(task: Task): Record<string, unknown> {
     tags: task.tags,
     dueDate: task.dueDate,
     plannedFor: task.plannedFor,
+    startDate: task.startDate,
     repeat: task.repeat,
     parentId: task.parentId,
     childIds: task.childIds,
     createdAt: task.createdAt,
   };
   if (task.spawnedFrom !== undefined) doc.spawnedFrom = task.spawnedFrom;
+  if (task.notes !== undefined) doc.notes = task.notes;
   if (task.completedAt !== undefined) doc.completedAt = task.completedAt;
   return doc;
 }
@@ -126,12 +130,15 @@ export function fromTaskDoc(id: string, data: unknown): Task | null {
     tags: strings(data.tags),
     dueDate: typeof data.dueDate === 'string' ? data.dueDate : null,
     plannedFor: isISODate(data.plannedFor) ? data.plannedFor : null,
+    startDate: isISODate(data.startDate) ? data.startDate : null,
     repeat: normalizeRepeat(data.repeat),
     parentId: typeof data.parentId === 'string' ? data.parentId : null,
     childIds: strings(data.childIds),
     createdAt: num(data.createdAt),
   };
   if (typeof data.spawnedFrom === 'string') task.spawnedFrom = data.spawnedFrom;
+  const notes = normalizeNotes(data.notes);
+  if (notes !== undefined) task.notes = notes;
   if (typeof data.completedAt === 'number') task.completedAt = data.completedAt;
   return task;
 }

@@ -1,10 +1,12 @@
-import { visibleTreeIds } from '../lib/views';
+import { hiddenUntilStart } from '../lib/tree';
+import { todayISO, visibleTreeIds } from '../lib/views';
 import { useTaskStore } from './tasks';
 import { useUIStore } from './ui';
 
 /**
  * Show a task wherever it lives: switch to the tree, drop a tag filter that hides it, expand
- * its collapsed ancestors, focus it and pulse it. TaskItem scrolls it into view once mounted.
+ * its collapsed ancestors, show the tasks that start later if it is one of them, focus it and
+ * pulse it. TaskItem scrolls it into view once mounted.
  */
 export function revealTask(id: string): void {
   const tasks = useTaskStore.getState();
@@ -15,6 +17,7 @@ export function revealTask(id: string): void {
   if (ui.tagFilter !== null && !visibleTreeIds(tasks, ui.tagFilter)?.has(id)) {
     ui.setTagFilter(null);
   }
+  if (hiddenUntilStart(tasks, id, todayISO())) ui.setShowUpcoming(true);
   tasks.revealTask(id);
   ui.setFocusedId(id);
   ui.flashRow(id);

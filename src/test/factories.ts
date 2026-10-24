@@ -13,6 +13,7 @@ export const mkTask = (id: string, over: Partial<Task> = {}): Task => ({
   dueDate: null,
   repeat: null,
   plannedFor: null,
+  startDate: null,
   parentId: null,
   childIds: [],
   createdAt: 1,

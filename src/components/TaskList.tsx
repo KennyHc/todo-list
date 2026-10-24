@@ -38,6 +38,7 @@ import {
   type Projection,
 } from '../lib/dnd';
 import { getDescendants } from '../lib/tree';
+import { todayISO } from '../lib/views';
 import { useDragStore } from '../store/drag';
 import { useTaskStore } from '../store/tasks';
 import { useUIStore } from '../store/ui';
@@ -45,6 +46,7 @@ import { DragPreview } from './DragPreview';
 import { EmptyState } from './EmptyState';
 import { useSessionStore } from '../store/session';
 import { SortableTaskItem } from './TaskItem';
+import { UpcomingFooter } from './UpcomingFooter';
 import styles from './TaskList.module.css';
 
 /** Mouse and pen drag after 4px; touch has its own sensor (press and hold) so scrolling works. */
@@ -94,7 +96,10 @@ export function TaskList() {
   const celebrate = useSessionStore((s) => s.completedSomething);
   const reduced = useReducedMotion();
   const activeId = useDragStore((s) => s.activeId);
-  const liveIds = useTaskStore(useShallow((s) => flattenTree(s, { tag })));
+  const showUpcoming = useUIStore((s) => s.showUpcoming);
+  const liveIds = useTaskStore(
+    useShallow((s) => flattenTree(s, { tag, today: todayISO(), showUpcoming })),
+  );
   const key = useTaskStore((s) => structureKey(s));
   // Moves apply at once; nothing reorders mid-drag. A just-completed row (already filed in
   // History, so absent from `liveIds`) stays until its strike has played, then pops out.
@@ -340,6 +345,7 @@ export function TaskList() {
           <EmptyState celebrate={celebrate} />
         </div>
       )}
+      <UpcomingFooter />
       <div className={styles.srOnly} aria-live="polite">
         {liveText}
       </div>

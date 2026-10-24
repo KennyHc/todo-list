@@ -2,6 +2,8 @@
   position: fixed;
   z-index: 60;
   max-width: calc(100vw - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 10px;
   background: var(--elevated);
   border: 1px solid var(--border-strong);

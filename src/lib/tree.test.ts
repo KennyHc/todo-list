@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_TAGS, MAX_TITLE_LENGTH, type Difficulty, type TaskTree } from '../types';
+import {
+  MAX_NOTES_LENGTH,
+  MAX_TAGS,
+  MAX_TITLE_LENGTH,
+  type Difficulty,
+  type TaskTree,
+} from '../types';
+import { mkState, mkTask } from '../test/factories';
 import {
   addTask,
   clearCompleted,
@@ -8,9 +15,11 @@ import {
   emptyTree,
   getAncestors,
   getDescendants,
+  hiddenUntilStart,
   indentTask,
   isLeaf,
   moveTask,
+  notStarted,
   outdentTask,
   progress,
   sortedChildIds,
@@ -825,5 +834,82 @@ describe('repeat in the tree logic', () => {
     const next = updateTask(tree, id, { dueDate: '2026-03-15' });
     expect(next.tasks[id].repeat).toEqual({ every: 'month' });
     expect(tree.tasks[id].repeat).toEqual({ every: 'month', anchorDay: 31 });
+  });
+});
+
+describe('notes', () => {
+  it('addTask stores clamped notes, and nothing for blank ones', () => {
+    const { tree, id } = addTask(emptyTree(), {
+      title: 'a',
+      notes: 'x'.repeat(MAX_NOTES_LENGTH + 50),
+    });
+    expect(tree.tasks[id].notes).toHaveLength(MAX_NOTES_LENGTH);
+    const blank = addTask(emptyTree(), { title: 'b', notes: '  \n ' });
+    expect('notes' in blank.tree.tasks[blank.id]).toBe(false);
+    const none = addTask(emptyTree(), { title: 'c' });
+    expect('notes' in none.tree.tasks[none.id]).toBe(false);
+  });
+
+  it('updateTask sets, changes and clamps notes', () => {
+    const { tree, id } = addTask(emptyTree(), { title: 'a' });
+    const set = updateTask(tree, id, { notes: 'line 1\nline 2' });
+    expect(set.tasks[id].notes).toBe('line 1\nline 2');
+    const changed = updateTask(set, id, { notes: 'y'.repeat(MAX_NOTES_LENGTH + 1) });
+    expect(changed.tasks[id].notes).toHaveLength(MAX_NOTES_LENGTH);
+  });
+
+  it('a blank notes patch removes the key; removing nothing is a no-op', () => {
+    const { tree, id } = addTask(emptyTree(), { title: 'a', notes: 'keep me' });
+    const removed = updateTask(tree, id, { notes: '   ' });
+    expect('notes' in removed.tasks[id]).toBe(false);
+    expect(updateTask(removed, id, { notes: '' })).toBe(removed);
+    expect(updateTask(tree, id, { notes: 'keep me' })).toBe(tree);
+  });
+});
+
+describe('startDate', () => {
+  it('defaults to null; addTask and updateTask set and clear it', () => {
+    const plain = addTask(emptyTree(), { title: 'a' });
+    expect(plain.tree.tasks[plain.id].startDate).toBeNull();
+    const dated = addTask(emptyTree(), { title: 'b', startDate: '2026-11-01' });
+    expect(dated.tree.tasks[dated.id].startDate).toBe('2026-11-01');
+    const cleared = updateTask(dated.tree, dated.id, { startDate: null });
+    expect(cleared.tasks[dated.id].startDate).toBeNull();
+    expect(updateTask(cleared, dated.id, { startDate: null })).toBe(cleared);
+  });
+
+  it('notStarted is true only for a start date after today', () => {
+    const task = (startDate: string | null) => mkTask('a', { startDate });
+    expect(notStarted(task(null), '2026-10-20')).toBe(false);
+    expect(notStarted(task('2026-10-20'), '2026-10-20')).toBe(false);
+    expect(notStarted(task('2026-10-19'), '2026-10-20')).toBe(false);
+    expect(notStarted(task('2026-10-21'), '2026-10-20')).toBe(true);
+  });
+
+  it('a hidden parent hides its subtree, but a hidden child does not hide its parent', () => {
+    const tree = mkState([
+      mkTask('p', { childIds: ['c'], startDate: '2026-11-01' }),
+      mkTask('c', { parentId: 'p', childIds: ['g'] }),
+      mkTask('g', { parentId: 'c' }),
+      mkTask('q', { childIds: ['r'] }),
+      mkTask('r', { parentId: 'q', startDate: '2026-11-01' }),
+    ]);
+    const hidden = (id: string) => hiddenUntilStart(tree, id, '2026-10-20');
+    expect(['p', 'c', 'g', 'q', 'r'].map(hidden)).toEqual([true, true, true, false, true]);
+    expect(hiddenUntilStart(tree, 'nope', '2026-10-20')).toBe(false);
+    expect(hiddenUntilStart(tree, 'p', '2026-11-01')).toBe(false);
+  });
+
+  it('does not touch difficulty sums or progress', () => {
+    const b = addTask(emptyTree(), { title: 'p' });
+    const c1 = addTask(b.tree, { title: 'a', parentId: b.id, difficulty: 2 });
+    const c2 = addTask(c1.tree, {
+      title: 'b',
+      parentId: b.id,
+      difficulty: 3,
+      startDate: '2999-01-01',
+    });
+    expect(effectiveDifficulty(c2.tree, b.id)).toBe(5);
+    expect(progress(c2.tree, b.id)).toEqual({ done: 0, total: 2 });
   });
 });

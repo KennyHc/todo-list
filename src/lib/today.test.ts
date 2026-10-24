@@ -421,3 +421,43 @@ describe('todayReason', () => {
     expect(reason?.danger).toBe(true);
   });
 });
+
+describe('start dates', () => {
+  const LATER = '2026-10-26';
+
+  it('a not-started task is not in Today, and neither is its subtree', () => {
+    const tree = treeOf([
+      mkTask('p', { childIds: ['c'], startDate: LATER, dueDate: TODAY }),
+      mkTask('c', { parentId: 'p', dueDate: '2026-10-19' }),
+      mkTask('q', { dueDate: TODAY }),
+    ]);
+    expect(todayList(tree, TODAY)).toEqual(['q']);
+    // On the day it starts the parent is back, standing for its overdue subtask.
+    expect(todayList(tree, LATER)).toEqual(['p', 'q']);
+  });
+
+  it('shows up as soon as the start date arrives', () => {
+    const tree = treeOf([mkTask('a', { plannedFor: TODAY, startDate: '2026-10-21' })]);
+    expect(todayList(tree, TODAY)).toEqual([]);
+    expect(todayList(tree, '2026-10-21')).toEqual(['a']);
+  });
+
+  it('keeps the parent difficulty sum, but not for hidden tasks in the load', () => {
+    const tree = treeOf([
+      mkTask('p', { childIds: ['a', 'b'], dueDate: TODAY }),
+      mkTask('a', { parentId: 'p', difficulty: 2 }),
+      mkTask('b', { parentId: 'p', difficulty: 3, startDate: LATER }),
+    ]);
+    // The parent is in Today with all of its open points: the data is untouched.
+    expect(todayList(tree, TODAY)).toEqual(['p']);
+    expect(openPoints(tree, 'p')).toBe(5);
+  });
+
+  it('suggestions skip not-started tasks', () => {
+    const tree = treeOf([
+      mkTask('a', { dueDate: '2026-10-22', startDate: LATER }),
+      mkTask('b', { dueDate: '2026-10-23' }),
+    ]);
+    expect(suggestions(tree, TODAY, 8)).toEqual(['b']);
+  });
+});

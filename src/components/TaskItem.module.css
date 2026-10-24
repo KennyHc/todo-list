@@ -59,6 +59,12 @@
   }
 }
 
+/* A task that starts later, shown on request from the Tree's footer. On the row, so children
+   (which are dimmed by their own rows) don't compound. */
+.row[data-upcoming] {
+  opacity: 0.55;
+}
+
 /* Context-only ancestors under a tag filter. On the row, not the item, so children don't compound. */
 .row[data-dim] {
   opacity: 0.5;
@@ -189,6 +195,50 @@
   min-height: 20px;
   color: var(--text-2);
   font-size: 13px;
+}
+
+.starts {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 450;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+/* The small note icon on the meta line; it opens and closes the note under the title. */
+.noteBtn {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    color var(--t-fast),
+    var(--t-press);
+}
+
+.noteBtn:hover,
+.noteBtn[aria-expanded='true'] {
+  color: var(--accent-ink);
+}
+
+@media (max-width: 480px), (hover: none) {
+  .noteBtn::after {
+    content: '';
+    position: absolute;
+    inset: -8px -6px;
+  }
 }
 
 .more {

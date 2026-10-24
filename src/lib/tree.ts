@@ -1,5 +1,12 @@
 import { nanoid } from 'nanoid';
-import { MAX_TITLE_LENGTH, type Difficulty, type Repeat, type Task, type TaskTree } from '../types';
+import {
+  MAX_NOTES_LENGTH,
+  MAX_TITLE_LENGTH,
+  type Difficulty,
+  type Repeat,
+  type Task,
+  type TaskTree,
+} from '../types';
 import { normalizeTags } from './tags';
 
 type Tasks = Record<string, Task>;
@@ -15,12 +22,23 @@ export type NewTask = {
   dueDate?: string | null;
   repeat?: Repeat | null;
   plannedFor?: string | null;
+  startDate?: string | null;
+  notes?: string;
 };
 
 export type TaskPatch = Partial<
   Pick<
     Task,
-    'title' | 'difficulty' | 'color' | 'collapsed' | 'tags' | 'dueDate' | 'repeat' | 'plannedFor'
+    | 'title'
+    | 'difficulty'
+    | 'color'
+    | 'collapsed'
+    | 'tags'
+    | 'dueDate'
+    | 'repeat'
+    | 'plannedFor'
+    | 'startDate'
+    | 'notes'
   >
 >;
 
@@ -29,6 +47,25 @@ export const sameRepeat = (a: Repeat | null | undefined, b: Repeat | null | unde
   (!!a && !!b && a.every === b.every && a.weekday === b.weekday && a.anchorDay === b.anchorDay);
 
 const clampTitle = (title: string) => title.slice(0, MAX_TITLE_LENGTH);
+/** Notes are clamped like titles; blank ones are no notes at all (''). */
+const clampNotes = (notes: string) => (notes.trim() === '' ? '' : notes.slice(0, MAX_NOTES_LENGTH));
+
+/** A stored `notes` value made safe: clamped, and undefined unless it is non-blank text. */
+export const normalizeNotes = (value: unknown): string | undefined =>
+  typeof value === 'string' && clampNotes(value) !== '' ? clampNotes(value) : undefined;
+
+/** True while the task's start date is still ahead: it is hidden from the lists (see Task). */
+export const notStarted = (task: Task, today: string): boolean =>
+  task.startDate !== null && task.startDate > today;
+
+/** Hidden by its own start date or by an ancestor's (a hidden parent takes its subtree along). */
+export function hiddenUntilStart(tree: TaskTree, id: string, today: string): boolean {
+  const task = tree.tasks[id];
+  if (!task) return false;
+  return (
+    notStarted(task, today) || getAncestors(tree, id).some((a) => notStarted(tree.tasks[a], today))
+  );
+}
 
 export const emptyTree = (): TaskTree => ({ tasks: {}, rootIds: [] });
 
@@ -185,6 +222,8 @@ export function addTask(
     dueDate = null,
     repeat = null,
     plannedFor = null,
+    startDate = null,
+    notes,
   }: NewTask,
   now = Date.now(),
 ): { tree: TaskTree; id: string } {
@@ -203,6 +242,8 @@ export function addTask(
     dueDate,
     repeat: repeat === null ? null : { ...repeat },
     plannedFor,
+    startDate,
+    ...(notes !== undefined && clampNotes(notes) !== '' && { notes: clampNotes(notes) }),
     parentId,
     childIds: [],
     createdAt: now,
@@ -233,6 +274,16 @@ export function updateTask(tree: TaskTree, id: string, rawPatch: TaskPatch): Tas
   const patch: TaskPatch = { ...rawPatch };
   if (patch.tags !== undefined) patch.tags = normalizeTags(patch.tags);
   if (patch.title !== undefined) patch.title = clampTitle(patch.title);
+  // Notes go through '' (none): a blank one removes the key, so absent and empty are one thing.
+  let dropNotes = false;
+  if (patch.notes !== undefined) {
+    const notes = clampNotes(patch.notes);
+    if (notes === (task.notes ?? '')) delete patch.notes;
+    else if (notes === '') {
+      delete patch.notes;
+      dropNotes = true;
+    } else patch.notes = notes;
+  }
   if (patch.dueDate !== undefined && patch.dueDate !== task.dueDate && patch.repeat === undefined) {
     // A repeat is meaningless without a due date, so clearing the date clears it too; and a
     // monthly anchor belongs to the old date, so moving the date re-anchors on the new day.
@@ -242,13 +293,17 @@ export function updateTask(tree: TaskTree, id: string, rawPatch: TaskPatch): Tas
       delete patch.repeat.anchorDay;
     }
   }
-  const changed = (Object.keys(patch) as (keyof TaskPatch)[]).some(
-    (key) => patch[key] !== undefined && !sameValue(patch[key], task[key]),
-  );
+  const changed =
+    dropNotes ||
+    (Object.keys(patch) as (keyof TaskPatch)[]).some(
+      (key) => patch[key] !== undefined && !sameValue(patch[key], task[key]),
+    );
   if (!changed) return tree;
 
   const draft = createDraft(tree);
-  Object.assign(draft.edit(id), patch);
+  const edited = draft.edit(id);
+  Object.assign(edited, patch);
+  if (dropNotes) delete edited.notes;
   return draft.finish();
 }
 

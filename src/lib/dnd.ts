@@ -9,9 +9,15 @@ export const INDENT = 24;
 /** A row of the flattened tree: what is needed to project a drop. */
 export type FlatItem = { id: string; depth: number; parentId: string | null };
 
-/** Visible rows in render order: open tasks only, collapsed subtrees and filtered rows skipped. */
-export function flattenTree(tree: TaskTree, { tag }: { tag: string | null }): string[] {
-  return treeRows(tree, tag);
+/**
+ * Visible rows in render order: open tasks only, collapsed subtrees, filtered rows and (unless
+ * `showUpcoming`) tasks that have not started yet skipped.
+ */
+export function flattenTree(
+  tree: TaskTree,
+  { tag, today, showUpcoming }: { tag: string | null; today?: string; showUpcoming?: boolean },
+): string[] {
+  return treeRows(tree, tag, { today, showUpcoming });
 }
 
 /** Depth and parent for each id, keeping the given order. Unknown ids are dropped. */

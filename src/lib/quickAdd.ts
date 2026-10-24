@@ -5,8 +5,8 @@ import { normalizeTags, TAG_TOKEN } from './tags';
 import { todayISO } from './views';
 
 /**
- * Natural-language quick add. `parseQuickAdd` pulls tags, a due date, a difficulty and a repeat
- * out of one line of text and reports each recognised piece as a token with its position, so the
+ * Natural-language quick add. `parseQuickAdd` pulls tags, a due date, a start date, a difficulty
+ * and a repeat out of one line of text and reports each recognised piece as a token with its position, so the
  * composer can show it as a chip and let the user dismiss it.
  *
  * Rules (all matching is case-insensitive, on whole words, in local time):
@@ -29,6 +29,11 @@ import { todayISO } from './views';
  *   only that one is a real date). Impossible dates match nothing. With several date phrases the
  *   LAST one wins and the others stay in the title. `on`, `by`, `due`, `due on`, `due by`
  *   directly before a date are consumed with it.
+ * - Start date ("hide until"): `from`, `starting`, `start` or `after` directly before any date
+ *   phrase above sets the day the task starts instead of its due date ("Renew passport from nov 1
+ *   by nov 30"); the cue is consumed with the date, and the last one wins like for due dates.
+ *   Those four words also count as cue words for the ambiguous date forms. Without a date after
+ *   them they are just words: "from home", "from 5 to 6" and "start the car" stay in the title.
  * - Repeat: every day, daily, every weekday, weekdays, every week, weekly, every <weekday>,
  *   every month, monthly. Without an explicit date the due date is the first occurrence.
  * - Title: the text minus the tokens, whitespace collapsed and stray punctuation tidied. It is
@@ -39,7 +44,7 @@ import { todayISO } from './views';
 /** What the parser recognises is exactly what tasks store. */
 export type QuickRepeat = Repeat;
 export type QuickToken = {
-  kind: 'tag' | 'date' | 'difficulty' | 'repeat';
+  kind: 'tag' | 'date' | 'start' | 'difficulty' | 'repeat';
   start: number;
   end: number;
   raw: string;
@@ -49,6 +54,8 @@ export type QuickAdd = {
   title: string;
   tags: string[];
   dueDate: string | null;
+  /** The day the task starts (it stays hidden until then), or null. */
+  startDate: string | null;
   difficulty: 1 | 2 | 3 | 4 | 5 | null;
   repeat: QuickRepeat | null;
   tokens: QuickToken[];
@@ -122,6 +129,8 @@ const YEAR = /^\d{4}$/;
 const DIFFICULTY = /^\(*!([1-5])[,.;:)]*$/;
 // Consumed together with a date that follows them ("for next week" → just the date).
 const LEAD_WORDS = new Set(['on', 'by', 'due', 'for']);
+// Consumed together with a date that follows them, which then is the start date, not the due date.
+const START_WORDS = new Set(['from', 'starting', 'start', 'after']);
 
 type Word = {
   start: number;
@@ -184,6 +193,21 @@ function dateLabel(date: string, today: string, locale: string | undefined): str
     return new Intl.DateTimeFormat(locale, opts).format(dt);
   } catch {
     return new Intl.DateTimeFormat(undefined, opts).format(dt);
+  }
+}
+
+function startLabel(date: string, today: string, locale: string | undefined): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const opts: Intl.DateTimeFormatOptions = {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    ...(y === Number(today.slice(0, 4)) ? {} : { year: 'numeric' }),
+  };
+  try {
+    return `Starts ${new Intl.DateTimeFormat(locale, opts).format(new Date(y, m - 1, d))}`;
+  } catch {
+    return `Starts ${new Intl.DateTimeFormat(undefined, opts).format(new Date(y, m - 1, d))}`;
   }
 }
 
@@ -303,7 +327,7 @@ export function parseQuickAdd(text: string, opts: QuickAddOptions = {}): QuickAd
   // --- Dates ---
   // Ambiguous forms (3-letter weekdays, yearless numerics) need a cue word before them or must
   // end the input (ignoring trailing #tags and !N), so "Wed planning doc" or "1/2 cup" stay text.
-  const CUES = new Set(['on', 'by', 'due', 'next', 'this', 'until', 'before']);
+  const CUES = new Set(['on', 'by', 'due', 'next', 'this', 'until', 'before', ...START_WORDS]);
   const hasCue = (i: number) =>
     i > 0 && !masked[i - 1] && words[i - 1].trail === '' && CUES.has(words[i - 1].core);
   const endsInput = (i: number) => {
@@ -407,7 +431,7 @@ export function parseQuickAdd(text: string, opts: QuickAddOptions = {}): QuickAd
     return null;
   };
 
-  type DateHit = { start: number; end: number; date: string };
+  type DateHit = { start: number; end: number; date: string; kind: 'date' | 'start' };
   const dateHits: DateHit[] = [];
   let free = 0;
   for (let i = 0; i < W;) {
@@ -421,24 +445,42 @@ export function parseQuickAdd(text: string, opts: QuickAddOptions = {}): QuickAd
       continue;
     }
     let first = i;
+    let kind: DateHit['kind'] = 'date';
     const prev = (k: number) => (i - k >= free && !masked[i - k] ? words[i - k] : undefined);
     const p1 = prev(1);
-    if (p1 && LEAD_WORDS.has(p1.core) && p1.trail === '') {
+    if (p1 && START_WORDS.has(p1.core) && p1.trail === '') {
+      first = i - 1;
+      kind = 'start';
+    } else if (p1 && LEAD_WORDS.has(p1.core) && p1.trail === '') {
       first = i - 1;
       const p2 = prev(2);
       if (p1.core !== 'due' && p2 && p2.core === 'due' && p2.trail === '') first = i - 2;
     }
-    dateHits.push({ start: words[first].coreStart, end: words[i + m.n - 1].end, date: m.date });
+    dateHits.push({
+      start: words[first].coreStart,
+      end: words[i + m.n - 1].end,
+      date: m.date,
+      kind,
+    });
     i += m.n;
     free = i;
   }
-  let dueDate: string | null = null;
-  let dateTokenAdded = false;
-  for (let k = dateHits.length - 1; k >= 0 && !dateTokenAdded; k--) {
-    const h = dateHits[k];
-    dateTokenAdded = push('date', h.start, h.end, dateLabel(h.date, today, opts.locale));
-    if (dateTokenAdded) dueDate = h.date;
-  }
+  // The last phrase of each kind that isn't dismissed wins.
+  const lastDate = (kind: DateHit['kind']): string | null => {
+    for (let k = dateHits.length - 1; k >= 0; k--) {
+      const h = dateHits[k];
+      if (h.kind !== kind) continue;
+      const label =
+        kind === 'start'
+          ? startLabel(h.date, today, opts.locale)
+          : dateLabel(h.date, today, opts.locale);
+      if (push(kind, h.start, h.end, label)) return h.date;
+    }
+    return null;
+  };
+  let dueDate = lastDate('date');
+  const dateTokenAdded = dueDate !== null;
+  const startDate = lastDate('start');
 
   // --- Difficulty (last non-dismissed wins) ---
   let difficulty: QuickAdd['difficulty'] = null;
@@ -481,12 +523,13 @@ export function parseQuickAdd(text: string, opts: QuickAddOptions = {}): QuickAd
       title: buildTitle(text, tagTokens),
       tags,
       dueDate: null,
+      startDate: null,
       difficulty: null,
       repeat: null,
       tokens: tagTokens,
     };
   }
-  return { title, tags, dueDate, difficulty, repeat, tokens };
+  return { title, tags, dueDate, startDate, difficulty, repeat, tokens };
 }
 
 function buildTitle(text: string, tokens: readonly QuickToken[]): string {

@@ -235,3 +235,25 @@ describe('siblingMoveTarget', () => {
     expect(target).toEqual({ parentId: null, index: 0 });
   });
 });
+
+describe('flattenTree and start dates', () => {
+  it('skips a not-started task and its subtree unless showUpcoming is on', () => {
+    const s = build();
+    const hidden = updateTask(s.tree, s.A, { startDate: '2999-01-01' });
+    expect(flattenTree(hidden, { tag: null })).toEqual([s.B, s.C]);
+    expect(flattenTree(hidden, { tag: null, showUpcoming: true })).toEqual([
+      s.A,
+      s.a1,
+      s.a2,
+      s.B,
+      s.C,
+    ]);
+    expect(flattenTree(hidden, { tag: null, today: '2999-01-01' })).toEqual([
+      s.A,
+      s.a1,
+      s.a2,
+      s.B,
+      s.C,
+    ]);
+  });
+});

@@ -22,11 +22,14 @@ const isTypingKey = (e: KeyboardEvent) => e.metaKey || e.ctrlKey || e.altKey || 
  * "Move to": Today, Tomorrow, This weekend, Next week, a date of your choice, or no date. Each
  * quick pick shows the date it resolves to; choosing one records an undo ("Moved "X" to Sat, Oct 24").
  * Inside it t, m, w and n pick the first four. With the Today view on, "Plan for today" tops the
- * list (p) and the first pick reads "Due today": planning keeps the due date as it is.
+ * list (p) and the first pick reads "Due today": planning keeps the due date as it is. "Hide
+ * until…" opens the date picker for the day the task starts (it stays out of the lists until
+ * then), and "Show now" clears that day.
  */
 export function RescheduleMenu({ id, open, onClose, anchorRef, align = 'end' }: Props) {
   const task = useTask(id);
-  const [picking, setPicking] = useState(false);
+  /** The date picker is open: for the due date, or for the day the task starts. */
+  const [picking, setPicking] = useState<'due' | 'start' | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const today = todayISO();
   const picks = quickPicks(today);
@@ -36,7 +39,7 @@ export function RescheduleMenu({ id, open, onClose, anchorRef, align = 'end' }: 
 
   // Reopens on the quick picks, not on the date input.
   useEffect(() => {
-    if (!open) setPicking(false);
+    if (!open) setPicking(null);
   }, [open]);
 
   const choose = useCallback(
@@ -47,13 +50,21 @@ export function RescheduleMenu({ id, open, onClose, anchorRef, align = 'end' }: 
     [id, onClose],
   );
 
+  const hide = useCallback(
+    (date: string | null) => {
+      onClose();
+      useTaskStore.getState().hideUntil(id, date);
+    },
+    [id, onClose],
+  );
+
   const plan = useCallback(() => {
     onClose();
     useTaskStore.getState().plan(id, todayISO());
   }, [id, onClose]);
 
   useEffect(() => {
-    if (!open || picking) return;
+    if (!open || picking !== null) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.isComposing || isTypingKey(e)) return;
       if (todayView && e.key.toLowerCase() === 'p') {
@@ -94,13 +105,16 @@ export function RescheduleMenu({ id, open, onClose, anchorRef, align = 'end' }: 
       align={align}
       width={248}
     >
-      <h3 className={styles.heading}>Reschedule</h3>
-      {picking ? (
+      <h3 className={styles.heading}>{picking === 'start' ? 'Hide until' : 'Reschedule'}</h3>
+      {picking !== null ? (
         <DatePicker
-          value={null}
+          inputLabel={picking === 'start' ? 'Hide until' : undefined}
+          value={picking === 'start' ? task.startDate : null}
           onChange={(date) => {
             // Typing a year passes through 0002, 0020, ...: wait for a real one.
-            if (date !== null && date >= '1000-01-01') choose(date);
+            if (picking === 'start') {
+              if (date === null || date >= '1000-01-01') hide(date);
+            } else if (date !== null && date >= '1000-01-01') choose(date);
           }}
           onPicked={onClose}
         />
@@ -141,7 +155,7 @@ export function RescheduleMenu({ id, open, onClose, anchorRef, align = 'end' }: 
             type="button"
             role="menuitem"
             className={styles.item}
-            onClick={() => setPicking(true)}
+            onClick={() => setPicking('due')}
           >
             <span>Pick date{'…'}</span>
             <ChevronRight
@@ -159,6 +173,31 @@ export function RescheduleMenu({ id, open, onClose, anchorRef, align = 'end' }: 
               onClick={() => choose(null)}
             >
               <span>Remove date</span>
+            </button>
+          )}
+          <div className={styles.divider} role="separator" />
+          <button
+            type="button"
+            role="menuitem"
+            className={styles.item}
+            onClick={() => setPicking('start')}
+          >
+            <span>Hide until{'…'}</span>
+            <ChevronRight
+              className={styles.chevron}
+              size={14}
+              strokeWidth={1.75}
+              aria-hidden="true"
+            />
+          </button>
+          {task.startDate !== null && (
+            <button
+              type="button"
+              role="menuitem"
+              className={styles.item}
+              onClick={() => hide(null)}
+            >
+              <span>Show now</span>
             </button>
           )}
         </div>

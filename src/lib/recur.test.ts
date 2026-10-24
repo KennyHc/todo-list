@@ -261,6 +261,7 @@ describe('spawnNextOccurrence', () => {
       dueDate: '2026-10-26',
       repeat: mondays,
       plannedFor: null,
+      startDate: null,
       spawnedFrom: 'water',
       parentId: null,
       childIds: [],
@@ -405,5 +406,58 @@ describe('spawnNextOccurrence', () => {
     const second = spawnNextOccurrence(first.tree, first.newId, new Date(2026, 1, 28).getTime())!;
     expect(second.tree.tasks[second.newId].dueDate).toBe('2026-03-31');
     expect(second.tree.tasks[second.newId].repeat).toEqual({ every: 'month', anchorDay: 31 });
+  });
+});
+
+describe('spawnNextOccurrence: notes and start dates', () => {
+  const base = {
+    title: 'Pay rent',
+    dueDate: '2026-10-18',
+    repeat: mondays,
+    done: true,
+    completedAt: 5,
+  };
+
+  it('copies the notes', () => {
+    const tree = treeOf([mkTask('r', { ...base, notes: 'Landlord: 555\nhttps://pay.test' })]);
+    const result = spawnNextOccurrence(tree, 'r', NOW)!;
+    expect(result.tree.tasks[result.newId].notes).toBe('Landlord: 555\nhttps://pay.test');
+  });
+
+  it('has no notes key when the original has none', () => {
+    const tree = treeOf([mkTask('r', base)]);
+    const result = spawnNextOccurrence(tree, 'r', NOW)!;
+    expect('notes' in result.tree.tasks[result.newId]).toBe(false);
+  });
+
+  it('shifts the start date by the same number of days as the due date', () => {
+    // Due Sun 18 Oct, next Monday 26 Oct (a catch-up from today, Tue 20 Oct): 8 days.
+    const tree = treeOf([mkTask('r', { ...base, startDate: '2026-10-11' })]);
+    const result = spawnNextOccurrence(tree, 'r', NOW)!;
+    const copy = result.tree.tasks[result.newId];
+    expect(copy.dueDate).toBe('2026-10-26');
+    expect(copy.startDate).toBe('2026-10-19');
+  });
+
+  it('keeps a task without a start date without one', () => {
+    const tree = treeOf([mkTask('r', base)]);
+    const result = spawnNextOccurrence(tree, 'r', NOW)!;
+    expect(result.tree.tasks[result.newId].startDate).toBeNull();
+  });
+
+  it('copies and shifts the notes and start dates of the subtree', () => {
+    const tree = treeOf([
+      mkTask('r', { ...base, childIds: ['s'], startDate: '2026-10-11' }),
+      mkTask('s', {
+        parentId: 'r',
+        notes: 'sub note',
+        startDate: '2026-10-12',
+        done: true,
+      }),
+    ]);
+    const result = spawnNextOccurrence(tree, 'r', NOW)!;
+    const copy = result.tree.tasks[result.newId];
+    const sub = result.tree.tasks[copy.childIds[0]];
+    expect(sub).toMatchObject({ notes: 'sub note', startDate: '2026-10-20', done: false });
   });
 });

@@ -61,6 +61,18 @@ export function dueLabel(dueDate: string, today: string = todayISO()): string {
   return (sameYear ? shortDate : longDate).format(date);
 }
 
+const weekdayShort = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+
+/** "Starts tomorrow", "Starts Mon" (within 6 days), otherwise "Starts Nov 2": a start date's pill. */
+export function startsLabel(startDate: string, today: string = todayISO()): string {
+  const days = daysBetween(today, startDate);
+  if (days === 1) return 'Starts tomorrow';
+  const date = parseISO(startDate);
+  if (days >= 2 && days <= 6) return `Starts ${weekdayShort.format(date)}`;
+  const sameYear = date.getFullYear() === parseISO(today).getFullYear();
+  return `Starts ${(sameYear ? shortDate : longDate).format(date)}`;
+}
+
 /** "Friday": just the weekday, for a date already known to fall within the week. */
 export const weekdayName = (iso: string): string => weekdayFormat.format(parseISO(iso));
 

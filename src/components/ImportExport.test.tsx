@@ -24,6 +24,7 @@ const restored: PersistedTasks = {
       dueDate: null,
       repeat: null,
       plannedFor: null,
+      startDate: null,
       difficulty: 1,
       color: null,
       createdAt: 1000,

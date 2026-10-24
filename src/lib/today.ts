@@ -1,6 +1,6 @@
 import type { Task, TaskTree } from '../types';
 import type { HistoryEntry } from './history';
-import { getAncestors } from './tree';
+import { getAncestors, notStarted } from './tree';
 
 /*
  * The Today view's maths. Pure and self-contained (dates are compared as 'YYYY-MM-DD' strings,
@@ -9,7 +9,8 @@ import { getAncestors } from './tree';
  * A task is "in Today" when it is open and (a) overdue, (b) due today or (c) planned for today
  * or an earlier day (an unfinished plan rolls over). When a task and one of its ancestors both
  * qualify, only the topmost is in Today: the parent stands for its whole subtree, counted once
- * with the points of the subtasks still open.
+ * with the points of the subtasks still open. A task that has not started yet (its start date
+ * is after today) is not in Today, and neither is anything under it.
  */
 
 export type TodayKind = 'overdue' | 'due' | 'planned';
@@ -43,13 +44,16 @@ export function todayKind(task: Task, today: string): TodayKind | null {
   return null;
 }
 
-/** Ids of the open tasks in tree order (a done task takes its whole subtree with it). */
-function openPreorder(tree: TaskTree): string[] {
+/**
+ * Ids of the open tasks in tree order (a done task takes its whole subtree with it, and so does
+ * one that has not started yet).
+ */
+function openPreorder(tree: TaskTree, today: string): string[] {
   const out: string[] = [];
   const walk = (ids: string[]) => {
     for (const id of ids) {
       const task = tree.tasks[id];
-      if (!task || task.done) continue;
+      if (!task || task.done || notStarted(task, today)) continue;
       out.push(id);
       walk(task.childIds);
     }
@@ -76,7 +80,7 @@ const RANK: Record<TodayKind, number> = { overdue: 0, due: 1, planned: 2 };
  * tasks carrying it. A task whose ancestor is in Today is left out (the ancestor covers it).
  */
 export function todayItems(tree: TaskTree, today: string, tag: string | null = null): TodayItem[] {
-  const order = openPreorder(tree);
+  const order = openPreorder(tree, today);
   const kinds = new Map<string, TodayKind>();
   for (const id of order) {
     const task = tree.tasks[id];
@@ -204,7 +208,7 @@ export function suggestions(
   max = 3,
 ): string[] {
   if (capacityLeft <= 0 || max <= 0) return [];
-  const order = openPreorder(tree);
+  const order = openPreorder(tree, today);
   const inToday = new Set(order.filter((id) => todayKind(tree.tasks[id], today) !== null));
 
   const dated: { id: string; due: string; at: number }[] = [];
