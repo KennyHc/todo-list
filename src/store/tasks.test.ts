@@ -1143,6 +1143,9 @@ describe('startDate', () => {
   });
 
   it('a repeating task\u2019s next occurrence keeps its notes and shifts its start date', () => {
+    // Spawns catch up past today, so pin the clock to the day the task is due (Tue 20 Oct 2026).
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 20, 10, 30));
     const id = get().add({
       title: 'Water',
       dueDate: '2026-10-20',
@@ -1157,6 +1160,7 @@ describe('startDate', () => {
       startDate: '2026-10-20',
       notes: 'use the can',
     });
+    vi.useRealTimers();
   });
 
   it('restoring from History brings back a task with its notes and start date', () => {
