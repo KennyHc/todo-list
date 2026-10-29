@@ -1,0 +1,31 @@
+name: Agent task
+description: A small, well-scoped task for a Claude agent to pick up.
+labels: ['agent:ready']
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should be true when this is done? One or two sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: How to tell it's finished. Checks, tests, or behaviour you can see.
+      placeholder: |
+        - npm test passes
+        - ...
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: In scope / out of scope
+      description: Files or areas to touch, and anything the agent should leave alone.
+  - type: input
+    id: related
+    attributes:
+      label: Related issues
+      description: Earlier issues this builds on, e.g. #12. The agent reads their log entries.
