@@ -264,6 +264,30 @@ input {
   box-shadow: none;
 }
 
+/*
+ * A plan for the day (Week view) has a hollow marker in place of the solid bar: the same strip,
+ * outlined. Rows without a colour get a neutral one, so every plan reads the same way.
+ */
+[data-quiet]::after,
+:root[data-theme='dark'] [data-row-color][data-quiet]::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 5px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 3px;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+[data-row-color][data-quiet]::after,
+:root[data-theme='dark'] [data-row-color][data-quiet]::after {
+  border-color: color-mix(in srgb, var(--row-color) 70%, var(--text));
+}
+
 /* The keyboard-focus bar takes the same spot while a row is focused. */
 [data-row-color][data-focused]::after {
   opacity: 0;

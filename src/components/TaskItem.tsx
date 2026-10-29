@@ -95,6 +95,13 @@ type Props = {
   reasonDanger?: boolean;
   /** Today view: this planned row pushes the day over capacity (tinted). */
   over?: boolean;
+  /** Week view: the row is a plan for this day, not its due date (hollow marker, muted title). */
+  quiet?: boolean;
+  /**
+   * Week view: a narrow column. The title wraps, the hover actions shrink to the ⋯ menu and the
+   * "large task" nudge is left out.
+   */
+  compact?: boolean;
   /** Shared-layout id, so a Suggested row can glide into the list as this one. */
   layoutId?: string;
 };
@@ -195,6 +202,8 @@ function TaskItemInner({
   reason,
   reasonDanger = false,
   over = false,
+  quiet = false,
+  compact = false,
   layoutId,
 }: Props) {
   const liveTask = useTask(id);
@@ -327,6 +336,7 @@ function TaskItemInner({
             completedCollapsed: ui.completedCollapsed,
             completedShowAll: ui.completedShowAll,
             showUpcoming: ui.showUpcoming,
+            weekAnchor: ui.weekAnchor,
           });
           ui.setFocusedId(
             neighborAfterRemoval(order, id, new Set([id, ...getDescendants(tasks, id)])),
@@ -511,6 +521,8 @@ function TaskItemInner({
                 data-upcoming={upcoming || undefined}
                 data-focused={focused || undefined}
                 data-over={over || undefined}
+                data-quiet={quiet || undefined}
+                data-compact={compact || undefined}
                 data-row-color={color ?? undefined}
                 data-done={(color !== null && task.done) || undefined}
                 data-inherited={(color !== null && colorSource === 'parent') || undefined}
@@ -598,7 +610,7 @@ function TaskItemInner({
                           data-swipe-through
                           onClick={edit}
                         >
-                          <StrikeText done={task.done} delay={delay}>
+                          <StrikeText done={task.done} delay={delay} wrap={compact}>
                             {shownTitle}
                           </StrikeText>
                         </button>
@@ -678,8 +690,9 @@ function TaskItemInner({
                     empty space, so nothing reserves room for them at rest. */}
                   {!phone && (
                     <div className={styles.actions}>
-                      {/* Touch reschedules by swipe; the mouse gets a button. */}
-                      {!touch && (
+                      {/* Touch reschedules by swipe; the mouse gets a button. A compact row
+                        keeps only the ⋯, so the strip doesn't cover its checkbox. */}
+                      {!touch && !compact && (
                         <motion.button
                           {...iconMotion}
                           type="button"
@@ -705,7 +718,7 @@ function TaskItemInner({
                         onDelete={requestDelete}
                       />
                       {/* Touch has the menu and swipe-to-delete; the row stays quiet. */}
-                      {!touch && (
+                      {!touch && !compact && (
                         <>
                           <motion.button
                             {...iconMotion}
@@ -764,7 +777,7 @@ function TaskItemInner({
             </SwipeRow>
 
             <AnimatePresence initial={false}>
-              {leaf && !task.done && task.difficulty === MAX_DIFFICULTY && (
+              {!compact && leaf && !task.done && task.difficulty === MAX_DIFFICULTY && (
                 <BreakdownNudge key="nudge" onBreakdown={addChild} />
               )}
             </AnimatePresence>

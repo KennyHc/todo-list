@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { taskStorage } from './storage';
 import { useTaskStore } from './tasks';
 
-export type View = 'today' | 'tree' | 'deadline' | 'history';
+export type View = 'today' | 'tree' | 'deadline' | 'history' | 'week';
 /** copy/import: the AI dialogs. export/paste: backup export and the unified paste import. */
 export type AiDialog = 'copy' | 'import' | 'export' | 'paste' | null;
 
@@ -26,6 +26,8 @@ type UIState = {
   completedShowAll: boolean;
   /** The Tree view shows the tasks that start later, dimmed, inline. Not persisted. */
   showUpcoming: boolean;
+  /** Monday of the week the Week view shows, or null for the current week. Not persisted. */
+  weekAnchor: string | null;
   /** The row the keyboard acts on. Not persisted. */
   focusedId: string | null;
   /** Whether the tag filter popover is open, so a hotkey can open it. Not persisted. */
@@ -51,6 +53,7 @@ type UIState = {
   setCompletedCollapsed: (collapsed: boolean) => void;
   setCompletedShowAll: (showAll: boolean) => void;
   setShowUpcoming: (show: boolean) => void;
+  setWeekAnchor: (weekStart: string | null) => void;
   setFocusedId: (id: string | null) => void;
   setFilterOpen: (open: boolean) => void;
   setPaletteOpen: (open: boolean) => void;
@@ -75,6 +78,7 @@ export const useUIStore = create<UIState>()(
       completedCollapsed: false,
       completedShowAll: false,
       showUpcoming: false,
+      weekAnchor: null,
       focusedId: null,
       filterOpen: false,
       paletteOpen: false,
@@ -91,6 +95,7 @@ export const useUIStore = create<UIState>()(
       setCompletedCollapsed: (completedCollapsed) => set({ completedCollapsed }),
       setCompletedShowAll: (completedShowAll) => set({ completedShowAll }),
       setShowUpcoming: (showUpcoming) => set({ showUpcoming }),
+      setWeekAnchor: (weekAnchor) => set({ weekAnchor }),
       setFocusedId: (focusedId) => set({ focusedId }),
       setFilterOpen: (filterOpen) => set({ filterOpen }),
       setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
@@ -122,7 +127,9 @@ export const useUIStore = create<UIState>()(
 
 /** The views in switch order. Today comes first, and only exists while the feature is on. */
 export const viewOrder = (todayView: boolean): View[] =>
-  todayView ? ['today', 'tree', 'deadline', 'history'] : ['tree', 'deadline', 'history'];
+  todayView
+    ? ['today', 'tree', 'deadline', 'history', 'week']
+    : ['tree', 'deadline', 'history', 'week'];
 
 /** The view actually shown: a persisted 'today' falls back to the Tree while the feature is off. */
 export const effectiveView = (view: View, todayView: boolean): View =>

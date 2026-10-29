@@ -638,6 +638,25 @@
   font-weight: 500;
 }
 
+/* Week view: a plan for this day (its due date is another) reads quieter than a deadline. */
+.row[data-quiet] .titleBtn {
+  color: var(--text-2);
+}
+
+.row[data-quiet][data-done] .titleBtn {
+  color: var(--muted);
+}
+
+/* Week view: a narrow column, so the row gives up a little padding to the title. Below 1024px
+   the days are full width and the row keeps its usual insets. */
+@media (min-width: 1024px) {
+  .row[data-compact] {
+    gap: 0 var(--space-1);
+    padding-right: var(--space-1);
+    padding-left: var(--space-1);
+  }
+}
+
 /* The planned rows that push the day over capacity, when "move something" is pressed. */
 .row[data-over],
 .row[data-over]:hover {
