@@ -166,3 +166,58 @@ export function weekRange(start: string, today: string): string {
   const format = sameYear ? rangeFormat : rangeYearFormat;
   return `${format.format(from)} – ${format.format(to)}`;
 }
+
+/** A Week view move: which date of the task changes, and to what. */
+export type WeekMove = { field: 'dueDate' | 'plannedFor'; date: string };
+
+/**
+ * Where dropping a row from day `from` onto day `to` moves it: a due row changes the due date,
+ * a planned row changes the plan. Null when it lands where it was, or for a plan dropped on a
+ * day before today (an open plan for a past day rolls over to today, so it would not move).
+ */
+export function weekDropMove(
+  kind: WeekKind,
+  from: string,
+  to: string,
+  today: string,
+): WeekMove | null {
+  if (from === to) return null;
+  if (kind === 'planned') return to < today ? null : { field: 'plannedFor', date: to };
+  return { field: 'dueDate', date: to };
+}
+
+/**
+ * Where `[` (step -1) and `]` (step 1) move a task in the week starting `start`: a day earlier
+ * or later. The keys act on a task, not one of its rows, so its due date moves when it is due
+ * that week, otherwise its plan (from the day it shows on: an earlier plan has rolled over to
+ * today). Null when it has neither date, or when a plan would go before today (see
+ * `weekDropMove`).
+ */
+export function weekStepMove(
+  task: Pick<Task, 'dueDate' | 'plannedFor'>,
+  step: 1 | -1,
+  start: string,
+  today: string,
+): WeekMove | null {
+  const end = addDays(start, 6);
+  const dueThisWeek = task.dueDate !== null && task.dueDate >= start && task.dueDate <= end;
+  if (!dueThisWeek && task.plannedFor !== null) {
+    const shown = task.plannedFor < today ? today : task.plannedFor;
+    const date = addDays(shown, step);
+    return date < today ? null : { field: 'plannedFor', date };
+  }
+  if (task.dueDate === null) return null;
+  return { field: 'dueDate', date: addDays(task.dueDate, step) };
+}
+
+/**
+ * The task the day header's link lands on in By deadline: the first of `ids` (that list, so in
+ * due order) that is open and due on `date` or later. Null when nothing is due from then on.
+ */
+export function firstDueFrom(tasks: TaskTree['tasks'], ids: string[], date: string): string | null {
+  const hit = ids.find((id) => {
+    const task = tasks[id];
+    return task !== undefined && !task.done && task.dueDate !== null && task.dueDate >= date;
+  });
+  return hit ?? null;
+}

@@ -41,6 +41,7 @@ import {
 } from '../lib/tree';
 import { useSessionStore } from './session';
 import { allTags, deadlineList, todayISO, visibleTreeIds } from '../lib/views';
+import type { WeekMove } from '../lib/week';
 import type { ColorSource } from '../lib/colorResolve';
 import { DEFAULT_SETTINGS, type Settings, type Task, type TaskTree } from '../types';
 
@@ -89,6 +90,11 @@ type TaskActions = {
   hideUntil: (id: string, startDate: string | null) => void;
   /** Sets (or, with null, clears) a due date and records an undo ("Moved \u201cX\u201d to Sat, Oct 24"). */
   reschedule: (id: string, dueDate: string | null) => void;
+  /**
+   * Week view: moves a task's due date or its plan to another day and records an undo ("Moved
+   * \u201cX\u201d to Thu, Oct 30").
+   */
+  moveToDay: (id: string, move: WeekMove) => void;
   /**
    * Moves every open overdue task (with `tag`, only those carrying it) to today in one undo
    * entry; repeat rules are kept. Returns how many moved.
@@ -300,6 +306,14 @@ export const createTaskStore = () =>
       const after = updateTask(treeOf(state), id, { dueDate });
       if (after.tasks === state.tasks) return;
       set({ ...after, undo: undoEntry(state, rescheduleLabel(task.title, dueDate)) });
+    },
+    moveToDay: (id, { field, date }) => {
+      const state = get();
+      const task = state.tasks[id];
+      if (!task) return;
+      const after = updateTask(treeOf(state), id, { [field]: date });
+      if (after.tasks === state.tasks) return;
+      set({ ...after, undo: undoEntry(state, rescheduleLabel(task.title, date)) });
     },
     moveOverdueToToday: (tag = null) => {
       const state = get();

@@ -44,6 +44,7 @@ const GROUPS: ShortcutGroup[] = [
           ['alt', '←'],
         ],
       },
+      { label: 'Week: previous or next day', keys: [['['], [']']] },
     ],
   },
   {

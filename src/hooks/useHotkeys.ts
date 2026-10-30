@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { siblingMoveTarget } from '../lib/dnd';
 import { isLeaf } from '../lib/tree';
+import { weekStart, weekStepMove } from '../lib/week';
 import { neighborAfterRemoval, todayISO, visibleOrder, visibleTreeIds } from '../lib/views';
 import { useTaskStore } from '../store/tasks';
 import { currentView, useUIStore, viewOrder, type View } from '../store/ui';
@@ -22,6 +23,7 @@ export type HotkeyAction =
   | { type: 'collapse'; collapsed: boolean }
   | { type: 'reorder'; step: 1 | -1 }
   | { type: 'nest'; direction: 'in' | 'out' }
+  | { type: 'day'; step: 1 | -1 }
   | { type: 'help' };
 
 export type HotkeyEvent = {
@@ -122,6 +124,11 @@ export function matchHotkey(e: HotkeyEvent, ctx: HotkeyContext): HotkeyAction | 
     case 'Backspace':
     case 'Delete':
       return ctx.hasFocus ? { type: 'delete' } : null;
+    case '[':
+    case ']':
+      return ctx.hasFocus && ctx.view === 'week'
+        ? { type: 'day', step: e.key === ']' ? 1 : -1 }
+        : null;
     case 'ArrowRight':
     case 'ArrowLeft':
       return ctx.hasFocus && ctx.view === 'tree' && !own
@@ -272,6 +279,21 @@ export function useHotkeys(): void {
           if (parentId && useTaskStore.getState().tasks[parentId]?.collapsed) {
             tasks.update(parentId, { collapsed: false });
           }
+          break;
+        }
+        case 'day': {
+          if (!focusedId) break;
+          const task = tasks.tasks[focusedId];
+          if (!task) break;
+          const today = todayISO();
+          const current = weekStart(today);
+          const start = ui.weekAnchor ?? current;
+          const move = weekStepMove(task, action.step, start, today);
+          if (!move) break;
+          tasks.moveToDay(focusedId, move);
+          // Past Sunday or before Monday: the week follows the row, so it stays selected.
+          const shown = weekStart(move.date);
+          if (shown !== start) ui.setWeekAnchor(shown === current ? null : shown);
           break;
         }
         case 'help':

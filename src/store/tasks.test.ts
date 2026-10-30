@@ -866,6 +866,17 @@ describe('rescheduling', () => {
     expect(get().undo).toBeNull();
   });
 
+  it('moveToDay moves the due date or the plan, with a "Moved" undo', () => {
+    const id = get().add({ title: 'Call', dueDate: '2026-10-21', plannedFor: '2026-10-20' });
+    get().moveToDay(id, { field: 'plannedFor', date: '2026-10-22' });
+    expect(get().tasks[id]).toMatchObject({ dueDate: '2026-10-21', plannedFor: '2026-10-22' });
+    expect(get().undo?.label).toMatch(/^Moved “Call” to Thu, /);
+    get().moveToDay(id, { field: 'dueDate', date: '2026-10-23' });
+    expect(get().tasks[id]).toMatchObject({ dueDate: '2026-10-23', plannedFor: '2026-10-22' });
+    get().undoLast();
+    expect(get().tasks[id]).toMatchObject({ dueDate: '2026-10-21', plannedFor: '2026-10-22' });
+  });
+
   describe('moveOverdueToToday', () => {
     it('moves every open overdue task in one undo entry, leaving the rest alone', () => {
       const a = get().add({ title: 'A', dueDate: '2026-10-01' });
