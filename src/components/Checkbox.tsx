@@ -22,7 +22,7 @@ export function Checkbox({ checked, onToggle, label = 'Done', delay = 0 }: Props
   }
 
   return (
-    <motion.button
+    <button
       type="button"
       role="checkbox"
       aria-checked={checked}
@@ -30,7 +30,6 @@ export function Checkbox({ checked, onToggle, label = 'Done', delay = 0 }: Props
       data-press="off"
       className={styles.hit}
       onClick={onToggle}
-      whileTap={{ scale: 0.85 }}
     >
       {burst > 0 && (
         <motion.span
@@ -45,6 +44,9 @@ export function Checkbox({ checked, onToggle, label = 'Done', delay = 0 }: Props
       <motion.span
         className={styles.box}
         initial={false}
+        // whileTap makes framer-motion add tabindex="0" unless one is set; the button is the stop.
+        tabIndex={-1}
+        whileTap={{ scale: 0.85 }}
         animate={
           checked
             ? {
@@ -85,6 +87,6 @@ export function Checkbox({ checked, onToggle, label = 'Done', delay = 0 }: Props
           />
         </svg>
       </motion.span>
-    </motion.button>
+    </button>
   );
 }
