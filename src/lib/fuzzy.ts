@@ -8,6 +8,8 @@ export type FuzzyMatch = {
 const TIER_SUBSTRING = 3000;
 const TIER_WORD_START = 2000;
 const TIER_SUBSEQUENCE = 1000;
+/** Queries shorter than this skip the subsequence tier: scattered letters are mostly noise. */
+const MIN_SUBSEQUENCE_QUERY = 4;
 
 const isWordStart = (text: string, i: number) => i === 0 || /[^\p{L}\p{N}]/u.test(text[i - 1]);
 
@@ -45,8 +47,9 @@ function subsequenceMatch(q: string, t: string): number[] | null {
 /**
  * A small, forgiving matcher for titles. Case-insensitive, whitespace in the query is ignored
  * for the word-start and subsequence tiers. A contiguous substring beats a word-start match
- * (each query chunk starting a word), which beats a plain subsequence. Within a tier, earlier
- * and tighter matches, and shorter texts, win. An empty query matches everything with score 0.
+ * (each query chunk starting a word), which beats a plain subsequence. Queries under 4
+ * characters (ignoring whitespace) never fall back to a subsequence. Within a tier, earlier and
+ * tighter matches, and shorter texts, win. An empty query matches everything with score 0.
  */
 export function fuzzyMatch(query: string, text: string): FuzzyMatch | null {
   const q = query.trim().toLowerCase();
@@ -74,6 +77,7 @@ export function fuzzyMatch(query: string, text: string): FuzzyMatch | null {
     return { score: TIER_WORD_START + shortness - words[0], indices: words };
   }
 
+  if (compact.length < MIN_SUBSEQUENCE_QUERY) return null;
   const sub = subsequenceMatch(compact, t);
   if (sub) {
     let adjacent = 0;
