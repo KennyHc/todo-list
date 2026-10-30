@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { mkState, mkTask } from '../test/factories';
 import type { Task } from '../types';
-import { weekDays, weekIds, weekRange, weekStart } from './week';
+import {
+  firstDueFrom,
+  weekDays,
+  weekDropMove,
+  weekIds,
+  weekRange,
+  weekStart,
+  weekStepMove,
+} from './week';
 
 // Wed 21 Oct 2026, so the week is Mon 19 - Sun 25 Oct.
 const TODAY = '2026-10-21';
@@ -300,5 +308,116 @@ describe('weekRange', () => {
   it('adds the year outside today’s year', () => {
     expect(weekRange('2026-12-28', TODAY)).toMatch(/2027/);
     expect(weekRange('2025-06-02', TODAY)).toMatch(/2025/);
+  });
+});
+
+describe('weekDropMove', () => {
+  it('moves the due date when a due row lands on another day', () => {
+    expect(weekDropMove('due', '2026-10-21', '2026-10-23', TODAY)).toEqual({
+      field: 'dueDate',
+      date: '2026-10-23',
+    });
+  });
+
+  it('lets a due date move into the past (the task becomes overdue)', () => {
+    expect(weekDropMove('due', '2026-10-21', '2026-10-19', TODAY)).toEqual({
+      field: 'dueDate',
+      date: '2026-10-19',
+    });
+  });
+
+  it('moves the plan, not the due date, when a planned row lands on another day', () => {
+    expect(weekDropMove('planned', '2026-10-22', '2026-10-24', TODAY)).toEqual({
+      field: 'plannedFor',
+      date: '2026-10-24',
+    });
+    expect(weekDropMove('planned', '2026-10-22', TODAY, TODAY)).toEqual({
+      field: 'plannedFor',
+      date: TODAY,
+    });
+  });
+
+  it('is null for a drop on the same day', () => {
+    expect(weekDropMove('due', '2026-10-21', '2026-10-21', TODAY)).toBeNull();
+    expect(weekDropMove('planned', '2026-10-22', '2026-10-22', TODAY)).toBeNull();
+  });
+
+  it('is null for a plan dropped before today, where it would only roll over again', () => {
+    expect(weekDropMove('planned', TODAY, '2026-10-20', TODAY)).toBeNull();
+  });
+});
+
+describe('weekStepMove', () => {
+  it('moves a due date this week a day either way', () => {
+    const task = mkTask('t', { dueDate: '2026-10-21' });
+    expect(weekStepMove(task, 1, START, TODAY)).toEqual({ field: 'dueDate', date: '2026-10-22' });
+    expect(weekStepMove(task, -1, START, TODAY)).toEqual({ field: 'dueDate', date: '2026-10-20' });
+  });
+
+  it('crosses the week, month and year', () => {
+    expect(weekStepMove(mkTask('t', { dueDate: '2026-10-25' }), 1, START, TODAY)).toEqual({
+      field: 'dueDate',
+      date: '2026-10-26',
+    });
+    expect(weekStepMove(mkTask('t', { dueDate: '2026-12-31' }), 1, '2026-12-28', TODAY)).toEqual({
+      field: 'dueDate',
+      date: '2027-01-01',
+    });
+  });
+
+  it('moves the due date when the task is both due and planned this week', () => {
+    const task = mkTask('t', { dueDate: '2026-10-24', plannedFor: '2026-10-22' });
+    expect(weekStepMove(task, -1, START, TODAY)).toEqual({ field: 'dueDate', date: '2026-10-23' });
+  });
+
+  it('moves the plan when only the plan is this week', () => {
+    const task = mkTask('t', { dueDate: '2026-11-05', plannedFor: '2026-10-22' });
+    expect(weekStepMove(task, 1, START, TODAY)).toEqual({
+      field: 'plannedFor',
+      date: '2026-10-23',
+    });
+    expect(weekStepMove(mkTask('t', { plannedFor: '2026-10-22' }), -1, START, TODAY)).toEqual({
+      field: 'plannedFor',
+      date: TODAY,
+    });
+  });
+
+  it('steps a rolled-over plan from today, where it shows', () => {
+    const task = mkTask('t', { plannedFor: '2026-10-19' });
+    expect(weekStepMove(task, 1, START, TODAY)).toEqual({
+      field: 'plannedFor',
+      date: '2026-10-22',
+    });
+  });
+
+  it('is null for a plan that would go before today, or a task with no date', () => {
+    expect(weekStepMove(mkTask('t', { plannedFor: TODAY }), -1, START, TODAY)).toBeNull();
+    expect(weekStepMove(mkTask('t'), 1, START, TODAY)).toBeNull();
+  });
+});
+
+describe('firstDueFrom', () => {
+  const tasks = Object.fromEntries(
+    [
+      mkTask('a', { dueDate: '2026-10-20' }),
+      mkTask('b', { dueDate: '2026-10-22', done: true }),
+      mkTask('c', { dueDate: '2026-10-22' }),
+      mkTask('d', { dueDate: '2026-10-24' }),
+      mkTask('e', { dueDate: null }),
+    ].map((task) => [task.id, task]),
+  );
+  const ids = ['a', 'b', 'c', 'd', 'e'];
+
+  it('is the first open task due that day', () => {
+    expect(firstDueFrom(tasks, ids, '2026-10-22')).toBe('c');
+  });
+
+  it('falls through to the next one due after the day', () => {
+    expect(firstDueFrom(tasks, ids, '2026-10-23')).toBe('d');
+    expect(firstDueFrom(tasks, ids, '2026-10-01')).toBe('a');
+  });
+
+  it('is null when nothing is due from that day on', () => {
+    expect(firstDueFrom(tasks, ids, '2026-10-25')).toBeNull();
   });
 });

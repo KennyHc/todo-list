@@ -116,6 +116,13 @@
   }
 }
 
+/* A row dragged over this day. */
+.day[data-over] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--surface) 90%, var(--accent));
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
 /* Today: an accent edge and a tinted head. */
 .day[data-today] {
   border-color: var(--ring);
@@ -133,6 +140,27 @@
 
 .day[data-today] .dayHead {
   background: var(--accent-soft);
+}
+
+/* Weekday and date: a link to the day in By deadline. */
+.dayLink {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: -2px -4px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--t-fast);
+}
+
+.dayLink:hover {
+  background: var(--surface-2);
 }
 
 .dow {
@@ -175,6 +203,70 @@
 
 .points[data-zero] {
   opacity: 0.6;
+}
+
+/* Add a task on this day: quiet, shown on hover with a mouse and always on narrow screens. */
+.add {
+  display: inline-flex;
+  align-self: center;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: -3px -4px -3px 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    background-color var(--t-fast),
+    color var(--t-fast);
+}
+
+.day:hover .add,
+.add:focus-visible {
+  opacity: 1;
+}
+
+.add:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+@media (max-width: 1023px), (hover: none) {
+  .add {
+    opacity: 1;
+  }
+}
+
+/*
+ * Seven columns with a mouse: no room for the "+" beside the points, so it takes their place
+ * while the day is hovered.
+ */
+@media (min-width: 1024px) and (hover: hover) {
+  .dayHead {
+    position: relative;
+  }
+
+  .add {
+    position: absolute;
+    top: calc(var(--space-3) - 1px);
+    right: var(--space-2);
+    margin: 0;
+  }
+
+  .points {
+    transition: opacity var(--dur-fast) var(--ease-out);
+  }
+
+  .day:hover .points,
+  .day:has(.add:focus-visible) .points {
+    opacity: 0;
+  }
 }
 
 .rows {

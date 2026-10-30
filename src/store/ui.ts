@@ -28,6 +28,8 @@ type UIState = {
   showUpcoming: boolean;
   /** Monday of the week the Week view shows, or null for the current week. Not persisted. */
   weekAnchor: string | null;
+  /** A Week day's "+" asked the composer to open set to this due date. Not persisted. */
+  composerDay: string | null;
   /** The row the keyboard acts on. Not persisted. */
   focusedId: string | null;
   /** Whether the tag filter popover is open, so a hotkey can open it. Not persisted. */
@@ -54,6 +56,7 @@ type UIState = {
   setCompletedShowAll: (showAll: boolean) => void;
   setShowUpcoming: (show: boolean) => void;
   setWeekAnchor: (weekStart: string | null) => void;
+  setComposerDay: (date: string | null) => void;
   setFocusedId: (id: string | null) => void;
   setFilterOpen: (open: boolean) => void;
   setPaletteOpen: (open: boolean) => void;
@@ -79,6 +82,7 @@ export const useUIStore = create<UIState>()(
       completedShowAll: false,
       showUpcoming: false,
       weekAnchor: null,
+      composerDay: null,
       focusedId: null,
       filterOpen: false,
       paletteOpen: false,
@@ -96,6 +100,7 @@ export const useUIStore = create<UIState>()(
       setCompletedShowAll: (completedShowAll) => set({ completedShowAll }),
       setShowUpcoming: (showUpcoming) => set({ showUpcoming }),
       setWeekAnchor: (weekAnchor) => set({ weekAnchor }),
+      setComposerDay: (composerDay) => set({ composerDay }),
       setFocusedId: (focusedId) => set({ focusedId }),
       setFilterOpen: (filterOpen) => set({ filterOpen }),
       setPaletteOpen: (paletteOpen) => set({ paletteOpen }),

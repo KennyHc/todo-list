@@ -113,6 +113,8 @@ export type RowDrag = Pick<
   /** Show the handle (tree view, no tag filter). */
   enabled: boolean;
   style: CSSProperties;
+  /** The handle's verb: "Reorder" in the Tree, "Move" in Week (between days). */
+  verb?: string;
 };
 
 const NO_PATH: string[] = [];
@@ -574,7 +576,7 @@ function TaskItemInner({
                     type="button"
                     ref={drag.setActivatorNodeRef}
                     className={styles.grip}
-                    aria-label={`Reorder ${task.title}`}
+                    aria-label={`${drag.verb ?? 'Reorder'} ${task.title}`}
                     {...drag.attributes}
                     {...drag.listeners}
                   >

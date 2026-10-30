@@ -62,6 +62,8 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const [caret, setCaret] = useState(0);
   const [tags, setTags] = useState<string[]>([]);
   const [due, setDue] = useState<string | null>(null);
+  /** The day a Week "+" opened the composer for: the due date unless the text or toolbar says. */
+  const [dayDue, setDayDue] = useState<string | null>(null);
   /** A repeat picked from the toolbar; it wins over one typed in the text. */
   const [pickedRepeat, setPickedRepeat] = useState<Repeat | null>(null);
   const [focused, setFocused] = useState(false);
@@ -102,6 +104,15 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
     if (newTask || text !== null) inputRef.current?.focus();
   }, []);
 
+  // A Week day's "+": focus the composer, set to that day.
+  const composerDay = useUIStore((s) => s.composerDay);
+  useEffect(() => {
+    if (composerDay === null) return;
+    setDayDue(composerDay);
+    useUIStore.getState().setComposerDay(null);
+    inputRef.current?.focus();
+  }, [composerDay]);
+
   const parsed = useMemo(
     () => parseQuickAdd(value, { ignore: ignored, repeats: SUPPORTS_REPEAT }),
     [value, ignored],
@@ -139,14 +150,16 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const repeatToken = parsed.tokens.find((t) => t.kind === 'repeat');
   /**
    * The due date the task gets: the picked date, then a date typed in the text, then (for a
-   * repeat) its first occurrence. A repeat from the text already got that from the parser; one
-   * picked from the toolbar overrides it, so the first occurrence is worked out again.
+   * repeat) its first occurrence, then the Week day it was opened for. A repeat from the text
+   * already got that from the parser; one picked from the toolbar overrides it, so the first
+   * occurrence is worked out again.
    */
   const dueDate =
     due ??
     (pickedRepeat === null || dateToken !== undefined
       ? parsed.dueDate
-      : firstOccurrence(pickedRepeat, todayISO()));
+      : firstOccurrence(pickedRepeat, todayISO())) ??
+    dayDue;
   const tagTokens = parsed.tokens.filter((t) => t.kind === 'tag');
 
   const before = value.slice(0, caret);
@@ -214,6 +227,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
     setCaret(0);
     setTags([]);
     setDue(null);
+    setDayDue(null);
     setPickedRepeat(null);
     setPanel(null);
   };
@@ -245,7 +259,10 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   };
 
   const onBlur = (e: FocusEvent<HTMLDivElement>) => {
-    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false);
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    setFocused(false);
+    // A Week day's "+" left without typing anything: forget the day.
+    if (value === '' && panel === null) setDayDue(null);
   };
 
   const showToolbar =
@@ -253,9 +270,11 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
     value !== '' ||
     tags.length > 0 ||
     due !== null ||
+    dayDue !== null ||
     pickedRepeat !== null ||
     panel !== null;
-  const toolbarDue = due ?? (pickedRepeat !== null ? dueDate : null);
+  const toolbarDue =
+    due ?? (pickedRepeat !== null ? dueDate : null) ?? (parsed.dueDate === null ? dayDue : null);
 
   return (
     <div
@@ -482,6 +501,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
                       aria-label="Clear due date"
                       onClick={() => {
                         setDue(null);
+                        setDayDue(null);
                         setPickedRepeat(null);
                       }}
                     >
@@ -516,7 +536,10 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
             value={toolbarDue}
             onChange={(date) => {
               setDue(date);
-              if (date === null) setPickedRepeat(null);
+              if (date === null) {
+                setPickedRepeat(null);
+                setDayDue(null);
+              }
             }}
             onPicked={closePanel}
             repeat={pickedRepeat}

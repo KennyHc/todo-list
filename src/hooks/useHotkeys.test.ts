@@ -114,6 +114,13 @@ describe('matchHotkey', () => {
     expect(matchHotkey(ev('j'), ctx({ view: 'history' }))).toBeNull();
     expect(matchHotkey(ev('1'), ctx({ view: 'history' }))).toEqual({ type: 'view', view: 'tree' });
   });
+
+  it('[ and ] move the focused row a day in Week only', () => {
+    expect(matchHotkey(ev('['), ctx({ view: 'week' }))).toEqual({ type: 'day', step: -1 });
+    expect(matchHotkey(ev(']'), ctx({ view: 'week' }))).toEqual({ type: 'day', step: 1 });
+    expect(matchHotkey(ev(']'), ctx({ view: 'tree' }))).toBeNull();
+    expect(matchHotkey(ev(']'), ctx({ view: 'week', hasFocus: false }))).toBeNull();
+  });
 });
 
 describe('matchHotkey with the Today view on', () => {
