@@ -1,6 +1,7 @@
 import type { TaskTree } from '../types';
 import { todayList } from './today';
 import { getAncestors, getDescendants, hiddenUntilStart, notStarted } from './tree';
+import { weekIds, weekStart } from './week';
 
 export type DueStatus = 'overdue' | 'today' | 'soon' | 'later';
 
@@ -157,7 +158,7 @@ export function upcomingCount(tree: TaskTree, today: string, tag: string | null 
  * Ids of the rows currently on screen, in display order: tree order (open tasks only,
  * skipping collapsed subtrees and anything the tag filter hides) or deadline order, which
  * ends with the Completed rows unless that section is collapsed (or limited to its preview),
- * or the Today list. History rows aren't tasks, so that view has no keyboard order.
+ * the Today list, or the Week's days in order. History rows aren't tasks, so that view has no keyboard order.
  */
 export function visibleOrder(
   tree: TaskTree,
@@ -167,16 +168,20 @@ export function visibleOrder(
     completedCollapsed = false,
     completedShowAll = false,
     showUpcoming = false,
+    weekAnchor = null,
   }: {
-    view: 'today' | 'tree' | 'deadline' | 'history';
+    view: 'today' | 'tree' | 'deadline' | 'history' | 'week';
     tag: string | null;
     completedCollapsed?: boolean;
     completedShowAll?: boolean;
     showUpcoming?: boolean;
+    /** Monday of the week the Week view shows; null for the current week. */
+    weekAnchor?: string | null;
   },
   today: string = todayISO(),
 ): string[] {
   if (view === 'history') return [];
+  if (view === 'week') return weekIds(tree, weekAnchor ?? weekStart(today), today, tag);
   if (view === 'today') return todayList(tree, today, tag);
   if (view === 'deadline') {
     const all = deadlineList(tree, { tag }, today);

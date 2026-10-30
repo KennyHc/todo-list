@@ -85,7 +85,7 @@ describe('Features in the avatar menu', () => {
     const radios = within(screen.getByRole('radiogroup', { name: 'View' }))
       .getAllByRole('radio')
       .map((r) => r.getAttribute('aria-label'));
-    expect(radios).toEqual(['Today', 'Tree', 'By deadline', 'History']);
+    expect(radios).toEqual(['Today', 'Tree', 'By deadline', 'History', 'Week']);
     expect(viewTab('Today')).toHaveAttribute('aria-checked', 'true');
     expect(useUIStore.getState().view).toBe('today');
 

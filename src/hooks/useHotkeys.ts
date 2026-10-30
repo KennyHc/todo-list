@@ -94,7 +94,8 @@ export function matchHotkey(e: HotkeyEvent, ctx: HotkeyContext): HotkeyAction | 
     case '1':
     case '2':
     case '3':
-    case '4': {
+    case '4':
+    case '5': {
       const view = viewOrder(ctx.todayView === true)[Number(e.key) - 1];
       return view ? { type: 'view', view } : null;
     }
@@ -143,6 +144,7 @@ const orderOf = (ui: ReturnType<typeof useUIStore.getState>) => ({
   completedCollapsed: ui.completedCollapsed,
   completedShowAll: ui.completedShowAll,
   showUpcoming: ui.showUpcoming,
+  weekAnchor: ui.weekAnchor,
 });
 
 const asElement = (target: EventTarget | null) => (target instanceof Element ? target : null);

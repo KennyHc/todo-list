@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
-import { CalendarClock, History, ListTree, Sun, type LucideIcon } from 'lucide-react';
+import { CalendarClock, CalendarDays, History, ListTree, Sun, type LucideIcon } from 'lucide-react';
 import { useTaskStore } from '../store/tasks';
 import { useUIStore, useView, viewOrder, type View } from '../store/ui';
 import styles from './ViewSwitch.module.css';
@@ -11,6 +11,7 @@ const OPTION: Record<View, { label: string; Icon: LucideIcon }> = {
   tree: { label: 'Tree', Icon: ListTree },
   deadline: { label: 'By deadline', Icon: CalendarClock },
   history: { label: 'History', Icon: History },
+  week: { label: 'Week', Icon: CalendarDays },
 };
 
 const STEPS: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };

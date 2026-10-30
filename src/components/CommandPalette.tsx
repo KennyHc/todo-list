@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   CalendarClock,
+  CalendarDays,
   CheckCheck,
   Copy,
   Download,
@@ -71,6 +72,7 @@ const VIEWS: Record<View, { label: string; Icon: LucideIcon }> = {
   tree: { label: 'Go to Tree', Icon: ListTree },
   deadline: { label: 'Go to By deadline', Icon: CalendarClock },
   history: { label: 'Go to History', Icon: History },
+  week: { label: 'Go to Week', Icon: CalendarDays },
 };
 
 /** Renders `text` with the matched characters emphasised. */

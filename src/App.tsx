@@ -23,6 +23,7 @@ import { TaskList } from './components/TaskList';
 import { TodayList } from './components/TodayList';
 import { UndoToast } from './components/UndoToast';
 import { ViewToolbar } from './components/ViewToolbar';
+import { WeekView } from './components/WeekView';
 import { useHotkeys } from './hooks/useHotkeys';
 import { useIsPhone } from './hooks/useMediaQuery';
 import { usePasteImport } from './hooks/usePasteImport';
@@ -153,6 +154,8 @@ function App() {
                   <HistoryList />
                 ) : view === 'today' ? (
                   <TodayList />
+                ) : view === 'week' ? (
+                  <WeekView />
                 ) : isEmpty ? (
                   <EmptyState welcome={freshSignIn} />
                 ) : view === 'deadline' ? (

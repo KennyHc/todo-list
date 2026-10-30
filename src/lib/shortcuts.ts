@@ -63,6 +63,7 @@ const GROUPS: ShortcutGroup[] = [
       { label: 'Tree', keys: [['2']] },
       { label: 'By deadline', keys: [['3']] },
       { label: 'History', keys: [['4']] },
+      { label: 'Week', keys: [['5']] },
       { label: 'Filter by tag', keys: [['/']] },
     ],
   },
@@ -82,6 +83,7 @@ const VIEW_KEYS_WITHOUT_TODAY: Record<string, string> = {
   Tree: '1',
   'By deadline': '2',
   History: '3',
+  Week: '4',
 };
 
 /**

@@ -119,17 +119,19 @@ describe('matchHotkey', () => {
 describe('matchHotkey with the Today view on', () => {
   const on = (extra: Partial<HotkeyContext> = {}) => ctx({ todayView: true, ...extra });
 
-  it('numbers the views from Today: 1 Today, 2 Tree, 3 By deadline, 4 History', () => {
+  it('numbers the views from Today: 1 Today, 2 Tree, 3 By deadline, 4 History, 5 Week', () => {
     expect(matchHotkey(ev('1'), on())).toEqual({ type: 'view', view: 'today' });
     expect(matchHotkey(ev('2'), on())).toEqual({ type: 'view', view: 'tree' });
     expect(matchHotkey(ev('3'), on())).toEqual({ type: 'view', view: 'deadline' });
     expect(matchHotkey(ev('4'), on())).toEqual({ type: 'view', view: 'history' });
+    expect(matchHotkey(ev('5'), on())).toEqual({ type: 'view', view: 'week' });
   });
 
-  it('leaves the numbering alone while it is off, and 4 does nothing', () => {
+  it('leaves the numbering alone while it is off: Week is 4 and 5 does nothing', () => {
     expect(matchHotkey(ev('1'), ctx())).toEqual({ type: 'view', view: 'tree' });
     expect(matchHotkey(ev('3'), ctx())).toEqual({ type: 'view', view: 'history' });
-    expect(matchHotkey(ev('4'), ctx())).toBeNull();
+    expect(matchHotkey(ev('4'), ctx())).toEqual({ type: 'view', view: 'week' });
+    expect(matchHotkey(ev('5'), ctx())).toBeNull();
   });
 
   it('p plans the focused row, only with the feature on', () => {
