@@ -11,6 +11,8 @@
   margin: 0;
   padding: var(--space-1) 0 var(--space-1);
   color: var(--text-2);
+  /* A textarea defaults to the monospace system font. */
+  font-family: inherit;
   font-size: 13px;
   font-weight: 400;
   letter-spacing: 0;
@@ -57,6 +59,13 @@
 
 .editor:focus-visible {
   outline: none;
+}
+
+.hint {
+  margin: 0 0 var(--space-1);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 14px;
 }
 
 /* Phone: aligned with the 16px title and its larger line. */
