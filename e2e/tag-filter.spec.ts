@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { addTask, signIn, titleBtn, uniqueSub } from './helpers';
 
-const TAG = 'work-in-progress-reallylongtag';
+// MAX_TAG_LENGTH (24) characters: the longest tag the app keeps.
+const TAG = 'work-in-progress-longtag';
 const filterBtn = (page: Page) => page.getByRole('button', { name: 'Filter', exact: true });
 const banner = (page: Page) => page.getByRole('status').filter({ hasText: 'Filtered by' });
 
