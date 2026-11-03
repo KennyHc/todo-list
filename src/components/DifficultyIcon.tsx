@@ -10,10 +10,12 @@ type Props = {
   onChange: (d: Difficulty) => void;
   /** Dim the glyph, e.g. on a finished row. */
   dimmed?: boolean;
+  /** -1 inside a task row, which is the Tab stop for its controls (roving tabindex). */
+  tabIndex?: number;
 };
 
 /** A row's difficulty as a small signal-strength glyph; clicking it opens the level menu. */
-export function DifficultyIcon({ value, onChange, dimmed = false }: Props) {
+export function DifficultyIcon({ value, onChange, dimmed = false, tabIndex }: Props) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const close = useCallback(() => setOpen(false), []);
@@ -28,6 +30,7 @@ export function DifficultyIcon({ value, onChange, dimmed = false }: Props) {
         title={DIFFICULTY_NAMES[value]}
         aria-haspopup="dialog"
         aria-expanded={open}
+        tabIndex={tabIndex}
         onClick={() => setOpen((o) => !o)}
       >
         <DifficultyGlyph value={value} />

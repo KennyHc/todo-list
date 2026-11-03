@@ -28,6 +28,7 @@ import { addSubtask } from '../lib/addSubtask';
 import { splitTitleLinks } from '../lib/links';
 import { ignoreTextEntry } from '../lib/textEntry';
 import { primeKeyboard } from '../lib/focusProxy';
+import { rowControls, TEXT_ENTRY } from '../hooks/useHotkeys';
 import { getAncestors, getDescendants, hiddenUntilStart } from '../lib/tree';
 import {
   isContextOnly,
@@ -104,6 +105,8 @@ type Props = {
   compact?: boolean;
   /** Shared-layout id, so a Suggested row can glide into the list as this one. */
   layoutId?: string;
+  /** Tree view: the row is a treeitem in TaskList's `role="tree"`; elsewhere it is a group. */
+  tree?: boolean;
 };
 
 export type RowDrag = Pick<
@@ -207,6 +210,7 @@ function TaskItemInner({
   quiet = false,
   compact = false,
   layoutId,
+  tree = false,
 }: Props) {
   const liveTask = useTask(id);
   const liveLeaf = useIsLeaf(id);
@@ -216,6 +220,7 @@ function TaskItemInner({
   const liveProgress = useProgress(id);
   const editing = useTaskStore((s) => s.editingId === id);
   const focused = useUIStore((s) => s.focusedId === id);
+  const tabStop = useUIStore((s) => s.tabStopId === id);
   const deleteRequested = useUIStore((s) => s.deleteRequestId === id);
   const rescheduleRequested = useUIStore((s) => s.rescheduleRequestId === id);
   const revealPulse = useUIStore((s) => (s.revealFlash?.id === id ? s.revealFlash.n : 0));
@@ -385,6 +390,16 @@ function TaskItemInner({
     if (focused) rowRef.current?.scrollIntoView?.({ block: 'nearest' });
   }, [focused]);
 
+  // Keyboard focus follows the focused row (j/k, a completed row handing on, an edit ending),
+  // but only from nowhere or from another row: never out of a field or a dialog.
+  useEffect(() => {
+    const row = rowRef.current;
+    const active = document.activeElement;
+    if (!focused || editing || !row || active === row) return;
+    const fromRow = active?.closest('[data-row-id]') && !active.closest(TEXT_ENTRY);
+    if (active === null || active === document.body || fromRow) row.focus({ preventScroll: true });
+  }, [focused, editing]);
+
   // Revealed from the palette: the row may only just have mounted under a still-expanding
   // parent, so scroll again once it has settled.
   useEffect(() => {
@@ -445,6 +460,7 @@ function TaskItemInner({
       aria-label={task.collapsed ? 'Expand' : 'Collapse'}
       aria-expanded={!task.collapsed}
       onClick={() => store.update(id, { collapsed: !task.collapsed })}
+      tabIndex={-1}
       initial={false}
       animate={{ rotate: task.collapsed ? 0 : 90 }}
       whileHover={{ scale: 1.08 }}
@@ -458,6 +474,7 @@ function TaskItemInner({
   return (
     <motion.li
       ref={liRef}
+      role={tree ? 'none' : undefined}
       className={styles.item}
       data-completing={completing || undefined}
       style={
@@ -518,6 +535,14 @@ function TaskItemInner({
               <motion.div
                 ref={rowRef}
                 className={`${styles.row} ${task.done ? styles.rowDone : ''} ${editing || noteMode === 'edit' ? styles.rowEditing : ''} ${focused ? styles.rowFocused : ''}`}
+                // One Tab stop per row (roving tabindex); its buttons are reached with →.
+                role={tree ? 'treeitem' : 'group'}
+                tabIndex={tabStop ? 0 : -1}
+                aria-label={task.done ? `${task.title}, done` : task.title}
+                aria-level={tree ? depth + 1 : undefined}
+                aria-expanded={tree && !leaf ? !task.collapsed : undefined}
+                aria-selected={tree ? focused : undefined}
+                data-row=""
                 data-meta={hasMeta || undefined}
                 data-dim={dimmed || undefined}
                 data-upcoming={upcoming || undefined}
@@ -543,6 +568,32 @@ function TaskItemInner({
                     return;
                   }
                   useUIStore.getState().setFocusedId(id);
+                }}
+                onFocus={(e) => {
+                  // Tabbing onto the row selects it, so the keys act on it.
+                  if (e.target === e.currentTarget && !focused) {
+                    useUIStore.getState().setFocusedId(id);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  // In the row's buttons: ←/→ step through them (← from the first goes back to
+                  // the row), Esc goes back to the row. ↑/↓ and the rest are useHotkeys'.
+                  const row = rowRef.current;
+                  const item = liRef.current;
+                  if (e.defaultPrevented || e.altKey || e.metaKey || e.ctrlKey || e.shiftKey)
+                    return;
+                  if (!row || !item || useDragStore.getState().activeId !== null) return;
+                  const controls = rowControls(item);
+                  const at = controls.indexOf(e.target as HTMLElement);
+                  if (at === -1) return;
+                  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    const next = at + (e.key === 'ArrowRight' ? 1 : -1);
+                    (next < 0 ? row : controls[Math.min(next, controls.length - 1)]).focus();
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    row.focus();
+                  }
                 }}
               >
                 {revealPulse > 0 && (
@@ -579,6 +630,7 @@ function TaskItemInner({
                     aria-label={`${drag.verb ?? 'Reorder'} ${task.title}`}
                     {...drag.attributes}
                     {...drag.listeners}
+                    tabIndex={-1}
                   >
                     <GripVertical size={14} strokeWidth={1.75} aria-hidden="true" />
                   </button>
@@ -588,6 +640,7 @@ function TaskItemInner({
                   label={`Done: ${task.title}`}
                   delay={delay}
                   onToggle={() => store.toggle(id)}
+                  tabIndex={-1}
                 />
                 <div className={styles.title}>
                   <div
@@ -609,6 +662,7 @@ function TaskItemInner({
                         <button
                           type="button"
                           className={styles.titleBtn}
+                          tabIndex={-1}
                           data-swipe-through
                           onClick={edit}
                         >
@@ -645,6 +699,7 @@ function TaskItemInner({
                                 className={styles.noteBtn}
                                 aria-label={noteOpen ? 'Hide note' : 'Show note'}
                                 aria-expanded={noteOpen}
+                                tabIndex={-1}
                                 data-swipe-through
                                 onClick={() => setNoteMode(noteOpen ? 'closed' : 'read')}
                               >
@@ -652,13 +707,14 @@ function TaskItemInner({
                               </button>
                             )}
                             {chipLinks.map((href) => (
-                              <LinkChip key={href} href={href} />
+                              <LinkChip key={href} href={href} tabIndex={-1} />
                             ))}
                             {shownTags.map((tag) => (
                               <TagChip
                                 key={tag}
                                 tag={tag}
                                 plain
+                                tabIndex={-1}
                                 onClick={() => setTagFilter(tag)}
                               />
                             ))}
@@ -703,6 +759,7 @@ function TaskItemInner({
                           aria-label="Reschedule"
                           aria-haspopup="dialog"
                           aria-expanded={rescheduleOpen}
+                          tabIndex={-1}
                           onClick={(e) => {
                             rescheduleAnchor.current = e.currentTarget;
                             setRescheduleOpen(!rescheduleOpen);
@@ -715,6 +772,7 @@ function TaskItemInner({
                         id={id}
                         buttonClassName={styles.iconBtn}
                         motionProps={iconMotion}
+                        tabIndex={-1}
                         onAddSubtask={addChild}
                         onNote={editNote}
                         onDelete={requestDelete}
@@ -728,6 +786,7 @@ function TaskItemInner({
                             data-press="off"
                             className={styles.iconBtn}
                             aria-label="Add subtask"
+                            tabIndex={-1}
                             onClick={addChild}
                           >
                             <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
@@ -738,6 +797,7 @@ function TaskItemInner({
                             data-press="off"
                             className={`${styles.iconBtn} ${styles.deleteBtn}`}
                             aria-label="Delete task"
+                            tabIndex={-1}
                             onClick={requestDelete}
                           >
                             <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
@@ -750,6 +810,7 @@ function TaskItemInner({
                     <DifficultyIcon
                       value={task.difficulty}
                       dimmed={task.done}
+                      tabIndex={-1}
                       onChange={(difficulty) => store.update(id, { difficulty })}
                     />
                   ) : (
@@ -780,7 +841,7 @@ function TaskItemInner({
 
             <AnimatePresence initial={false}>
               {!compact && leaf && !task.done && task.difficulty === MAX_DIFFICULTY && (
-                <BreakdownNudge key="nudge" onBreakdown={addChild} />
+                <BreakdownNudge key="nudge" onBreakdown={addChild} tabIndex={-1} />
               )}
             </AnimatePresence>
           </div>
@@ -835,6 +896,7 @@ function SortableTaskItemInner({ dragEnabled, ...props }: SortableProps) {
   return (
     <TaskItemInner
       {...props}
+      tree
       drag={{
         enabled: dragEnabled,
         setNodeRef: sortable.setNodeRef,

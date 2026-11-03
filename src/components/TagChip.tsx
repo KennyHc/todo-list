@@ -18,10 +18,22 @@ type Props = {
   colorOpen?: boolean;
   /** Rows and lists: just the colour dot and the name, no pill. Chips stay pills. */
   plain?: boolean;
+  /** -1 inside a task row, which is the Tab stop for its controls (roving tabindex). */
+  tabIndex?: number;
 };
 
 /** A tag chip in the tag's assigned colour, or else its stable hash colour (chips only). */
-export function TagChip({ tag, onClick, onRemove, muted, hash, onColor, colorOpen, plain }: Props) {
+export function TagChip({
+  tag,
+  onClick,
+  onRemove,
+  muted,
+  hash,
+  onColor,
+  colorOpen,
+  plain,
+  tabIndex,
+}: Props) {
   const assigned = useTaskStore((s) => s.tagColors[tag]);
   const style = { ['--tag' as string]: assigned ?? tagColor(tag) };
   const body = (
@@ -46,6 +58,7 @@ export function TagChip({ tag, onClick, onRemove, muted, hash, onColor, colorOpe
           aria-label={`Colour for #${tag}`}
           aria-expanded={colorOpen}
           title={`Colour for #${tag}`}
+          tabIndex={tabIndex}
           onClick={onColor}
         >
           <span className={styles.dot} aria-hidden="true" />
@@ -56,6 +69,7 @@ export function TagChip({ tag, onClick, onRemove, muted, hash, onColor, colorOpe
           type="button"
           className={`${styles.body} ${styles.clickable}`}
           aria-label={`Filter by tag ${tag}`}
+          tabIndex={tabIndex}
           onClick={onClick}
         >
           {body}
@@ -68,6 +82,7 @@ export function TagChip({ tag, onClick, onRemove, muted, hash, onColor, colorOpe
           type="button"
           className={styles.remove}
           aria-label={`Remove tag ${tag}`}
+          tabIndex={tabIndex}
           onClick={onRemove}
         >
           <X size={11} strokeWidth={2} aria-hidden="true" />

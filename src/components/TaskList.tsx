@@ -295,7 +295,7 @@ export function TaskList() {
           items={dragItems.map((item) => item.id)}
           strategy={verticalListSortingStrategy}
         >
-          <ul ref={listRef} className={styles.list}>
+          <ul ref={listRef} className={styles.list} role="tree" aria-label="Tasks">
             <AnimatePresence initial={false}>
               {items.map((item, i) => (
                 <SortableTaskItem
