@@ -57,6 +57,12 @@ function WeekBar({ start, current }: { start: string; current: string }) {
         {weekRange(start, todayISO())}
       </h2>
       <div className={styles.nav} role="group" aria-label="Week">
+        {/* Only off the current week; first, so the arrows don't move when it comes and goes. */}
+        {!here && (
+          <button type="button" className={styles.todayBtn} onClick={() => go(current)}>
+            Today
+          </button>
+        )}
         <button
           type="button"
           className={styles.navBtn}
@@ -64,14 +70,6 @@ function WeekBar({ start, current }: { start: string; current: string }) {
           onClick={() => go(addDays(start, -7))}
         >
           <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className={styles.todayBtn}
-          disabled={here}
-          onClick={() => go(current)}
-        >
-          Today
         </button>
         <button
           type="button"
@@ -95,6 +93,8 @@ function DayRow({ item, date, today }: { item: WeekItem; date: string; today: st
   // A plan that rolled over from an earlier day says so ("From Mon"), as in Today.
   const reason = task && item.carried ? todayReason(task, today) : null;
   const enabled = task !== undefined && !task.done;
+  // An overdue row shows its red due pill, as in Tree, rather than relying on its past day.
+  const overdue = enabled && task.dueDate !== null && task.dueDate < today;
   const draggable = useDraggable({
     id: `${item.kind}:${item.id}`,
     data: { id: item.id, kind: item.kind, date } satisfies RowData,
@@ -117,7 +117,7 @@ function DayRow({ item, date, today }: { item: WeekItem; date: string; today: st
         verb: 'Move',
       }}
       // A due row sits under its date already; a plan keeps its due pill to say when it is due.
-      section={item.kind === 'due' ? 'today' : undefined}
+      section={item.kind === 'due' && !overdue ? 'today' : undefined}
       quiet={item.kind === 'planned'}
       compact
       reason={reason?.label}
@@ -199,10 +199,13 @@ const announcements: Announcements = {
     over
       ? `“${titleOf(active.data.current)}” is over ${weekdayDate(String(over.id))}.`
       : `“${titleOf(active.data.current)}” is not over a day.`,
-  onDragEnd: ({ active, over }) =>
-    over
-      ? `Dropped “${titleOf(active.data.current)}” on ${weekdayDate(String(over.id))}.`
-      : `“${titleOf(active.data.current)}” was dropped without moving.`,
+  // A move is said by the undo toast ("Moved … · Undo"), so this region empties rather than
+  // keep a "Dropped … on Tue" that an Undo would make wrong.
+  onDragEnd: ({ active, over }) => {
+    const row = active.data.current as RowData;
+    if (over && weekDropMove(row.kind, row.date, String(over.id), todayISO())) return '';
+    return `“${titleOf(row)}” was dropped without moving.`;
+  },
   onDragCancel: ({ active }) => `Cancelled. “${titleOf(active.data.current)}” did not move.`,
 };
 
