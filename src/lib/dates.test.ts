@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addDays,
+  BUCKET_LABELS,
   daysBetween,
   deadlineBucket,
   dueLabel,
@@ -198,5 +199,9 @@ describe('deadlineBucket', () => {
     expect(deadlineBucket(open('2027-01-01'), '2026-12-31')).toBe('tomorrow');
     expect(deadlineBucket(open('2027-01-07'), '2026-12-31')).toBe('week');
     expect(deadlineBucket(open('2027-01-08'), '2026-12-31')).toBe('later');
+  });
+
+  it('calls the week bucket "Next 7 days", not the calendar week', () => {
+    expect(BUCKET_LABELS.week).toBe('Next 7 days');
   });
 });
