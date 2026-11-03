@@ -193,7 +193,7 @@
 
 .points {
   margin-left: auto;
-  color: var(--muted);
+  color: var(--text-2);
   font-size: 12px;
   font-weight: 500;
   line-height: 16px;
@@ -201,8 +201,9 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* "0 pts": quieter than a day with work, but no fade, so it keeps 4.5:1. */
 .points[data-zero] {
-  opacity: 0.6;
+  color: var(--muted);
 }
 
 /* Add a task on this day: quiet, shown on hover with a mouse and always on narrow screens. */
