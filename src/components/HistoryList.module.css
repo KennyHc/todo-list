@@ -1,0 +1,259 @@
+.card {
+  margin: 10px 0 0;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  transition:
+    background-color var(--t-theme),
+    border-color var(--t-theme);
+}
+
+.group + .group {
+  margin-top: 4px;
+}
+
+.heading {
+  margin: 0;
+  padding: 10px 8px 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 16px;
+  text-transform: uppercase;
+}
+
+.group:first-child .heading {
+  padding-top: 6px;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 6px 8px 8px;
+  border-radius: var(--r-md);
+  transition: background-color var(--t-fast);
+}
+
+.entry:hover,
+.entry:has(:focus-visible) {
+  background: var(--surface-2);
+}
+
+.check {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  color: var(--check-ink);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.titleLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.title {
+  min-width: 0;
+  color: var(--text);
+  font-size: 14.5px;
+  font-weight: 450;
+  letter-spacing: -0.005em;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.auto {
+  flex: none;
+  padding: 0 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 14px;
+  text-transform: uppercase;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+}
+
+.crumb {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 550;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.entry:hover .badge {
+  background: var(--surface);
+}
+
+.due {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.late {
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.time {
+  flex: none;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.remove {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: -4px 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--muted);
+  opacity: 0;
+  cursor: pointer;
+  transition:
+    opacity var(--t-fast),
+    background-color var(--t-fast),
+    color var(--t-fast);
+}
+
+.entry:hover .remove,
+.remove:focus-visible {
+  opacity: 1;
+}
+
+.remove:hover {
+  background: var(--border-strong);
+  color: var(--text-2);
+}
+
+@media (hover: none) {
+  .remove {
+    opacity: 1;
+  }
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 36px 16px 32px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.emptyTitle {
+  margin: 10px 0 0;
+  color: var(--text);
+  font-size: 14.5px;
+  font-weight: 550;
+}
+
+.emptyHint {
+  margin: 4px 0 0;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-top: 6px;
+  padding: 8px 6px 2px;
+  border-top: 1px solid var(--border);
+}
+
+.textBtn {
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--t-fast);
+}
+
+.textBtn:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.textBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 4px;
+  }
+
+  .remove::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+}

@@ -1,0 +1,110 @@
+.region {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: max(20px, calc(env(safe-area-inset-bottom) + 12px));
+  z-index: 50;
+  display: grid;
+  justify-items: center;
+  padding: 0 16px;
+  pointer-events: none;
+}
+
+/* Swapping toasts overlap in one grid cell. */
+.card {
+  position: relative;
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 280px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 10px 10px 14px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--elevated);
+  box-shadow: var(--shadow-pop);
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 20px;
+  pointer-events: auto;
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  margin-right: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undo,
+.close {
+  flex: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--t-fast);
+}
+
+.undo {
+  padding: 4px 10px;
+  border-radius: var(--r-sm);
+  color: var(--accent-ink);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.undo:hover {
+  background: var(--accent-soft);
+}
+
+.close {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-sm);
+  color: var(--muted);
+}
+
+.close:hover {
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+.bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  opacity: 0.6;
+  transform-origin: left;
+  animation: drain 5s linear forwards;
+}
+
+.card:hover .bar,
+.card:focus-within .bar {
+  animation-play-state: paused;
+}
+
+@keyframes drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+}

@@ -1,0 +1,265 @@
+import { describe, expect, it } from 'vitest';
+import type { TaskTree } from '../types';
+import { addTask, emptyTree, toggleDone, updateTask } from './tree';
+import {
+  allTags,
+  deadlineList,
+  dueStatus,
+  neighborAfterRemoval,
+  taskPath,
+  todayISO,
+  visibleOrder,
+  visibleTreeIds,
+} from './views';
+
+type Spec = { tags?: string[]; dueDate?: string | null; parentId?: string | null };
+
+function build() {
+  let tree: TaskTree = emptyTree();
+  let clock = 1000;
+  const add = (title: string, spec: Spec = {}) => {
+    const r = addTask(tree, { title, ...spec }, (clock += 10));
+    tree = r.tree;
+    return r.id;
+  };
+  return {
+    add,
+    get tree() {
+      return tree;
+    },
+    set tree(t: TaskTree) {
+      tree = t;
+    },
+  };
+}
+
+describe('allTags', () => {
+  it('counts across parents and subtasks, sorted by count desc then name', () => {
+    const b = build();
+    const p = b.add('p', { tags: ['b', 'z'] });
+    b.add('c', { parentId: p, tags: ['b', 'a'] });
+    b.add('d', { tags: ['a', 'z', 'b'] });
+    expect(allTags(b.tree)).toEqual([
+      { tag: 'b', count: 3 },
+      { tag: 'a', count: 2 },
+      { tag: 'z', count: 2 },
+    ]);
+  });
+
+  it('is empty without tags', () => {
+    expect(allTags(emptyTree())).toEqual([]);
+  });
+});
+
+describe('taskPath', () => {
+  it('returns ancestor titles root first', () => {
+    const b = build();
+    const a = b.add('A');
+    const c = b.add('B', { parentId: a });
+    const d = b.add('C', { parentId: c });
+    expect(taskPath(b.tree, d)).toEqual(['A', 'B']);
+    expect(taskPath(b.tree, a)).toEqual([]);
+    expect(taskPath(b.tree, 'nope')).toEqual([]);
+  });
+});
+
+describe('visibleTreeIds', () => {
+  it('returns null without a tag', () => {
+    expect(visibleTreeIds(build().tree, null)).toBeNull();
+  });
+
+  it('includes matches, their ancestors and descendants of matches, not siblings', () => {
+    const b = build();
+    const root = b.add('root');
+    const mid = b.add('mid', { parentId: root, tags: ['x'] });
+    const leaf = b.add('leaf', { parentId: mid });
+    const sibling = b.add('sib', { parentId: root });
+    const deep = b.add('deep', { parentId: sibling, tags: ['x'] });
+    const other = b.add('other');
+    const ids = visibleTreeIds(b.tree, 'x')!;
+    expect(ids).toEqual(new Set([root, mid, leaf, sibling, deep]));
+    expect(ids.has(other)).toBe(false);
+  });
+
+  it('does not include descendants of an ancestor-only task', () => {
+    const b = build();
+    const root = b.add('root');
+    const hit = b.add('hit', { parentId: root, tags: ['x'] });
+    const miss = b.add('miss', { parentId: root });
+    const ids = visibleTreeIds(b.tree, 'x')!;
+    expect(ids).toEqual(new Set([root, hit]));
+    expect(ids.has(miss)).toBe(false);
+  });
+
+  it('is empty for an unknown tag', () => {
+    const b = build();
+    b.add('a', { tags: ['x'] });
+    expect(visibleTreeIds(b.tree, 'nope')!.size).toBe(0);
+  });
+});
+
+describe('deadlineList', () => {
+  it('orders dated asc, then undated by createdAt, then done by completedAt desc', () => {
+    const b = build();
+    const noDate1 = b.add('nd1');
+    const late = b.add('late', { dueDate: '2026-03-01' });
+    const doneA = b.add('doneA', { dueDate: '2026-01-01' });
+    const early = b.add('early', { dueDate: '2026-02-01' });
+    const noDate2 = b.add('nd2');
+    const doneB = b.add('doneB');
+    b.tree = toggleDone(b.tree, doneA, 5000);
+    b.tree = toggleDone(b.tree, doneB, 6000);
+    expect(deadlineList(b.tree, { tag: null })).toEqual([
+      early,
+      late,
+      noDate1,
+      noDate2,
+      doneB,
+      doneA,
+    ]);
+  });
+
+  it('flattens subtasks and parents ignoring hierarchy', () => {
+    const b = build();
+    const p = b.add('p', { dueDate: '2026-05-02' });
+    const c = b.add('c', { parentId: p, dueDate: '2026-05-01' });
+    expect(deadlineList(b.tree, { tag: null })).toEqual([c, p]);
+  });
+
+  it('keeps insertion order for equal due dates (stable)', () => {
+    const b = build();
+    const x = b.add('x', { dueDate: '2026-05-01' });
+    const y = b.add('y', { dueDate: '2026-05-01' });
+    const z = b.add('z', { dueDate: '2026-05-01' });
+    expect(deadlineList(b.tree, { tag: null })).toEqual([x, y, z]);
+  });
+
+  it('keeps insertion order for equal createdAt and equal completedAt', () => {
+    let tree = emptyTree();
+    const ids: string[] = [];
+    for (const t of ['a', 'b', 'c']) {
+      const r = addTask(tree, { title: t }, 1);
+      tree = r.tree;
+      ids.push(r.id);
+    }
+    expect(deadlineList(tree, { tag: null })).toEqual(ids);
+    tree = toggleDone(toggleDone(tree, ids[0], 9), ids[1], 9);
+    expect(deadlineList(tree, { tag: null })).toEqual([ids[2], ids[0], ids[1]]);
+  });
+
+  it('filters by tag', () => {
+    const b = build();
+    const a = b.add('a', { tags: ['x'], dueDate: '2026-05-01' });
+    b.add('b', { tags: ['y'] });
+    const c = b.add('c', { tags: ['x'] });
+    expect(deadlineList(b.tree, { tag: 'x' })).toEqual([a, c]);
+    expect(deadlineList(b.tree, { tag: 'none' })).toEqual([]);
+  });
+
+  it('moves a task into the done group when completed', () => {
+    const b = build();
+    const a = b.add('a', { dueDate: '2026-05-01' });
+    const c = b.add('c', { dueDate: '2026-06-01' });
+    b.tree = toggleDone(b.tree, a, 100);
+    expect(deadlineList(b.tree, { tag: null })).toEqual([c, a]);
+    b.tree = updateTask(b.tree, c, { dueDate: null });
+    expect(deadlineList(b.tree, { tag: null })).toEqual([c, a]);
+  });
+});
+
+describe('todayISO', () => {
+  it('uses the local date, zero padded', () => {
+    expect(todayISO(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
+    expect(todayISO(new Date(2026, 11, 31, 0, 0))).toBe('2026-12-31');
+  });
+});
+
+describe('dueStatus', () => {
+  const today = '2026-03-10';
+  it('returns null without a date', () => {
+    expect(dueStatus(null, today)).toBeNull();
+  });
+
+  it('classifies around boundaries', () => {
+    expect(dueStatus('2026-03-09', today)).toBe('overdue');
+    expect(dueStatus('2026-03-10', today)).toBe('today');
+    expect(dueStatus('2026-03-11', today)).toBe('soon');
+    expect(dueStatus('2026-03-13', today)).toBe('soon');
+    expect(dueStatus('2026-03-14', today)).toBe('later');
+  });
+
+  it('works across month and year ends and DST changes', () => {
+    expect(dueStatus('2026-01-02', '2025-12-31')).toBe('soon');
+    expect(dueStatus('2026-01-04', '2025-12-31')).toBe('later');
+    expect(dueStatus('2026-03-01', '2026-02-28')).toBe('soon');
+    expect(dueStatus('2026-03-30', '2026-03-28')).toBe('soon');
+    expect(dueStatus('2026-11-02', '2026-10-31')).toBe('soon');
+    expect(dueStatus('2025-12-31', '2026-01-01')).toBe('overdue');
+  });
+});
+
+describe('visibleOrder', () => {
+  function sample() {
+    const b = build();
+    const a = b.add('a', { tags: ['x'] });
+    const a1 = b.add('a1', { parentId: a });
+    const a2 = b.add('a2', { parentId: a, tags: ['x'] });
+    const c = b.add('c', { dueDate: '2026-01-01' });
+    const d = b.add('d');
+    return { b, a, a1, a2, c, d };
+  }
+
+  it('walks the tree depth first', () => {
+    const { b, a, a1, a2, c, d } = sample();
+    expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([a, a1, a2, c, d]);
+  });
+
+  it('puts done tasks after undone siblings, like the list', () => {
+    const { b, a, a1, a2, c, d } = sample();
+    b.tree = toggleDone(b.tree, a1, 10);
+    expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([a, a2, a1, c, d]);
+    b.tree = toggleDone(b.tree, a, 20);
+    expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([c, d, a, a1, a2]);
+  });
+
+  it('skips the children of collapsed parents', () => {
+    const { b, a, c, d } = sample();
+    b.tree = updateTask(b.tree, a, { collapsed: true });
+    expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([a, c, d]);
+  });
+
+  it('respects the tag filter', () => {
+    const { b, a, a1, a2 } = sample();
+    expect(visibleOrder(b.tree, { view: 'tree', tag: 'x' })).toEqual([a, a1, a2]);
+    expect(visibleOrder(b.tree, { view: 'tree', tag: 'none' })).toEqual([]);
+  });
+
+  it('uses deadline order, flat and ignoring collapse', () => {
+    const { b, a, a1, a2, c, d } = sample();
+    b.tree = updateTask(b.tree, a, { collapsed: true });
+    expect(visibleOrder(b.tree, { view: 'deadline', tag: null })).toEqual([c, a, a1, a2, d]);
+    expect(visibleOrder(b.tree, { view: 'deadline', tag: 'x' })).toEqual([a, a2]);
+  });
+
+  it('is empty in the history view', () => {
+    expect(visibleOrder(sample().b.tree, { view: 'history', tag: null })).toEqual([]);
+  });
+});
+
+describe('neighborAfterRemoval', () => {
+  const order = ['a', 'b', 'c', 'd'];
+  it('prefers the next row, then the previous', () => {
+    expect(neighborAfterRemoval(order, 'b')).toBe('c');
+    expect(neighborAfterRemoval(order, 'd')).toBe('c');
+    expect(neighborAfterRemoval(['a'], 'a')).toBeNull();
+  });
+
+  it('skips rows removed along with it', () => {
+    expect(neighborAfterRemoval(order, 'b', new Set(['b', 'c']))).toBe('d');
+    expect(neighborAfterRemoval(order, 'c', new Set(['c', 'd']))).toBe('b');
+  });
+
+  it('returns null for an unknown id', () => {
+    expect(neighborAfterRemoval(order, 'zzz')).toBeNull();
+  });
+});

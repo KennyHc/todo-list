@@ -1,0 +1,58 @@
+.nudge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  /* Align with the title: row padding 8 + chevron 20 + checkbox 18 + two 8px gaps. */
+  padding: 0 8px 6px 62px;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 20px;
+  transition: color var(--t-theme);
+}
+
+.flat {
+  padding-left: 34px;
+}
+
+.message {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.icon {
+  flex: none;
+  margin-top: 3.5px;
+  color: var(--accent);
+}
+
+.button {
+  position: relative;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--accent-ink);
+  font: inherit;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.button:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.button:focus-visible {
+  outline-offset: 1px;
+}
+
+@media (max-width: 480px), (hover: none) {
+  .button::after {
+    content: '';
+    position: absolute;
+    inset: -12px -4px;
+  }
+}

@@ -1,0 +1,18 @@
+.ring {
+  flex: none;
+  transform: rotate(-90deg);
+}
+
+.track,
+.arc {
+  fill: none;
+}
+
+.track {
+  stroke: var(--border-strong);
+}
+
+.arc {
+  stroke: var(--accent);
+  stroke-linecap: round;
+}

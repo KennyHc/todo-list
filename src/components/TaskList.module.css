@@ -1,0 +1,57 @@
+.list {
+  position: relative;
+  margin: 10px 0 0;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  list-style: none;
+  transition:
+    background-color var(--t-theme),
+    border-color var(--t-theme);
+}
+
+@media (max-width: 480px) {
+  .list {
+    padding: 4px;
+  }
+}
+
+/* Drop indicator: a 2px accent line with a dot at its left end. */
+.indicator {
+  position: absolute;
+  z-index: 2;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    left 140ms var(--ease-out),
+    top 90ms var(--ease-out);
+}
+
+.indicator::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.indicator[data-reduced] {
+  transition: none;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

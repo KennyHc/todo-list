@@ -1,0 +1,432 @@
+.item {
+  --indent: 22px;
+  /* Horizontal centre of a row's checkbox: padding 8 + chevron 20 + gap 8 + half the 18px box. */
+  --guide-x: 45px;
+  list-style: none;
+  min-width: 0;
+}
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0 8px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 6px 0 8px;
+  border-radius: var(--r-md);
+  isolation: isolate;
+  transition:
+    background-color var(--t-fast),
+    opacity var(--t-fast);
+}
+
+/* Context-only ancestors under a tag filter. On the row, not the item, so children don't compound. */
+.row[data-dim] {
+  opacity: 0.5;
+}
+
+.row:hover,
+.row:has(:focus-visible) {
+  background: var(--surface-2);
+}
+
+.rowFocused,
+.rowFocused:hover {
+  background: var(--surface-2);
+}
+
+/* Keyboard focus: a short accent bar inset on the left edge. */
+.rowFocused::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 2px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.rowEditing,
+.rowEditing:hover {
+  background: var(--accent-soft);
+}
+
+.flash {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--r-md);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.reveal {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  opacity: 0;
+  pointer-events: none;
+  animation: reveal 600ms var(--ease-out);
+}
+
+@keyframes reveal {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  20%,
+  50% {
+    opacity: 1;
+  }
+}
+
+.tint {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--r-md);
+  background: var(--danger-soft);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chevronSpacer {
+  flex: none;
+  width: 20px;
+}
+
+.iconBtn {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background-color var(--t-fast),
+    color var(--t-fast);
+}
+
+.iconBtn:hover {
+  background: var(--border-strong);
+  color: var(--text-2);
+}
+
+.deleteBtn {
+  color: var(--danger);
+}
+
+.deleteBtn:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.tail {
+  display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 0;
+}
+
+.more {
+  padding: 2px 4px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.crumb {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color var(--t-theme);
+}
+
+.titleBtn:focus-visible {
+  outline-offset: 1px;
+}
+
+.chevron {
+  width: 20px;
+}
+
+.title {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 14.5px;
+  font-weight: 450;
+  letter-spacing: -0.005em;
+  line-height: 20px;
+}
+
+.titleLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px 8px;
+  min-width: 0;
+  cursor: text;
+}
+
+.titleBtn {
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: text;
+  border-radius: 4px;
+  transition: color var(--t-theme);
+}
+
+/* Seamless inline editing: same type as the label, only the caret and row tint show. */
+.titleInput {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 20px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  letter-spacing: inherit;
+  caret-color: var(--accent);
+}
+
+.titleInput:focus-visible {
+  outline: none;
+}
+
+.meta {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  transition: color var(--t-theme);
+}
+
+.badge {
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 550;
+  line-height: 16px;
+  transition:
+    background-color var(--t-fast),
+    border-color var(--t-theme),
+    color var(--t-theme);
+}
+
+.row:hover .badge {
+  background: var(--surface);
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  opacity: 0;
+  transition: opacity var(--t-fast);
+}
+
+.row:hover .actions,
+.row:has(:focus-visible) .actions,
+.actions:has([aria-expanded='true']) {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .actions {
+    opacity: 1;
+  }
+}
+
+/* Tree rows are flat: nesting is drawn with an indent and per-level guide lines. */
+.item[data-hidden] {
+  display: none;
+}
+
+/* The node the sortable moves and measures; the li itself stays put for the layout animation. */
+.wrap {
+  position: relative;
+}
+
+.wrap[data-dragging] {
+  opacity: 0.35;
+}
+
+.stack {
+  margin-left: calc(var(--depth, 0) * var(--indent));
+}
+
+/* Hairline guide under an ancestor's checkbox centre, one per nesting level. */
+.guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--guide-x) + var(--level) * var(--indent));
+  width: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
+
+.guideFirst {
+  top: -8px;
+}
+
+.guideLast {
+  bottom: 14px;
+}
+
+/* Drag handle in the left gutter, before the chevron. */
+.grip {
+  position: absolute;
+  top: 50%;
+  left: -6px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  cursor: grab;
+  opacity: 0;
+  transform: translateY(-50%);
+  touch-action: manipulation;
+  user-select: none;
+  transition:
+    opacity var(--t-fast),
+    color var(--t-fast);
+}
+
+.grip:active {
+  cursor: grabbing;
+}
+
+.grip:hover {
+  color: var(--text-2);
+}
+
+.row:hover .grip,
+.row:has(:focus-visible) .grip,
+.grip:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .grip {
+    opacity: 1;
+  }
+}
+
+/* A bigger touch target around the 14px icon. */
+.grip::after {
+  content: '';
+  position: absolute;
+  inset: -8px -6px;
+}
+
+@media (max-width: 480px) {
+  .item {
+    --indent: 10px;
+  }
+
+  .row {
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    min-height: 0;
+    padding: 6px 4px 6px 8px;
+  }
+
+  .chevron {
+    height: 24px;
+  }
+
+  /* Line 1: chevron + checkbox + title, which takes the rest of the width. */
+  .title {
+    order: 1;
+    flex: 1 1 calc(100% - 54px);
+  }
+
+  /* Tags and due date drop under the title text. */
+  .titleBtn {
+    flex: 1 1 100%;
+  }
+
+  /* Line 2: meta on the left, a compact action cluster on the right. */
+  .meta {
+    order: 2;
+    /* Auto basis: when meta and actions don't fit side by side, the actions wrap below. */
+    flex: 1 1 auto;
+    min-width: 0;
+    /* Line up under the title: chevron 20 + checkbox 18 + two 8px gaps. */
+    margin-left: 54px;
+  }
+
+  .actions {
+    order: 3;
+    margin-left: auto;
+  }
+
+  /* Three actions plus the 158px difficulty bar must fit side by side, even two levels deep. */
+  .actions .iconBtn {
+    width: 26px;
+  }
+
+  /* No chevron in the flat list, so everything shifts left by its width. */
+  .item[data-flat] .title {
+    flex-basis: calc(100% - 26px);
+  }
+
+  .item[data-flat] .meta {
+    margin-left: 26px;
+  }
+
+  /* 44px touch target around each 28px button. */
+  .iconBtn::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+}

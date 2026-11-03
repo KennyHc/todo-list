@@ -1,0 +1,68 @@
+.hit {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  /* 18px box centred in a 44px hit area that doesn't grow the row. */
+  margin: -13px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--r-md);
+}
+
+.hit:focus-visible {
+  outline: none;
+}
+
+.hit:focus-visible .box {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.box {
+  position: relative;
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  /* Pastels vanish on white at 1.5px, so ink them slightly in light mode. */
+  border: 1.5px solid color-mix(in srgb, var(--task-color) 72%, var(--text));
+  border-radius: 5px;
+  align-items: center;
+  justify-content: center;
+}
+
+:global([data-theme='dark']) .box {
+  border-color: color-mix(in srgb, var(--task-color) 70%, transparent);
+}
+
+.svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.check {
+  fill: none;
+  stroke: var(--check-ink);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 1.5px solid;
+  border-radius: 5px;
+  opacity: 0;
+  pointer-events: none;
+}

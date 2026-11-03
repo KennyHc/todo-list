@@ -1,0 +1,10 @@
+.slot {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+
+.digit {
+  display: inline-block;
+}

@@ -1,0 +1,30 @@
+.wrap {
+  position: relative;
+  display: inline-block;
+  vertical-align: top;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strike {
+  background-image: linear-gradient(var(--muted), var(--muted));
+  background-repeat: no-repeat;
+}
+
+/* Titles may wrap to two lines on small screens. */
+@media (max-width: 480px), (hover: none) {
+  .text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}

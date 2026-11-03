@@ -1,0 +1,50 @@
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px;
+}
+
+.swatch {
+  position: relative;
+  display: block;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  /* Hairline so pale swatches keep an edge on light surfaces. */
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  transition: transform var(--t-fast);
+}
+
+.swatch:hover {
+  transform: scale(1.1);
+}
+
+.swatch[aria-pressed='true'] {
+  box-shadow:
+    inset 0 0 0 1px var(--border-strong),
+    0 0 0 2px var(--elevated),
+    0 0 0 4px var(--text);
+}
+
+.swatch:focus-visible,
+.custom:focus-within {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.custom {
+  overflow: hidden;
+}
+
+.native {
+  position: absolute;
+  inset: -8px;
+  width: 36px;
+  height: 36px;
+  opacity: 0;
+  cursor: pointer;
+}
