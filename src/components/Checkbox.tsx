@@ -44,6 +44,8 @@ export function Checkbox({ checked, onToggle, label = 'Done', delay = 0 }: Props
       <motion.span
         className={styles.box}
         initial={false}
+        // whileTap makes framer-motion add tabindex="0" unless one is set; the button is the stop.
+        tabIndex={-1}
         whileTap={{ scale: 0.85 }}
         animate={
           checked
