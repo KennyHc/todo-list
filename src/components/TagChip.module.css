@@ -163,3 +163,33 @@
     inset: -10px -6px -12px;
   }
 }
+
+/*
+ * Touch: fingertip hit areas. A plain tag's grows around its text; in the tag editor the pill
+ * grows a little so its colour dot and remove button can each take a full one.
+ */
+@media (pointer: coarse) {
+  /* A row can place it with --tag-hit-inset (TaskItem does). */
+  .plain .clickable::after {
+    inset: var(--tag-hit-inset, var(--tap-inset));
+  }
+
+  .chip:not(.plain) {
+    min-height: 32px;
+    font-size: 13px;
+  }
+
+  .dotBtn,
+  .remove {
+    position: relative;
+    width: 28px;
+    height: 28px;
+  }
+
+  .dotBtn::after,
+  .remove::after {
+    content: '';
+    position: absolute;
+    inset: var(--tap-inset);
+  }
+}

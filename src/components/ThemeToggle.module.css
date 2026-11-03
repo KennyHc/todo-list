@@ -62,3 +62,11 @@
     inset: -9px -1px;
   }
 }
+
+/* Touch: each option a full fingertip wide (the ::after above makes it tall enough). */
+@media (pointer: coarse) {
+  .option,
+  .sm .option {
+    width: var(--tap);
+  }
+}

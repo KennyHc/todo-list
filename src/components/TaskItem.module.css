@@ -659,3 +659,45 @@
 .row[data-over]:hover {
   background: var(--danger-soft);
 }
+
+/*
+ * Touch on phones: fingertip hit areas without bigger controls. The title's runs the height of
+ * the first-line band (the row's top padding included), and a meta row is a little taller so
+ * the tags' 44px hit areas (TagChip) stay inside it and mostly off the title.
+ */
+@media (pointer: coarse) and (max-width: 480px) {
+  .titleBtn {
+    position: relative;
+  }
+
+  .titleBtn::after {
+    content: '';
+    position: absolute;
+    top: calc(var(--lh) / 2 - var(--band) / 2);
+    right: 0;
+    left: 0;
+    height: max(var(--band), var(--tap));
+  }
+
+  .titleLine {
+    row-gap: var(--space-2);
+  }
+
+  /* The rest of a tag's hit area, under the 16px meta line. */
+  .row[data-meta] {
+    padding-bottom: calc(var(--tap) - 16px - var(--space-2));
+  }
+
+  /* Cut off at the edge, but let the tags' hit areas reach above and below the line: from the
+     title's last line down, so a tap on the title never lands on a tag. */
+  .tail {
+    --tag-hit-inset: calc(-1 * var(--space-2)) var(--tap-inset)
+      calc(16px + var(--space-2) - var(--tap));
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+
+  .noteBtn::after {
+    inset: var(--tap-inset);
+  }
+}

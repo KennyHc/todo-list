@@ -75,3 +75,18 @@
     display: inline;
   }
 }
+
+/*
+ * Touch on phones: the wrapper clips (it animates its height), so the line takes the button's
+ * 44px hit area itself: a little room above, the rest below.
+ */
+@media (pointer: coarse) and (max-width: 480px) {
+  .nudge {
+    padding-top: var(--space-1);
+    padding-bottom: calc(var(--tap) - 20px - var(--space-1));
+  }
+
+  .button::after {
+    inset: calc(-1 * var(--space-1)) -4px calc(20px + var(--space-1) - var(--tap));
+  }
+}

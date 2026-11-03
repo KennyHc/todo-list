@@ -42,3 +42,17 @@
     gap: var(--space-1);
   }
 }
+
+/* Touch: Search and Filter sit far enough apart that their 44px hit areas don't overlap. */
+@media (pointer: coarse) and (max-width: 480px) {
+  .actions {
+    gap: var(--space-2);
+  }
+}
+
+@media (pointer: coarse) and (max-width: 359px) {
+  .bar:has([data-count='5']),
+  .bar:has([data-count='5']) .actions {
+    gap: var(--space-1);
+  }
+}

@@ -7,3 +7,5 @@ that made it.
   `.agent-log/`. (setup)
 - Week view uses 7 columns from 1024px and a stacked day list below that; issue #8 builds on
   this. (#7)
+- Touch targets: in `(pointer: coarse)` blocks, use `--tap` (44px) for sizes and
+  `::after { inset: var(--tap-inset) }` for hit boxes; never fine-pointer rules for this. (#44)
