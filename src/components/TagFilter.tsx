@@ -7,6 +7,28 @@ import { TagChip } from './TagChip';
 import { tagColor } from '../lib/tags';
 import styles from './TagFilter.module.css';
 
+/**
+ * One line under the toolbar while a tag filter is on, in every view: "Filtered by #work · Clear".
+ * The toolbar row has no room for the chip next to the views, so it lives here.
+ */
+export function FilterBanner() {
+  const tagFilter = useUIStore((s) => s.tagFilter);
+  const setTagFilter = useUIStore((s) => s.setTagFilter);
+  if (tagFilter === null) return null;
+  return (
+    <div className={styles.banner} role="status">
+      <span className={styles.bannerText}>Filtered by</span>
+      <TagChip tag={tagFilter} hash />
+      <span className={styles.bannerDot} aria-hidden="true">
+        {'·'}
+      </span>
+      <button type="button" className={styles.clear} onClick={() => setTagFilter(null)}>
+        Clear
+      </button>
+    </div>
+  );
+}
+
 export function TagFilter() {
   const tags = useAllTags();
   const tagColors = useTagColors();
@@ -27,7 +49,6 @@ export function TagFilter() {
 
   return (
     <div className={styles.filter}>
-      {tagFilter !== null && <TagChip tag={tagFilter} hash onRemove={() => setTagFilter(null)} />}
       <button
         ref={anchorRef}
         type="button"
