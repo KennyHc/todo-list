@@ -66,6 +66,20 @@ export const isInAppBrowser = (ua = typeof navigator === 'undefined' ? '' : navi
     ua,
   );
 
+/**
+ * True when the app runs installed (home-screen PWA). There a popup opens in a separate browser
+ * context (on iOS, Safari outside the app) that cannot hand its result back, so sign-in redirects.
+ */
+export const isStandalone = () => {
+  if (typeof window === 'undefined') return false;
+  if ((navigator as Navigator & { standalone?: boolean }).standalone === true) return true;
+  try {
+    return window.matchMedia?.('(display-mode: standalone)').matches ?? false;
+  } catch {
+    return false;
+  }
+};
+
 const SILENT_CODES = new Set([
   'auth/popup-closed-by-user',
   'auth/cancelled-popup-request',
@@ -89,10 +103,17 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   signInWithGoogle: async () => {
     set({ error: null });
     try {
-      // Popup first everywhere, phones included. The redirect flow hands off between the auth
-      // domain (firebaseapp.com) and the site (web.app), which Safari and Chrome's storage
-      // partitioning break: the user comes back signed out. On mobile the popup opens a tab.
-      // It must open synchronously inside the click, so nothing is awaited before this call.
+      // authDomain must be the site's own hosting domain (Firebase serves /__/auth/handler
+      // there), so the popup and redirect both finish same-origin. A different authDomain hands the
+      // result back through a cross-origin iframe that mobile storage partitioning blocks, and the
+      // user returns signed out. Installed apps redirect: their popup opens a separate browser
+      // context. Browser tabs try the popup first, which must open synchronously inside the click,
+      // so nothing is awaited before it, and fall back to the redirect when it is blocked.
+      if (isStandalone()) {
+        write(() => sessionStorage, REDIRECT_KEY, '1');
+        await signInWithRedirect(auth, googleProvider, popupRedirect);
+        return;
+      }
       try {
         await signInWithPopup(auth, googleProvider, popupRedirect);
         set({ freshSignIn: true });

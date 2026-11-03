@@ -194,12 +194,19 @@ cp .env.example .env.local
 | Variable                            | Purpose                                                  |
 | ----------------------------------- | -------------------------------------------------------- |
 | `VITE_FIREBASE_API_KEY`             | Web API key                                              |
-| `VITE_FIREBASE_AUTH_DOMAIN`         | Auth domain                                              |
+| `VITE_FIREBASE_AUTH_DOMAIN`         | Auth domain: must equal the hosting domain (see below)   |
 | `VITE_FIREBASE_PROJECT_ID`          | Firebase project ID                                      |
 | `VITE_FIREBASE_STORAGE_BUCKET`      | Storage bucket                                           |
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | Messaging sender ID                                      |
 | `VITE_FIREBASE_APP_ID`              | Web app ID                                               |
 | `VITE_USE_EMULATORS`                | Set to `1` to use the local auth and Firestore emulators |
+
+`VITE_FIREBASE_AUTH_DOMAIN` must be the domain the app is served from (production:
+`writeitdown.web.app`), not the `firebaseapp.com` default that `sdkconfig` prints. Firebase
+Hosting serves the sign-in handler at `/__/auth/handler` on that domain, so sign-in stays
+same-origin. With a different domain, phones come back from Google signed out. The domain's
+`https://<domain>/__/auth/handler` must be an authorized redirect URI on the OAuth client in Google
+Cloud.
 
 The values come from the Firebase console (Project settings, your web app) or from
 `firebase apps:sdkconfig WEB <appId>`. They are public by design; access is enforced by
