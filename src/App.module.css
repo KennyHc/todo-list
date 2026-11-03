@@ -47,6 +47,15 @@
   white-space: nowrap;
 }
 
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .pill {
   padding: 3px 8px;
   border: 1px solid var(--border);
