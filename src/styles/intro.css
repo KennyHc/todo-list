@@ -1,0 +1,94 @@
+/*
+ * Entrance on load: the page chrome settles first, then tasks rise one after another on a long
+ * expo-out curve. Uses the individual `translate` property so it composes with the transforms
+ * Framer Motion (layout) and dnd-kit set on the same rows instead of fighting them.
+ */
+@keyframes intro-rise {
+  from {
+    opacity: 0;
+    translate: 0 28px;
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+    filter: blur(0);
+  }
+}
+
+@keyframes intro-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The list card fades in just ahead of its tasks, so an empty card never pops in first. */
+  .intro [data-intro='4'] {
+    animation: intro-fade 600ms var(--ease-expo) 120ms both;
+  }
+
+  .intro [data-intro='1'],
+  .intro [data-intro='2'],
+  .intro [data-intro='3'],
+  .intro ul > li {
+    animation: intro-rise 900ms var(--ease-expo) both;
+  }
+
+  .intro [data-intro='2'] {
+    animation-delay: 60ms;
+  }
+
+  .intro [data-intro='3'] {
+    animation-delay: 120ms;
+  }
+
+  /* Tasks: 160ms after the chrome, 45ms apart, capped so long lists don't keep you waiting. */
+  .intro ul > li {
+    animation-delay: 745ms;
+  }
+
+  .intro ul > li:nth-child(1) {
+    animation-delay: 160ms;
+  }
+
+  .intro ul > li:nth-child(2) {
+    animation-delay: 205ms;
+  }
+  .intro ul > li:nth-child(3) {
+    animation-delay: 250ms;
+  }
+  .intro ul > li:nth-child(4) {
+    animation-delay: 295ms;
+  }
+  .intro ul > li:nth-child(5) {
+    animation-delay: 340ms;
+  }
+  .intro ul > li:nth-child(6) {
+    animation-delay: 385ms;
+  }
+  .intro ul > li:nth-child(7) {
+    animation-delay: 430ms;
+  }
+  .intro ul > li:nth-child(8) {
+    animation-delay: 475ms;
+  }
+  .intro ul > li:nth-child(9) {
+    animation-delay: 520ms;
+  }
+  .intro ul > li:nth-child(10) {
+    animation-delay: 565ms;
+  }
+  .intro ul > li:nth-child(11) {
+    animation-delay: 610ms;
+  }
+  .intro ul > li:nth-child(12) {
+    animation-delay: 655ms;
+  }
+  .intro ul > li:nth-child(13) {
+    animation-delay: 700ms;
+  }
+  .intro ul > li:nth-child(14) {
+    animation-delay: 745ms;
+  }
+}

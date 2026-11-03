@@ -1,6 +1,6 @@
 .card {
-  margin: 10px 0 0;
-  padding: 6px;
+  margin: var(--space-6) 0 0;
+  padding: var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   background: var(--surface);
@@ -10,13 +10,25 @@
     border-color var(--t-theme);
 }
 
-.group + .group {
-  margin-top: 4px;
+/* A day's header: its label on the left; on the first day, Edit / Delete all on the right. */
+.headerRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  /* 16 above, 8 below: the same rhythm as the deadline sections. */
+  padding: var(--space-4) var(--space-2) var(--space-2);
+  background: var(--surface);
+  transition: background-color var(--t-theme);
+}
+
+.group:first-child .headerRow {
+  padding-top: var(--space-2);
 }
 
 .heading {
   margin: 0;
-  padding: 10px 8px 4px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
@@ -25,8 +37,12 @@
   text-transform: uppercase;
 }
 
-.group:first-child .heading {
-  padding-top: 6px;
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  /* The buttons are taller than the label: pull the extra back so the header keeps its height. */
+  margin: -8px -4px;
 }
 
 .list {
@@ -35,14 +51,26 @@
   list-style: none;
 }
 
+.item {
+  border-radius: var(--r-md);
+  list-style: none;
+}
+
 .entry {
+  /* The same first-line band as a task row, so the time and glyph sit on the title's line. */
+  --pad-y: 6px;
+  --lh: 20px;
+  --band: 40px;
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 0 var(--space-2);
   min-width: 0;
-  padding: 8px 6px 8px 8px;
+  min-height: var(--band);
+  padding: var(--pad-y) var(--space-2);
   border-radius: var(--r-md);
-  transition: background-color var(--t-fast);
+  transition:
+    background-color var(--t-fast),
+    box-shadow var(--dur-base) var(--ease-in-out);
 }
 
 .entry:hover,
@@ -50,24 +78,75 @@
   background: var(--surface-2);
 }
 
+/* The task no longer exists: nothing to restore, so the row recedes a little. */
+.item[data-gone] .body,
+.item[data-gone] .time {
+  opacity: 0.7;
+}
+
+/* The round check restores the task. A 44px hit area that doesn't grow the row. */
 .check {
+  position: relative;
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: calc(var(--band) / 2 - 22px - var(--pad-y)) -13px -24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  cursor: pointer;
+}
+
+.check:disabled {
+  cursor: default;
+}
+
+.check:focus-visible {
+  outline: none;
+}
+
+.check:focus-visible .checkDot {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.checkDot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 18px;
   height: 18px;
-  margin-top: 1px;
   border-radius: 50%;
+  background: var(--accent);
   color: var(--check-ink);
+  transition:
+    transform var(--t-fast),
+    opacity var(--t-fast);
+}
+
+.check:disabled .checkDot {
+  opacity: 0.45;
+}
+
+.check:not(:disabled):hover .checkDot {
+  transform: scale(1.12);
+}
+
+.check:not(:disabled):active .checkDot {
+  transform: scale(0.88);
 }
 
 .body {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
+  padding-top: calc(var(--band) / 2 - var(--pad-y) - var(--lh) / 2);
 }
 
 .titleLine {
@@ -83,7 +162,7 @@
   font-size: 14.5px;
   font-weight: 450;
   letter-spacing: -0.005em;
-  line-height: 20px;
+  line-height: var(--lh);
   overflow-wrap: anywhere;
 }
 
@@ -100,95 +179,124 @@
   text-transform: uppercase;
 }
 
+/* One calm line: due date, tags, then the path. Whatever doesn't fit is clipped, not wrapped. */
 .meta {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 4px 6px;
+  gap: 0 var(--space-2);
   min-width: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.meta > * {
+  flex: none;
+}
+
+.meta > .crumb {
+  flex: 0 1 auto;
 }
 
 .crumb {
   min-width: 0;
   overflow: hidden;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* The difficulty sits at the row's far edge, on the title's line, after the time. */
+.glyph {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: var(--lh);
+  opacity: 0.6;
+}
+
 .badge {
-  padding: 1px 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
+  flex: none;
+  margin-top: calc((var(--lh) - 16px) / 2);
   color: var(--text-2);
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 550;
   line-height: 16px;
   white-space: nowrap;
 }
 
-.entry:hover .badge {
-  background: var(--surface);
-}
-
 .due {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-1);
 }
 
 .late {
   color: var(--danger);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 16px;
 }
 
 .time {
   flex: none;
-  margin-top: 2px;
+  margin-top: calc((var(--lh) - 16px) / 2);
   color: var(--muted);
   font-size: 12px;
   line-height: 16px;
 }
 
-.remove {
-  position: relative;
+/* A compact ghost button before the time. On hover devices it appears with the row. */
+.restore {
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 28px;
+  gap: 5px;
   height: 28px;
-  margin: -4px 0;
-  padding: 0;
+  margin: calc(var(--band) / 2 - 14px - var(--pad-y)) 0 -24px;
+  padding: 0 8px;
   border: 0;
   border-radius: var(--r-sm);
   background: none;
-  color: var(--muted);
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 16px;
   opacity: 0;
   cursor: pointer;
   transition:
-    opacity var(--t-fast),
+    opacity 120ms var(--ease-out),
     background-color var(--t-fast),
-    color var(--t-fast);
+    color var(--t-fast),
+    var(--t-press);
 }
 
-.entry:hover .remove,
-.remove:focus-visible {
+.entry:hover .restore,
+.entry:focus-within .restore,
+.restore:focus-visible {
   opacity: 1;
 }
 
-.remove:hover {
-  background: var(--border-strong);
-  color: var(--text-2);
+.restore:hover {
+  background: var(--border);
+  color: var(--text);
 }
 
-@media (hover: none) {
-  .remove {
+.restore:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+/* Touch has no hover: always there, quiet, with a 44px hit area that doesn't grow the row. */
+@media (hover: none) and (pointer: coarse) {
+  .restore {
+    min-width: 44px;
+    height: 44px;
+    margin: calc(var(--band) / 2 - 22px - var(--pad-y)) -4px -24px 0;
+    color: var(--muted);
     opacity: 1;
   }
 }
@@ -215,45 +323,192 @@
   font-size: 13px;
 }
 
-.footer {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 4px 12px;
-  margin-top: 6px;
-  padding: 8px 6px 2px;
-  border-top: 1px solid var(--border);
-}
-
 .textBtn {
-  padding: 4px 6px;
+  min-height: 32px;
+  padding: 4px var(--space-2);
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   background: none;
-  color: var(--muted);
-  font-size: 12.5px;
+  color: var(--accent-ink);
+  font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
-  transition: color var(--t-fast);
+  transition:
+    color var(--t-fast),
+    background-color var(--t-fast),
+    var(--t-press);
 }
 
-.textBtn:hover:not(:disabled) {
-  color: var(--text);
+.textBtn[data-strong] {
+  font-weight: 600;
 }
 
-.textBtn:disabled {
-  opacity: 0.5;
-  cursor: default;
+.textBtn:hover {
+  background: var(--surface-2);
 }
 
+.danger {
+  color: var(--danger);
+}
+
+/* iOS-style delete: a red round minus, in a 44px touch target at the row's right edge. */
+.minus {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: calc(var(--band) / 2 - 22px - var(--pad-y)) -6px -24px 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.minus:focus-visible {
+  outline: none;
+}
+
+.minus:focus-visible .minusDot {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.minusDot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+  transition: transform var(--t-fast);
+}
+
+.minus:active .minusDot {
+  transform: scale(0.88);
+}
+
+/*
+ * Phone: no card. Entries are edge to edge with the same inset hairlines as the task list, and
+ * each day's header is a small sticky label on the blurred page (with Edit on the first one).
+ */
 @media (max-width: 480px) {
   .card {
-    padding: 4px;
+    margin: 0 calc(-1 * var(--gutter-r)) 0 calc(-1 * var(--gutter-l));
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
   }
 
-  .remove::after {
+  .group {
+    position: relative;
+  }
+
+  .headerRow {
+    position: sticky;
+    top: var(--sticky-2);
+    z-index: 2;
+    margin-top: var(--space-3);
+    padding: var(--space-2) var(--gutter-r) var(--space-2) var(--gutter-l);
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
+  }
+
+  .group:first-child .headerRow {
+    margin-top: 0;
+  }
+
+  .heading {
+    font-size: 12px;
+  }
+
+  /* 44px tall tap targets, without making the header any taller. */
+  .controls {
+    margin: -12px -8px;
+  }
+
+  .textBtn {
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 15px;
+  }
+
+  .item {
+    position: relative;
+    border-radius: 0;
+  }
+
+  /* The inset hairline, starting at the title (gutter + 20px check + 12px gap). */
+  .item::before {
     content: '';
     position: absolute;
-    inset: -8px;
+    right: 0;
+    bottom: 0;
+    left: calc(var(--gutter-l) + 32px);
+    height: 1px;
+    background: var(--border);
+    pointer-events: none;
   }
+
+  .item:last-of-type::before {
+    display: none;
+  }
+
+  .entry {
+    --pad-y: 10px;
+    --lh: 21.6px;
+    --band: 52px;
+    gap: 0 var(--space-3);
+    padding: var(--pad-y) var(--gutter-r) var(--pad-y) var(--gutter-l);
+    border-radius: 0;
+  }
+
+  /* With a meta line the entry is as tall as its text. */
+  .entry[data-meta] {
+    --band: calc(var(--pad-y) * 2 + var(--lh));
+  }
+
+  .title {
+    font-size: 16px;
+    letter-spacing: -0.011em;
+  }
+
+  .checkDot {
+    width: 20px;
+    height: 20px;
+  }
+
+  .check {
+    margin-right: -12px;
+    margin-left: -12px;
+  }
+
+  .minus {
+    margin-right: -10px;
+  }
+
+  .restoreLabel {
+    display: none;
+  }
+}
+
+/*
+ * Trailing cluster alignment. The title's first line is centred in the --band (see .body), so
+ * the time, badge and glyph are offset from the row's top padding by the same amount, measured
+ * from their own height. They then share the title's first-line centre instead of sitting high.
+ * (.check, .restore and .minus already use this formula in their margins.)
+ */
+.time,
+.badge {
+  margin-top: calc(var(--band) / 2 - var(--pad-y) - 8px);
+}
+
+.glyph {
+  margin-top: calc(var(--band) / 2 - var(--pad-y) - var(--lh) / 2);
 }

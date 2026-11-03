@@ -1,0 +1,22 @@
+.glyph {
+  display: block;
+  flex: none;
+  overflow: visible;
+}
+
+.off {
+  fill: var(--muted);
+  opacity: 0.4;
+  transition: fill var(--t-theme);
+}
+
+/* Neutral: colour belongs to the row's edge. */
+.on {
+  fill: var(--text-2);
+  transition: fill var(--t-fast);
+}
+
+/* The top level hints at splitting the task. Kept subtle. */
+.glyph[data-hot] .on {
+  fill: var(--danger);
+}

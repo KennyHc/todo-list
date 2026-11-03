@@ -2,8 +2,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
 }
 
 .heading {
@@ -31,13 +31,13 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .stats {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .count {
@@ -63,21 +63,96 @@
     color var(--t-theme);
 }
 
+/* The phone-only pieces are not rendered on wider screens (see App.tsx). */
+.pinned,
+.compact {
+  display: none;
+}
+
+/*
+ * Phone: a large iOS-style title that collapses into a compact bar on scroll. The controls
+ * (progress and account) live in one sticky, zero-height wrapper so they ride along the large
+ * title's row first and then settle into the compact bar: one account button, never two.
+ */
 @media (max-width: 480px) {
   .header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 14px;
-    margin-bottom: 20px;
+    margin-bottom: var(--space-2);
   }
 
-  .controls {
-    justify-content: space-between;
-    gap: 12px;
+  .title {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 36px;
   }
 
-  /* Keep the toggle at the right edge even when there are no stats yet. */
-  .controls > :last-child {
-    margin-left: auto;
+  .date {
+    margin: 0;
+    font-size: 13px;
+    line-height: 18px;
+  }
+
+  .pinned {
+    position: sticky;
+    top: calc(var(--top-safe) + 7px);
+    z-index: 41;
+    display: block;
+    height: 0;
+  }
+
+  .pinned .controls {
+    position: absolute;
+    top: 3px;
+    right: 0;
+    gap: var(--space-3);
+  }
+
+  .stats {
+    gap: 6px;
+  }
+
+  .stats > svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .count {
+    font-size: 12px;
+  }
+
+  /* The load total is a desktop nicety; the phone header keeps only progress. */
+  .pill {
+    display: none;
+  }
+
+  .compact {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 40;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    height: var(--sticky-1);
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
+    pointer-events: none;
+  }
+
+  .compactTitle {
+    display: flex;
+    align-items: center;
+    height: var(--bar-h);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  /* Only reachable once it has faded in (opacity animates, so key off the scrolled flag). */
+  :global(.app[data-scrolled]) .compact {
+    pointer-events: auto;
   }
 }

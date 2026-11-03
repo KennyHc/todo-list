@@ -4,7 +4,6 @@ import {
   DragOverlay,
   KeyboardSensor,
   MeasuringStrategy,
-  PointerSensor,
   TouchSensor,
   closestCenter,
   useSensor,
@@ -14,7 +13,6 @@ import {
   type DragOverEvent,
   type DragStartEvent,
   type KeyboardCoordinateGetter,
-  type PointerSensorOptions,
   type ScreenReaderInstructions,
 } from '@dnd-kit/core';
 import {
@@ -24,6 +22,8 @@ import {
 } from '@dnd-kit/sortable';
 import { AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
+import { MOUSE_ACTIVATION, MousePenSensor, TOUCH_ACTIVATION } from '../hooks/dragSensors';
+import { useCompletionHold } from '../hooks/useCompletionHold';
 import { useSettledOrder } from '../hooks/useSettledOrder';
 import {
   INDENT,
@@ -37,29 +37,16 @@ import {
   type Projection,
 } from '../lib/dnd';
 import { getDescendants } from '../lib/tree';
+import { todayISO } from '../lib/views';
 import { useDragStore } from '../store/drag';
 import { useTaskStore } from '../store/tasks';
 import { useUIStore } from '../store/ui';
 import { DragPreview } from './DragPreview';
+import { EmptyState } from './EmptyState';
+import { useSessionStore } from '../store/session';
 import { SortableTaskItem } from './TaskItem';
+import { UpcomingFooter } from './UpcomingFooter';
 import styles from './TaskList.module.css';
-
-/** Mouse and pen drag after 4px; touch has its own sensor (press and hold) so scrolling works. */
-class MousePenSensor extends PointerSensor {
-  static activators = [
-    {
-      eventName: 'onPointerDown' as const,
-      handler: (
-        { nativeEvent: event }: { nativeEvent: PointerEvent },
-        { onActivation }: PointerSensorOptions,
-      ) => {
-        if (!event.isPrimary || event.button !== 0 || event.pointerType === 'touch') return false;
-        onActivation?.({ event });
-        return true;
-      },
-    },
-  ];
-}
 
 const EXPAND_DELAY = 600;
 const RELEASE_LAYOUT_MS = 320;
@@ -88,12 +75,18 @@ const structureKey = (s: { tasks: Record<string, { childIds: string[] }>; rootId
 
 export function TaskList() {
   const tag = useUIStore((s) => s.tagFilter);
+  const celebrate = useSessionStore((s) => s.completedSomething);
   const reduced = useReducedMotion();
   const activeId = useDragStore((s) => s.activeId);
-  const liveIds = useTaskStore(useShallow((s) => flattenTree(s, { tag })));
+  const showUpcoming = useUIStore((s) => s.showUpcoming);
+  const liveIds = useTaskStore(
+    useShallow((s) => flattenTree(s, { tag, today: todayISO(), showUpcoming })),
+  );
   const key = useTaskStore((s) => structureKey(s));
-  // Done rows sink after a beat; moves apply at once; nothing reorders mid-drag.
-  const ids = useSettledOrder(liveIds, 700, { key, frozen: activeId !== null });
+  // Moves apply at once; nothing reorders mid-drag. A just-completed row (already filed in
+  // History, so absent from `liveIds`) stays until its strike has played, then pops out.
+  const settledIds = useSettledOrder(liveIds, 700, { key, frozen: activeId !== null });
+  const ids = useCompletionHold(settledIds);
   const tasks = useTaskStore((s) => s.tasks);
   const items = useMemo(() => itemsFor({ tasks }, ids), [tasks, ids]);
   const guides = useMemo(() => guideFlags(items), [items]);
@@ -124,8 +117,8 @@ export function TaskList() {
   session.current.projection = projection;
 
   const sensors = useSensors(
-    useSensor(MousePenSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
+    useSensor(MousePenSensor, { activationConstraint: MOUSE_ACTIVATION }),
+    useSensor(TouchSensor, { activationConstraint: TOUCH_ACTIVATION }),
     useSensor(KeyboardSensor, {
       coordinateGetter: useCallback<KeyboardCoordinateGetter>((event, args) => {
         // Left and right change the nesting by one level, within what the slot allows.
@@ -229,6 +222,8 @@ export function TaskList() {
     session.current.indent = indent > 0 ? indent : INDENT;
     session.current.keyboardX = 0;
     document.body.style.cursor = 'grabbing';
+    // A small haptic cue that the long-press picked the row up (touch only).
+    if (window.matchMedia?.('(hover: none)').matches) navigator.vibrate?.(10);
     setOverId(id);
     setDeltaX(0);
     useDragStore.getState().start(id, new Set(getDescendants(useTaskStore.getState(), id)));
@@ -326,6 +321,13 @@ export function TaskList() {
           {activeId ? <DragPreview id={activeId} subtasks={subtasks} /> : null}
         </DragOverlay>
       </DndContext>
+      {ids.length === 0 && tag === null && (
+        // Everything is done: once the last rows have popped away, say so.
+        <div className={styles.allClear}>
+          <EmptyState celebrate={celebrate} />
+        </div>
+      )}
+      <UpcomingFooter />
       <div className={styles.srOnly} aria-live="polite">
         {liveText}
       </div>

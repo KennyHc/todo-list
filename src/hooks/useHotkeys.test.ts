@@ -28,6 +28,7 @@ describe('matchHotkey', () => {
     expect(matchHotkey(ev('x'), ctx())).toEqual({ type: 'toggle' });
     expect(matchHotkey(ev('Enter'), ctx())).toEqual({ type: 'edit' });
     expect(matchHotkey(ev('Backspace'), ctx())).toEqual({ type: 'delete' });
+    expect(matchHotkey(ev('s'), ctx())).toEqual({ type: 'reschedule' });
     expect(matchHotkey(ev('ArrowLeft'), ctx())).toEqual({ type: 'collapse', collapsed: true });
     expect(matchHotkey(ev('ArrowRight'), ctx())).toEqual({ type: 'collapse', collapsed: false });
     expect(matchHotkey(ev('?', { shiftKey: true }), ctx())).toEqual({ type: 'help' });
@@ -78,7 +79,7 @@ describe('matchHotkey', () => {
   });
 
   it('ignores everything else while typing or over a dialog', () => {
-    for (const key of ['n', 'j', 'x', '/', '1', ' ', 'Enter', 'Backspace', '?']) {
+    for (const key of ['n', 'j', 'x', 's', '/', '1', ' ', 'Enter', 'Backspace', '?']) {
       expect(matchHotkey(ev(key), ctx({ typing: true }))).toBeNull();
       expect(matchHotkey(ev(key), ctx({ modalOpen: true }))).toBeNull();
     }
@@ -93,7 +94,7 @@ describe('matchHotkey', () => {
 
   it('needs a focused row for row actions, but not for navigation', () => {
     const none = ctx({ hasFocus: false });
-    for (const key of ['x', ' ', 'e', 'Enter', 'Backspace', 'Delete', 'ArrowLeft']) {
+    for (const key of ['x', ' ', 'e', 's', 'Enter', 'Backspace', 'Delete', 'ArrowLeft']) {
       expect(matchHotkey(ev(key), none)).toBeNull();
     }
     expect(matchHotkey(ev('j'), none)).toEqual({ type: 'move', step: 1 });
@@ -112,5 +113,39 @@ describe('matchHotkey', () => {
     expect(matchHotkey(ev('ArrowRight'), ctx({ view: 'deadline' }))).toBeNull();
     expect(matchHotkey(ev('j'), ctx({ view: 'history' }))).toBeNull();
     expect(matchHotkey(ev('1'), ctx({ view: 'history' }))).toEqual({ type: 'view', view: 'tree' });
+  });
+
+  it('[ and ] move the focused row a day in Week only', () => {
+    expect(matchHotkey(ev('['), ctx({ view: 'week' }))).toEqual({ type: 'day', step: -1 });
+    expect(matchHotkey(ev(']'), ctx({ view: 'week' }))).toEqual({ type: 'day', step: 1 });
+    expect(matchHotkey(ev(']'), ctx({ view: 'tree' }))).toBeNull();
+    expect(matchHotkey(ev(']'), ctx({ view: 'week', hasFocus: false }))).toBeNull();
+  });
+});
+
+describe('matchHotkey with the Today view on', () => {
+  const on = (extra: Partial<HotkeyContext> = {}) => ctx({ todayView: true, ...extra });
+
+  it('numbers the views from Today: 1 Today, 2 Tree, 3 By deadline, 4 History, 5 Week', () => {
+    expect(matchHotkey(ev('1'), on())).toEqual({ type: 'view', view: 'today' });
+    expect(matchHotkey(ev('2'), on())).toEqual({ type: 'view', view: 'tree' });
+    expect(matchHotkey(ev('3'), on())).toEqual({ type: 'view', view: 'deadline' });
+    expect(matchHotkey(ev('4'), on())).toEqual({ type: 'view', view: 'history' });
+    expect(matchHotkey(ev('5'), on())).toEqual({ type: 'view', view: 'week' });
+  });
+
+  it('leaves the numbering alone while it is off: Week is 4 and 5 does nothing', () => {
+    expect(matchHotkey(ev('1'), ctx())).toEqual({ type: 'view', view: 'tree' });
+    expect(matchHotkey(ev('3'), ctx())).toEqual({ type: 'view', view: 'history' });
+    expect(matchHotkey(ev('4'), ctx())).toEqual({ type: 'view', view: 'week' });
+    expect(matchHotkey(ev('5'), ctx())).toBeNull();
+  });
+
+  it('p plans the focused row, only with the feature on', () => {
+    expect(matchHotkey(ev('p'), on())).toEqual({ type: 'plan' });
+    expect(matchHotkey(ev('p'), on({ hasFocus: false }))).toBeNull();
+    expect(matchHotkey(ev('p'), ctx())).toBeNull();
+    expect(matchHotkey(ev('p'), on({ typing: true }))).toBeNull();
+    expect(matchHotkey(ev('p', { metaKey: true }), on())).toBeNull();
   });
 });

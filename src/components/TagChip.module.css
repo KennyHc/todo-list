@@ -30,8 +30,46 @@
   font: inherit;
 }
 
+.dotBtn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  /* A small dot with a comfortable hit area that doesn't grow the chip. */
+  width: 22px;
+  height: 20px;
+  margin: -1px 0 -1px 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  cursor: pointer;
+}
+
+.dotBtn .dot {
+  width: 8px;
+  height: 8px;
+  box-shadow: 0 0 0 2px transparent;
+  transition: box-shadow var(--t-fast);
+}
+
+.dotBtn:hover .dot,
+.dotBtn[aria-expanded='true'] .dot {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tag) 35%, transparent);
+}
+
+.dotBtn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 0;
+}
+
+.dotBtn + .body {
+  padding-left: 3px;
+}
+
 .clickable {
   cursor: pointer;
+  transition: var(--t-press);
 }
 
 .clickable:hover {
@@ -82,4 +120,46 @@
 .remove:hover {
   background: var(--border-strong);
   color: var(--text);
+}
+
+/*
+ * Plain: a 6px colour dot and the tag's name in secondary text, with no pill behind it. It is the
+ * quiet way a tag reads in a row, so the title stays the loudest thing there.
+ */
+.plain {
+  position: relative;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.plain .body {
+  gap: 6px;
+  padding: 0;
+}
+
+.chip.plain:has(.clickable:hover) {
+  background: none;
+}
+
+.plain .clickable:hover .label {
+  color: var(--text);
+}
+
+/* A larger target around the small text, without changing the line it sits on. */
+.plain .clickable {
+  position: relative;
+}
+
+.plain .clickable::after {
+  content: '';
+  position: absolute;
+  inset: -8px -4px;
+}
+
+@media (max-width: 480px) {
+  .plain .clickable::after {
+    inset: -10px -6px -12px;
+  }
 }

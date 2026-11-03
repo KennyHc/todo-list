@@ -1,6 +1,8 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "web", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--", "--port", "5173", "--strictPort"], "port": 5173 }
+    { "name": "web", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--", "--port", "5173", "--strictPort"], "port": 5173 },
+    { "name": "emulators", "runtimeExecutable": "npx", "runtimeArgs": ["--yes", "firebase-tools@15", "emulators:start", "--only", "auth,firestore", "--project", "tasks-app-956r6"], "port": 4000 },
+    { "name": "web-emu", "runtimeExecutable": "npx", "runtimeArgs": ["vite", "--host", "127.0.0.1", "--port", "5175", "--strictPort"], "env": { "VITE_USE_EMULATORS": "1" }, "port": 5175, "url": "http://127.0.0.1:5175" }
   ]
 }

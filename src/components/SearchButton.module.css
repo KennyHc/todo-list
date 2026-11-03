@@ -15,7 +15,8 @@
   transition:
     background-color var(--t-fast),
     border-color var(--t-fast),
-    color var(--t-fast);
+    color var(--t-fast),
+    var(--t-press);
 }
 
 .button:hover {
@@ -30,10 +31,35 @@
 
 @media (max-width: 480px) {
   .button {
-    padding: 0 9px;
+    position: relative;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-color: transparent;
+    background: none;
   }
 
-  .label,
+  /* A 44px target around the 36px button. */
+  .button::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+  }
+
+  .keys {
+    display: none;
+  }
+}
+
+/* Narrow window (phones are above): icon only, so the toolbar fits the column. */
+@media (min-width: 481px) and (max-width: 720px) {
+  .button {
+    justify-content: center;
+    width: 30px;
+    padding: 0;
+  }
+
   .keys {
     display: none;
   }

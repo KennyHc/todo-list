@@ -17,3 +17,89 @@
   line-height: 16px;
   text-transform: uppercase;
 }
+
+.note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+.divider {
+  height: 1px;
+  margin: 12px -10px 6px;
+  background: var(--border);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--t-fast),
+    var(--t-press);
+}
+
+.item svg {
+  flex: none;
+  color: var(--text-2);
+}
+
+.item:hover {
+  background: var(--surface-2);
+}
+
+.danger,
+.danger svg {
+  color: var(--danger);
+}
+
+.danger:hover {
+  background: var(--danger-soft);
+}
+
+@media (max-width: 480px) {
+  .sections {
+    gap: 20px;
+  }
+
+  .heading {
+    margin-bottom: 8px;
+  }
+
+  .divider {
+    margin: 16px -16px 8px;
+  }
+
+  /* Icons line up with the section labels; the hover tint still gets some breathing room. */
+  .item {
+    width: calc(100% + 16px);
+    height: 48px;
+    margin: 0 -8px;
+    padding: 0 8px;
+    font-size: 15px;
+  }
+}
+
+.hint {
+  margin: 6px 4px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}

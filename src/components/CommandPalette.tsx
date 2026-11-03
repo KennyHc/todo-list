@@ -12,7 +12,9 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   CalendarClock,
+  CalendarDays,
   CheckCheck,
+  Copy,
   Download,
   FilterX,
   History,
@@ -22,23 +24,28 @@ import {
   Moon,
   Plus,
   Search,
+  Sparkles,
   Sun,
   Tag,
   Undo2,
+  Upload,
+  WandSparkles,
   type LucideIcon,
 } from 'lucide-react';
-import { exportBackup } from '../lib/backup';
+import { serializeBackup } from '../lib/backup';
+import { copyText } from '../lib/clipboard';
 import { fuzzyMatch } from '../lib/fuzzy';
 import { taskPath } from '../lib/views';
 import { revealTask } from '../store/reveal';
 import { useAllTags, useTaskStore } from '../store/tasks';
 import { useThemeStore } from '../store/theme';
-import { useUIStore, type View } from '../store/ui';
+import { useUIStore, viewOrder, type View } from '../store/ui';
 import type { Task } from '../types';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DuePill } from './DuePill';
 import { Keys } from './Kbd';
 import styles from './CommandPalette.module.css';
+import { dur, ease } from '../styles/motion';
 
 const MAX_TASKS = 8;
 const MAX_RECENT = 5;
@@ -60,11 +67,13 @@ type Row =
 
 type Section = { title: string; rows: Row[] };
 
-const VIEWS: { view: View; label: string; Icon: LucideIcon; key: string }[] = [
-  { view: 'tree', label: 'Go to Tree', Icon: ListTree, key: '1' },
-  { view: 'deadline', label: 'Go to By deadline', Icon: CalendarClock, key: '2' },
-  { view: 'history', label: 'Go to History', Icon: History, key: '3' },
-];
+const VIEWS: Record<View, { label: string; Icon: LucideIcon }> = {
+  today: { label: 'Go to Today', Icon: Sun },
+  tree: { label: 'Go to Tree', Icon: ListTree },
+  deadline: { label: 'Go to By deadline', Icon: CalendarClock },
+  history: { label: 'Go to History', Icon: History },
+  week: { label: 'Go to Week', Icon: CalendarDays },
+};
 
 /** Renders `text` with the matched characters emphasised. */
 function Highlight({ text, indices }: { text: string; indices: number[] }) {
@@ -97,6 +106,7 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
   const undo = useTaskStore((s) => s.undo);
   const tags = useAllTags();
   const tagFilter = useUIStore((s) => s.tagFilter);
+  const todayView = useTaskStore((s) => s.settings.todayView);
 
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
@@ -128,11 +138,11 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
         keys: ['n'],
         run: () => document.getElementById('composer')?.focus(),
       },
-      ...VIEWS.map(({ view, label, Icon, key }) => ({
+      ...viewOrder(todayView).map((view, i) => ({
         id: `view-${view}`,
-        label,
-        Icon,
-        keys: [key],
+        label: VIEWS[view].label,
+        Icon: VIEWS[view].Icon,
+        keys: [String(i + 1)],
         run: () => ui().setView(view),
       })),
       ...tags.map(({ tag }) => ({
@@ -164,7 +174,45 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
         run: onAskClear,
       });
     }
-    list.push({ id: 'export', label: 'Export backup', Icon: Download, run: () => exportBackup() });
+    list.push(
+      {
+        id: 'ai-copy',
+        label: 'Copy for AI',
+        Icon: Sparkles,
+        run: () => ui().setAiDialog('copy'),
+      },
+      {
+        id: 'ai-import',
+        label: 'Import from AI\u2026',
+        Icon: WandSparkles,
+        run: () => ui().setAiDialog('import'),
+      },
+    );
+    list.push(
+      {
+        id: 'export',
+        label: 'Export backup',
+        Icon: Download,
+        run: () => ui().setAiDialog('export'),
+      },
+      {
+        id: 'backup-copy',
+        label: 'Copy backup to clipboard',
+        Icon: Copy,
+        run: () => {
+          const { tasks, rootIds, history, tagColors, settings } = useTaskStore.getState();
+          void copyText(serializeBackup({ tasks, rootIds, history, tagColors, settings })).then(
+            (ok) => ui().showNotice(ok ? 'Backup copied' : 'Couldn\u2019t copy the backup'),
+          );
+        },
+      },
+      {
+        id: 'import-paste',
+        label: 'Import (paste)',
+        Icon: Upload,
+        run: () => ui().setAiDialog('paste'),
+      },
+    );
     if (undo) {
       list.push({
         id: 'undo',
@@ -182,11 +230,12 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
       run: () => ui().setSheetOpen(true),
     });
     return list;
-  }, [tags, tagFilter, doneCount, undo, onAskClear]);
+  }, [tags, tagFilter, doneCount, undo, onAskClear, todayView]);
 
   const sections = useMemo<Section[]>(() => {
     const q = query.trim();
-    const all = Object.values(tasks);
+    // Done tasks live in History, so there is no row to reveal.
+    const all = Object.values(tasks).filter((t) => !t.done);
     const toRow = (task: Task, indices: number[]): Row => ({
       kind: 'task',
       id: `task-${task.id}`,
@@ -204,7 +253,6 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
 
     if (q === '') {
       const recent = all
-        .filter((t) => !t.done)
         .sort((a, b) => b.createdAt - a.createdAt)
         .slice(0, MAX_RECENT)
         .map((t) => toRow(t, []));
@@ -280,7 +328,7 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.16 }}
+      transition={{ duration: dur.base, ease: ease.out }}
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -294,7 +342,7 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
         initial={{ opacity: 0, scale: 0.98, y: -6 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.98, y: -6 }}
-        transition={{ type: 'spring', duration: 0.16, bounce: 0 }}
+        transition={{ duration: dur.base, ease: ease.out }}
         onKeyDown={onKeyDown}
       >
         <div className={styles.field}>
@@ -354,7 +402,6 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
                       <>
                         <span
                           className={`${styles.dot} ${row.task.done ? styles.dotDone : ''}`}
-                          style={{ ['--task-color' as string]: row.task.color }}
                           aria-hidden="true"
                         />
                         <span
@@ -364,7 +411,11 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
                         </span>
                         {row.path && <span className={styles.path}>{row.path}</span>}
                         {row.task.dueDate !== null && (
-                          <DuePill dueDate={row.task.dueDate} done={row.task.done} />
+                          <DuePill
+                            dueDate={row.task.dueDate}
+                            done={row.task.done}
+                            repeat={row.task.repeat}
+                          />
                         )}
                       </>
                     ) : (

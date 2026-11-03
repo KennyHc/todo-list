@@ -1,5 +1,7 @@
 import type { TaskTree } from '../types';
-import { getAncestors, getDescendants, sortedChildIds } from './tree';
+import { todayList } from './today';
+import { getAncestors, getDescendants, hiddenUntilStart, notStarted } from './tree';
+import { weekIds, weekStart } from './week';
 
 export type DueStatus = 'overdue' | 'today' | 'soon' | 'later';
 
@@ -41,20 +43,39 @@ export function visibleTreeIds(tree: TaskTree, tag: string | null): Set<string> 
 }
 
 /**
- * Every task (parents and subtasks alike, hierarchy ignored), optionally filtered by tag:
- * undone with a due date (soonest first), undone without one (oldest first), then done
- * (most recently completed first). Ties keep the tree's insertion order.
+ * Every task (parents and subtasks alike, hierarchy ignored), optionally filtered by tag: the
+ * open ones with a due date (soonest first), then the open ones without (oldest first), then
+ * the done ones, most recently completed first (the Completed section). Ties keep the tree's
+ * insertion order. Open tasks that have not started yet (their own start date or an ancestor's
+ * is after `today`) are left out.
  */
-export function deadlineList(tree: TaskTree, { tag }: { tag: string | null }): string[] {
-  const tasks = Object.values(tree.tasks).filter((task) => tag === null || task.tags.includes(tag));
+export function deadlineList(
+  tree: TaskTree,
+  { tag }: { tag: string | null },
+  today: string = todayISO(),
+): string[] {
+  const tasks = Object.values(tree.tasks).filter(
+    (task) =>
+      (tag === null || task.tags.includes(tag)) &&
+      (task.done || !hiddenUntilStart(tree, task.id, today)),
+  );
   const dated = tasks
     .filter((t) => !t.done && t.dueDate !== null)
     .sort((a, b) => (a.dueDate! < b.dueDate! ? -1 : a.dueDate! > b.dueDate! ? 1 : 0));
   const undated = tasks.filter((t) => !t.done && t.dueDate === null).sort(byCreated);
-  const finished = tasks
+  const done = tasks
     .filter((t) => t.done)
     .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
-  return [...dated, ...undated, ...finished].map((t) => t.id);
+  return [...dated, ...undated, ...done].map((t) => t.id);
+}
+
+/** The Completed section shows this many rows until "Show all" is pressed. */
+export const COMPLETED_PREVIEW = 10;
+
+/** The part of the Completed section that is on screen, given its collapse / show-all state. */
+export function completedShown<T>(completed: T[], collapsed: boolean, showAll: boolean): T[] {
+  if (collapsed) return [];
+  return showAll ? completed : completed.slice(0, COMPLETED_PREVIEW);
 }
 
 const byCreated = (a: { createdAt: number }, b: { createdAt: number }) => a.createdAt - b.createdAt;
@@ -90,28 +111,85 @@ export function isContextOnly(tree: TaskTree, id: string, tag: string): boolean 
 }
 
 /**
- * Ids of the rows currently on screen, in display order: tree order (undone before done,
- * skipping collapsed subtrees and anything the tag filter hides) or deadline order. History
- * rows aren't tasks, so that view has no keyboard order.
+ * The Tree view's rows in display order: open tasks only (a done task, and with it its whole
+ * subtree, belongs to History), skipping collapsed subtrees and anything the tag filter hides.
+ * A task that has not started yet takes its subtree with it, unless `showUpcoming` is on.
  */
-export function visibleOrder(
+export function treeRows(
   tree: TaskTree,
-  { view, tag }: { view: 'tree' | 'deadline' | 'history'; tag: string | null },
+  tag: string | null,
+  { today = todayISO(), showUpcoming = false }: { today?: string; showUpcoming?: boolean } = {},
 ): string[] {
-  if (view === 'history') return [];
-  if (view === 'deadline') return deadlineList(tree, { tag });
   const visible = visibleTreeIds(tree, tag);
   const out: string[] = [];
   const walk = (ids: string[]) => {
-    for (const id of sortedChildIds(tree, ids)) {
+    for (const id of ids) {
       const task = tree.tasks[id];
-      if (!task || (visible && !visible.has(id))) continue;
+      if (!task || task.done || (visible && !visible.has(id))) continue;
+      if (!showUpcoming && notStarted(task, today)) continue;
       out.push(id);
       if (!task.collapsed) walk(task.childIds);
     }
   };
   walk(tree.rootIds);
   return out;
+}
+
+/**
+ * How many open tasks are hidden by a start date the Tree view could show: the topmost ones
+ * only (the descendants of a hidden task are not counted again), under the tag filter.
+ */
+export function upcomingCount(tree: TaskTree, today: string, tag: string | null = null): number {
+  const visible = visibleTreeIds(tree, tag);
+  let count = 0;
+  const walk = (ids: string[]) => {
+    for (const id of ids) {
+      const task = tree.tasks[id];
+      if (!task || task.done || (visible && !visible.has(id))) continue;
+      if (notStarted(task, today)) count += 1;
+      else walk(task.childIds);
+    }
+  };
+  walk(tree.rootIds);
+  return count;
+}
+
+/**
+ * Ids of the rows currently on screen, in display order: tree order (open tasks only,
+ * skipping collapsed subtrees and anything the tag filter hides) or deadline order, which
+ * ends with the Completed rows unless that section is collapsed (or limited to its preview),
+ * the Today list, or the Week's days in order. History rows aren't tasks, so that view has no keyboard order.
+ */
+export function visibleOrder(
+  tree: TaskTree,
+  {
+    view,
+    tag,
+    completedCollapsed = false,
+    completedShowAll = false,
+    showUpcoming = false,
+    weekAnchor = null,
+  }: {
+    view: 'today' | 'tree' | 'deadline' | 'history' | 'week';
+    tag: string | null;
+    completedCollapsed?: boolean;
+    completedShowAll?: boolean;
+    showUpcoming?: boolean;
+    /** Monday of the week the Week view shows; null for the current week. */
+    weekAnchor?: string | null;
+  },
+  today: string = todayISO(),
+): string[] {
+  if (view === 'history') return [];
+  if (view === 'week') return weekIds(tree, weekAnchor ?? weekStart(today), today, tag);
+  if (view === 'today') return todayList(tree, today, tag);
+  if (view === 'deadline') {
+    const all = deadlineList(tree, { tag }, today);
+    const open = all.filter((id) => !tree.tasks[id].done);
+    const done = all.filter((id) => tree.tasks[id].done);
+    return [...open, ...completedShown(done, completedCollapsed, completedShowAll)];
+  }
+  return treeRows(tree, tag, { today, showUpcoming });
 }
 
 /** The row to focus once `id` (and everything in `removed`) is gone: the next one, else the previous. */

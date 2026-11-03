@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import { mkState, mkTask } from '../test/factories';
 import type { TaskTree } from '../types';
 import { addTask, emptyTree, toggleDone, updateTask } from './tree';
 import {
+  COMPLETED_PREVIEW,
   allTags,
   deadlineList,
   dueStatus,
   neighborAfterRemoval,
   taskPath,
   todayISO,
+  treeRows,
+  upcomingCount,
   visibleOrder,
   visibleTreeIds,
 } from './views';
@@ -134,7 +138,7 @@ describe('deadlineList', () => {
     expect(deadlineList(b.tree, { tag: null })).toEqual([x, y, z]);
   });
 
-  it('keeps insertion order for equal createdAt and equal completedAt', () => {
+  it('keeps insertion order for equal createdAt', () => {
     let tree = emptyTree();
     const ids: string[] = [];
     for (const t of ['a', 'b', 'c']) {
@@ -156,14 +160,32 @@ describe('deadlineList', () => {
     expect(deadlineList(b.tree, { tag: 'none' })).toEqual([]);
   });
 
-  it('moves a task into the done group when completed', () => {
+  it('moves a task to the end when completed; a done parent takes its subtasks along', () => {
     const b = build();
     const a = b.add('a', { dueDate: '2026-05-01' });
     const c = b.add('c', { dueDate: '2026-06-01' });
+    const kid = b.add('kid', { parentId: c, dueDate: '2026-07-01' });
     b.tree = toggleDone(b.tree, a, 100);
-    expect(deadlineList(b.tree, { tag: null })).toEqual([c, a]);
-    b.tree = updateTask(b.tree, c, { dueDate: null });
-    expect(deadlineList(b.tree, { tag: null })).toEqual([c, a]);
+    expect(deadlineList(b.tree, { tag: null })).toEqual([c, kid, a]);
+    b.tree = toggleDone(b.tree, c, 200);
+    // Newest completion first; the parent and its subtask were completed together.
+    const list = deadlineList(b.tree, { tag: null });
+    expect(list.slice(0, 2).sort()).toEqual([c, kid].sort());
+    expect(list[2]).toBe(a);
+  });
+
+  it('puts done tasks last by completedAt desc, respecting the tag filter', () => {
+    const b = build();
+    const open = b.add('open', { tags: ['x'], dueDate: '2026-05-01' });
+    const old = b.add('old', { tags: ['x'] });
+    const recent = b.add('recent', { tags: ['x'] });
+    const other = b.add('other', { tags: ['y'] });
+    b.tree = toggleDone(b.tree, old, 100);
+    b.tree = toggleDone(b.tree, recent, 300);
+    b.tree = toggleDone(b.tree, other, 200);
+    expect(deadlineList(b.tree, { tag: null })).toEqual([open, recent, other, old]);
+    expect(deadlineList(b.tree, { tag: 'x' })).toEqual([open, recent, old]);
+    expect(deadlineList(b.tree, { tag: 'y' })).toEqual([other]);
   });
 });
 
@@ -209,17 +231,30 @@ describe('visibleOrder', () => {
     return { b, a, a1, a2, c, d };
   }
 
+  it('lists the Week view day by day, for the current or the chosen week', () => {
+    const tree = mkState([
+      mkTask('fri', { dueDate: '2026-10-23' }),
+      mkTask('mon', { dueDate: '2026-10-19' }),
+      mkTask('next', { dueDate: '2026-10-27' }),
+    ]);
+    const today = '2026-10-21';
+    expect(visibleOrder(tree, { view: 'week', tag: null }, today)).toEqual(['mon', 'fri']);
+    expect(
+      visibleOrder(tree, { view: 'week', tag: null, weekAnchor: '2026-10-26' }, today),
+    ).toEqual(['next']);
+  });
+
   it('walks the tree depth first', () => {
     const { b, a, a1, a2, c, d } = sample();
     expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([a, a1, a2, c, d]);
   });
 
-  it('puts done tasks after undone siblings, like the list', () => {
+  it('skips done tasks, and a done parent with its subtree, like the list', () => {
     const { b, a, a1, a2, c, d } = sample();
     b.tree = toggleDone(b.tree, a1, 10);
-    expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([a, a2, a1, c, d]);
+    expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([a, a2, c, d]);
     b.tree = toggleDone(b.tree, a, 20);
-    expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([c, d, a, a1, a2]);
+    expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([c, d]);
   });
 
   it('skips the children of collapsed parents', () => {
@@ -239,6 +274,23 @@ describe('visibleOrder', () => {
     b.tree = updateTask(b.tree, a, { collapsed: true });
     expect(visibleOrder(b.tree, { view: 'deadline', tag: null })).toEqual([c, a, a1, a2, d]);
     expect(visibleOrder(b.tree, { view: 'deadline', tag: 'x' })).toEqual([a, a2]);
+  });
+
+  it('ends with the Completed rows, unless that section is collapsed or limited', () => {
+    const b = build();
+    const open = b.add('open', { dueDate: '2026-05-01' });
+    const done: string[] = [];
+    for (let i = 0; i < 12; i += 1) {
+      const id = b.add(`d${i}`);
+      b.tree = toggleDone(b.tree, id, 1000 + i);
+      done.push(id);
+    }
+    const newest = [...done].reverse();
+    const order = (extra: object) =>
+      visibleOrder(b.tree, { view: 'deadline', tag: null, ...extra });
+    expect(order({})).toEqual([open, ...newest.slice(0, COMPLETED_PREVIEW)]);
+    expect(order({ completedShowAll: true })).toEqual([open, ...newest]);
+    expect(order({ completedCollapsed: true, completedShowAll: true })).toEqual([open]);
   });
 
   it('is empty in the history view', () => {
@@ -261,5 +313,94 @@ describe('neighborAfterRemoval', () => {
 
   it('returns null for an unknown id', () => {
     expect(neighborAfterRemoval(order, 'zzz')).toBeNull();
+  });
+});
+
+describe('start dates in the lists', () => {
+  const TODAY = '2026-10-20';
+  const LATER = '2026-10-26';
+  const tree = mkState([
+    mkTask('a'),
+    mkTask('p', { childIds: ['c1', 'c2'], startDate: LATER }),
+    mkTask('c1', { parentId: 'p', childIds: ['g'], dueDate: '2026-10-21' }),
+    mkTask('g', { parentId: 'c1' }),
+    mkTask('c2', { parentId: 'p' }),
+    mkTask('q', { childIds: ['r'] }),
+    mkTask('r', { parentId: 'q', startDate: LATER }),
+    mkTask('s', { startDate: TODAY }),
+    mkTask('t', { startDate: '2026-10-01' }),
+    mkTask('u', { startDate: LATER, done: true, completedAt: 5 }),
+  ]);
+
+  it('treeRows leaves out a not-started task with its whole subtree', () => {
+    expect(treeRows(tree, null, { today: TODAY })).toEqual(['a', 'q', 's', 't']);
+  });
+
+  it('a start date of today or earlier shows normally; nothing is cleared', () => {
+    expect(treeRows(tree, null, { today: LATER })).toEqual([
+      'a',
+      'p',
+      'c1',
+      'g',
+      'c2',
+      'q',
+      'r',
+      's',
+      't',
+    ]);
+    expect(tree.tasks.p.startDate).toBe(LATER);
+  });
+
+  it('showUpcoming brings them back in tree order', () => {
+    expect(treeRows(tree, null, { today: TODAY, showUpcoming: true })).toEqual([
+      'a',
+      'p',
+      'c1',
+      'g',
+      'c2',
+      'q',
+      'r',
+      's',
+      't',
+    ]);
+  });
+
+  it('deadlineList leaves them out too (subtree included), but not done tasks', () => {
+    expect(deadlineList(tree, { tag: null }, TODAY)).toEqual(['a', 'q', 's', 't', 'u']);
+    expect(deadlineList(tree, { tag: null }, LATER)).toContain('c1');
+  });
+
+  it('visibleOrder follows both views, with showUpcoming for the tree', () => {
+    const opts = { tag: null, completedShowAll: true };
+    expect(visibleOrder(tree, { ...opts, view: 'tree' }, TODAY)).toEqual(['a', 'q', 's', 't']);
+    expect(visibleOrder(tree, { ...opts, view: 'tree', showUpcoming: true }, TODAY)).toHaveLength(
+      9,
+    );
+    expect(visibleOrder(tree, { ...opts, view: 'deadline' }, TODAY)).not.toContain('c1');
+  });
+
+  describe('upcomingCount', () => {
+    it('counts only the topmost hidden tasks, not their descendants', () => {
+      // p (with three descendants) and r; the done one is not counted.
+      expect(upcomingCount(tree, TODAY)).toBe(2);
+    });
+
+    it('is zero when nothing is hidden, and when the date has come', () => {
+      expect(upcomingCount(mkState([mkTask('a'), mkTask('b', { startDate: TODAY })]), TODAY)).toBe(
+        0,
+      );
+      expect(upcomingCount(tree, LATER)).toBe(0);
+    });
+
+    it('respects the tag filter and skips tasks under a done parent', () => {
+      const tagged = mkState([
+        mkTask('a', { startDate: LATER, tags: ['x'] }),
+        mkTask('b', { startDate: LATER, tags: ['y'] }),
+        mkTask('d', { done: true, childIds: ['e'] }),
+        mkTask('e', { parentId: 'd', startDate: LATER, done: true }),
+      ]);
+      expect(upcomingCount(tagged, TODAY)).toBe(2);
+      expect(upcomingCount(tagged, TODAY, 'x')).toBe(1);
+    });
   });
 });

@@ -1,7 +1,7 @@
 .list {
   position: relative;
-  margin: 10px 0 0;
-  padding: 6px;
+  margin: var(--space-6) 0 0;
+  padding: var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   background: var(--surface);
@@ -12,9 +12,15 @@
     border-color var(--t-theme);
 }
 
+/* Phone: no card; the list is edge to edge and the rows draw their own hairlines. */
 @media (max-width: 480px) {
   .list {
-    padding: 4px;
+    margin: 0 calc(-1 * var(--gutter-r)) 0 calc(-1 * var(--gutter-l));
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
   }
 }
 
@@ -28,8 +34,8 @@
   opacity: 0;
   pointer-events: none;
   transition:
-    left 140ms var(--ease-out),
-    top 90ms var(--ease-out);
+    left var(--dur-fast) var(--ease-out),
+    top var(--dur-instant) var(--ease-out);
 }
 
 .indicator::before {
@@ -54,4 +60,38 @@
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/* Everything is done: once the last rows have popped away the card gives way to "All clear",
+   which fades in after the collapse (CSS, so it never takes part in presence). */
+.list:empty {
+  display: none;
+}
+
+/* Sits where the list card was: same gap under the toolbar. */
+.allClear > * {
+  margin-top: 0;
+}
+
+.allClear {
+  margin-top: var(--space-6);
+  animation: allClear 240ms var(--ease-out) 700ms backwards;
+}
+
+@media (max-width: 480px) {
+  .allClear {
+    margin-top: var(--space-6);
+  }
+}
+
+@keyframes allClear {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .allClear {
+    animation-delay: 0s;
+  }
 }

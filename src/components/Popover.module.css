@@ -2,6 +2,8 @@
   position: fixed;
   z-index: 60;
   max-width: calc(100vw - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 10px;
   background: var(--elevated);
   border: 1px solid var(--border-strong);
@@ -13,4 +15,64 @@
 
 .panel:focus-visible {
   outline: none;
+}
+
+/* Phone: a bottom sheet over a dimmed backdrop. */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+  background: rgba(8, 11, 18, 0.38);
+}
+
+.sheet {
+  position: fixed;
+  right: 0;
+  left: 0;
+  z-index: 60;
+  max-height: min(86vh, 86dvh);
+  background: var(--elevated);
+  border: 1px solid var(--border-strong);
+  border-bottom: 0;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  box-shadow: var(--shadow-pop);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.sheet:focus-visible {
+  outline: none;
+}
+
+.sheetInner {
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+/* The drag handle; the whole strip is the grab target. */
+.handle {
+  display: flex;
+  flex: none;
+  justify-content: center;
+  padding: 8px 0 4px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.grabber {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+
+.sheetBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 4px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }

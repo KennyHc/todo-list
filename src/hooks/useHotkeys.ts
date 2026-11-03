@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { siblingMoveTarget } from '../lib/dnd';
 import { isLeaf } from '../lib/tree';
-import { visibleOrder, visibleTreeIds } from '../lib/views';
+import { weekStart, weekStepMove } from '../lib/week';
+import { neighborAfterRemoval, todayISO, visibleOrder, visibleTreeIds } from '../lib/views';
 import { useTaskStore } from '../store/tasks';
-import { useUIStore, type View } from '../store/ui';
+import { currentView, useUIStore, viewOrder, type View } from '../store/ui';
 import type { Difficulty } from '../types';
 
 export type HotkeyAction =
@@ -16,10 +17,13 @@ export type HotkeyAction =
   | { type: 'toggle' }
   | { type: 'edit' }
   | { type: 'delete' }
+  | { type: 'reschedule' }
+  | { type: 'plan' }
   | { type: 'difficulty'; value: Difficulty }
   | { type: 'collapse'; collapsed: boolean }
   | { type: 'reorder'; step: 1 | -1 }
   | { type: 'nest'; direction: 'in' | 'out' }
+  | { type: 'day'; step: 1 | -1 }
   | { type: 'help' };
 
 export type HotkeyEvent = {
@@ -41,9 +45,9 @@ export type HotkeyContext = {
   view: View;
   /** A visible row is focused. */
   hasFocus: boolean;
+  /** The opt-in Today view is on: it takes key 1 and the others move up; `p` plans a row. */
+  todayView?: boolean;
 };
-
-const VIEW_KEYS: Record<string, View> = { '1': 'tree', '2': 'deadline', '3': 'history' };
 
 /**
  * Maps a key press to an action, or null when it isn't ours. Pure: everything it needs to know
@@ -92,7 +96,11 @@ export function matchHotkey(e: HotkeyEvent, ctx: HotkeyContext): HotkeyAction | 
     case '1':
     case '2':
     case '3':
-      return { type: 'view', view: VIEW_KEYS[e.key] };
+    case '4':
+    case '5': {
+      const view = viewOrder(ctx.todayView === true)[Number(e.key) - 1];
+      return view ? { type: 'view', view } : null;
+    }
     case 'j':
       return rows ? { type: 'move', step: 1 } : null;
     case 'k':
@@ -109,9 +117,18 @@ export function matchHotkey(e: HotkeyEvent, ctx: HotkeyContext): HotkeyAction | 
       return ctx.hasFocus ? { type: 'edit' } : null;
     case 'Enter':
       return ctx.hasFocus && !own ? { type: 'edit' } : null;
+    case 's':
+      return ctx.hasFocus ? { type: 'reschedule' } : null;
+    case 'p':
+      return ctx.hasFocus && ctx.todayView === true ? { type: 'plan' } : null;
     case 'Backspace':
     case 'Delete':
       return ctx.hasFocus ? { type: 'delete' } : null;
+    case '[':
+    case ']':
+      return ctx.hasFocus && ctx.view === 'week'
+        ? { type: 'day', step: e.key === ']' ? 1 : -1 }
+        : null;
     case 'ArrowRight':
     case 'ArrowLeft':
       return ctx.hasFocus && ctx.view === 'tree' && !own
@@ -127,6 +144,16 @@ const CONTROLS =
   'button, a[href], summary, [role="button"], [role="checkbox"], [role="radio"], [role="menuitem"], [role="option"], [role="tab"]';
 const OVERLAYS = '[role="dialog"], [role="alertdialog"]';
 
+/** The visibleOrder options for what the UI currently shows. */
+const orderOf = (ui: ReturnType<typeof useUIStore.getState>) => ({
+  view: currentView(),
+  tag: ui.tagFilter,
+  completedCollapsed: ui.completedCollapsed,
+  completedShowAll: ui.completedShowAll,
+  showUpcoming: ui.showUpcoming,
+  weekAnchor: ui.weekAnchor,
+});
+
 const asElement = (target: EventTarget | null) => (target instanceof Element ? target : null);
 
 /** Global keyboard workflow: row focus, task shortcuts, views and the palette. Use once, in App. */
@@ -137,14 +164,15 @@ export function useHotkeys(): void {
       const el = asElement(e.target);
       const ui = useUIStore.getState();
       const tasks = useTaskStore.getState();
-      const order = visibleOrder(tasks, { view: ui.view, tag: ui.tagFilter });
+      const order = visibleOrder(tasks, orderOf(ui));
       const focusedId = ui.focusedId !== null && order.includes(ui.focusedId) ? ui.focusedId : null;
       const ctx: HotkeyContext = {
         typing: !!el?.closest(TEXT_ENTRY),
         modalOpen: !!document.querySelector(OVERLAYS),
         interactive: !!el?.closest(CONTROLS),
-        view: ui.view,
+        view: currentView(),
         hasFocus: focusedId !== null,
+        todayView: tasks.settings.todayView,
       };
       const action = matchHotkey(e, ctx);
       if (!action) return;
@@ -182,15 +210,42 @@ export function useHotkeys(): void {
           ui.setFocusedId(order[next]);
           break;
         }
-        case 'toggle':
-          if (focusedId) tasks.toggle(focusedId);
+        case 'toggle': {
+          if (!focusedId) break;
+          tasks.toggle(focusedId);
+          // A completed row leaves the list (with its subtree, and maybe its parent), so focus
+          // moves on to the next row that stays, and j/k keep working.
+          const stays = new Set(visibleOrder(useTaskStore.getState(), orderOf(ui)));
+          if (!stays.has(focusedId)) {
+            const gone = new Set(order.filter((other) => !stays.has(other)));
+            ui.setFocusedId(neighborAfterRemoval(order, focusedId, gone));
+          }
           break;
+        }
         case 'edit':
           if (focusedId) tasks.setEditingId(focusedId);
           break;
         case 'delete':
           if (focusedId) ui.requestDelete(focusedId);
           break;
+        case 'reschedule':
+          if (focusedId) ui.requestReschedule(focusedId);
+          break;
+        case 'plan': {
+          if (!focusedId) break;
+          const task = tasks.tasks[focusedId];
+          if (!task) break;
+          const today = todayISO();
+          // Planned (for today or an earlier day, so it is in Today) -> take it out; else plan it.
+          const planned = task.plannedFor !== null && task.plannedFor <= today;
+          tasks.plan(focusedId, planned ? null : today);
+          // A row that leaves the list hands the keyboard focus on, like completing does.
+          const stays = new Set(visibleOrder(useTaskStore.getState(), orderOf(ui)));
+          if (!stays.has(focusedId)) {
+            ui.setFocusedId(neighborAfterRemoval(order, focusedId, new Set([focusedId])));
+          }
+          break;
+        }
         case 'difficulty':
           if (focusedId && isLeaf(tasks, focusedId)) {
             tasks.update(focusedId, { difficulty: action.value });
@@ -224,6 +279,21 @@ export function useHotkeys(): void {
           if (parentId && useTaskStore.getState().tasks[parentId]?.collapsed) {
             tasks.update(parentId, { collapsed: false });
           }
+          break;
+        }
+        case 'day': {
+          if (!focusedId) break;
+          const task = tasks.tasks[focusedId];
+          if (!task) break;
+          const today = todayISO();
+          const current = weekStart(today);
+          const start = ui.weekAnchor ?? current;
+          const move = weekStepMove(task, action.step, start, today);
+          if (!move) break;
+          tasks.moveToDay(focusedId, move);
+          // Past Sunday or before Monday: the week follows the row, so it stays selected.
+          const shown = weekStart(move.date);
+          if (shown !== start) ui.setWeekAnchor(shown === current ? null : shown);
           break;
         }
         case 'help':

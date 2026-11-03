@@ -1,0 +1,79 @@
+/* Sits under the title, so it lines up with the title text and not the checkbox. */
+.note {
+  min-width: 0;
+}
+
+.text,
+.editor {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-1) 0 var(--space-1);
+  color: var(--text-2);
+  /* A textarea defaults to the monospace system font. */
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  transition: color var(--t-theme);
+}
+
+.text {
+  border-radius: 4px;
+  cursor: text;
+}
+
+.text:focus-visible {
+  outline-offset: 2px;
+}
+
+.line {
+  margin: 0;
+}
+
+/* A line's link chips follow its text, like the chips after a title. */
+.line a {
+  margin-left: var(--space-2);
+  vertical-align: bottom;
+}
+
+/* Seamless inline editing, like the title input: only the caret and the row tint show. */
+.editor {
+  min-height: 26px;
+  max-height: min(60vh, 420px);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  caret-color: var(--accent);
+  overflow-y: auto;
+  resize: none;
+}
+
+.editor::placeholder {
+  color: var(--muted);
+}
+
+.editor:focus-visible {
+  outline: none;
+}
+
+.hint {
+  margin: 0 0 var(--space-1);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+/* Phone: aligned with the 16px title and its larger line. */
+@media (max-width: 480px) {
+  .text,
+  .editor {
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 22px;
+  }
+}

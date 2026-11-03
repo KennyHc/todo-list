@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TASK_COLORS } from './colors';
-import { normalizeTag, normalizeTags, parseQuickAdd, tagColor } from './tags';
+import { normalizeTag, normalizeTags, parseQuickAdd, TAG_TOKEN, tagColor } from './tags';
 
 describe('normalizeTag', () => {
   it('trims, lowercases and strips leading #', () => {
@@ -42,10 +42,10 @@ describe('parseQuickAdd', () => {
     expect(parseQuickAdd('x #A #a #b')).toEqual({ title: 'x', tags: ['a', 'b'] });
   });
 
-  it('supports - and _ and digits', () => {
+  it('supports - and _ and digits, but a number-only token stays in the title', () => {
     expect(parseQuickAdd('go #side-project #q3_goals #2026')).toEqual({
-      title: 'go',
-      tags: ['side-project', 'q3_goals', '2026'],
+      title: 'go #2026',
+      tags: ['side-project', 'q3_goals'],
     });
   });
 
@@ -79,5 +79,12 @@ describe('tagColor', () => {
   it('spreads different tags over several colors', () => {
     const colors = new Set(['a', 'b', 'c', 'd', 'e', 'home', 'work', 'money'].map(tagColor));
     expect(colors.size).toBeGreaterThan(2);
+  });
+});
+
+describe('TAG_TOKEN', () => {
+  it('requires at least one letter so issue numbers are not tags', () => {
+    const found = (text: string) => [...text.matchAll(TAG_TOKEN)].map((m) => m[2]);
+    expect(found('PR #123 #2fa #q4 #_x #-1')).toEqual(['2fa', 'q4', '_x']);
   });
 });

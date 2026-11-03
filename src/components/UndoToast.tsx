@@ -3,8 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useTaskStore, type UndoEntry } from '../store/tasks';
 import styles from './UndoToast.module.css';
-
-const SPRING = { type: 'spring', stiffness: 520, damping: 34 } as const;
+import { dur, ease, spring } from '../styles/motion';
 
 function isTextEntry(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -25,10 +24,10 @@ function Toast({ entry }: { entry: UndoEntry }) {
       animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
       exit={
         reduced
-          ? { opacity: 0, transition: { duration: 0.15 } }
-          : { opacity: 0, y: 8, transition: { duration: 0.15 } }
+          ? { opacity: 0, transition: { duration: dur.fast, ease: ease.out } }
+          : { opacity: 0, y: 8, transition: { duration: dur.fast, ease: ease.out } }
       }
-      transition={reduced ? { duration: 0.15 } : SPRING}
+      transition={reduced ? { duration: dur.fast } : spring.snappy}
     >
       <span className={styles.label}>{entry.label}</span>
       <button type="button" className={styles.undo} onClick={undo}>

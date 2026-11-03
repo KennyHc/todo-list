@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <!-- TODO: convert to og-image.png (1200x630); some social networks don't render SVG OG images. -->
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#7c9cf0" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#7c9cf0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="soft" x1="0" x2="1">
+      <stop offset="0" stop-color="#475569"/>
+      <stop offset="1" stop-color="#4466c9"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#f7f8fa"/>
+  <ellipse cx="900" cy="330" rx="420" ry="300" fill="url(#glow)"/>
+  <g font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+    <rect x="80" y="80" width="40" height="40" rx="11" fill="#7c9cf0"/>
+    <path d="M91 101l6 6 12-14" fill="none" stroke="#0f172a" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="136" y="110" font-size="30" font-weight="650" fill="#0f172a" letter-spacing="-0.6">Tasks</text>
+    <text x="80" y="330" font-size="84" font-weight="700" fill="#0f172a" letter-spacing="-3">Write it down.</text>
+    <text x="80" y="428" font-size="84" font-weight="700" fill="url(#soft)" letter-spacing="-3">It’s handled.</text>
+    <text x="80" y="520" font-size="26" fill="#475569">The calmest way to capture todos.</text>
+  </g>
+  <g transform="translate(690 190)">
+    <rect width="430" height="250" rx="20" fill="#ffffff" stroke="#0f172a" stroke-opacity="0.08" stroke-width="2"/>
+    <g font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="21" fill="#0f172a">
+      <rect x="29.5" y="37.5" width="21" height="21" rx="6.5" fill="none" stroke="#6a86b8" stroke-width="2"/>
+            <text x="70" y="55" font-weight="600">Plan a weekend trip</text>
+      <rect x="300" y="36" width="102" height="26" rx="7" fill="#f3f5f8" stroke="#0f172a" stroke-opacity="0.08"/>
+      <text x="351" y="55" font-size="15" font-weight="600" fill="#475569" text-anchor="middle">2/3  Σ 6</text>
+      <g transform="translate(34 0)">
+        <rect x="0" y="96" width="24" height="24" rx="7" fill="#A9C6F5"/>
+        <path d="M5 108l5 5 9-11" fill="none" stroke="#0f172a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="40" y="115" fill="#94a3b8">Book the cabin</text>
+        <rect x="0" y="146" width="24" height="24" rx="7" fill="#A9C6F5"/>
+        <path d="M5 158l5 5 9-11" fill="none" stroke="#0f172a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="40" y="165" fill="#94a3b8">Pack hiking gear</text>
+        <rect x="1.5" y="196.5" width="21" height="21" rx="6.5" fill="none" stroke="#6a86b8" stroke-width="2"/>
+        <text x="40" y="215">Invite friends</text>
+      </g>
+    </g>
+  </g>
+</svg>

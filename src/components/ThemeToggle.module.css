@@ -24,7 +24,9 @@
   background: none;
   color: var(--muted);
   cursor: pointer;
-  transition: color var(--t-fast);
+  transition:
+    color var(--t-fast),
+    var(--t-press);
 }
 
 .option:hover {
@@ -45,6 +47,12 @@
 
 .icon {
   position: relative;
+}
+
+/* Compact variant for the account menu. */
+.sm .option {
+  width: 28px;
+  height: 28px;
 }
 
 @media (max-width: 480px), (hover: none) {

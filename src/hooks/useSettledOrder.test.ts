@@ -76,3 +76,44 @@ describe('useSettledOrder options', () => {
     expect(result.current).toEqual(['b', 'c', 'a']);
   });
 });
+
+describe('useSettledOrder with additions', () => {
+  it('shows a new id at once but keeps the others in their old order until the delay', () => {
+    // 'x' is completed (it will sink) and completing it adds 'n' right after it.
+    const { result, rerender } = renderHook(({ ids }) => useSettledOrder(ids, 700), {
+      initialProps: { ids: ['a', 'x', 'b'] },
+    });
+    rerender({ ids: ['a', 'n', 'b', 'x'] });
+    expect(result.current).toEqual(['a', 'x', 'n', 'b']);
+    act(() => void vi.advanceTimersByTime(699));
+    expect(result.current).toEqual(['a', 'x', 'n', 'b']);
+    act(() => void vi.advanceTimersByTime(1));
+    expect(result.current).toEqual(['a', 'n', 'b', 'x']);
+  });
+
+  it('appends an added id with no later neighbour at the end', () => {
+    const { result, rerender } = renderHook(({ ids }) => useSettledOrder(ids, 700), {
+      initialProps: { ids: ['a', 'b'] },
+    });
+    rerender({ ids: ['b', 'a', 'c'] });
+    expect(result.current).toEqual(['a', 'b', 'c']);
+  });
+
+  it('applies everything at once when an anchor (a section header) appears or goes', () => {
+    const isAnchor = (id: string) => id.startsWith('section:');
+    const { result, rerender } = renderHook(({ ids }) => useSettledOrder(ids, 700, { isAnchor }), {
+      initialProps: { ids: ['section:today', 'x', 'y'] },
+    });
+    rerender({ ids: ['section:today', 'y', 'section:done', 'x'] });
+    expect(result.current).toEqual(['section:today', 'y', 'section:done', 'x']);
+  });
+
+  it('keeps waiting for a plain reorder when only non-anchor ids are added', () => {
+    const isAnchor = (id: string) => id.startsWith('section:');
+    const { result, rerender } = renderHook(({ ids }) => useSettledOrder(ids, 700, { isAnchor }), {
+      initialProps: { ids: ['section:today', 'x', 'section:done', 'z'] },
+    });
+    rerender({ ids: ['section:today', 'n', 'section:done', 'x', 'z'] });
+    expect(result.current).toEqual(['section:today', 'x', 'n', 'section:done', 'z']);
+  });
+});

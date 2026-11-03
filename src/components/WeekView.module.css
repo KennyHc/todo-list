@@ -1,0 +1,343 @@
+/*
+ * The Week view. From 1024px it breaks out of the 680px column so seven days fit side by side
+ * (narrower, a day column can't hold a word like "Groceries" next to its checkbox); below that
+ * the days stack, and on a phone they lose their cards and become sticky sections like the
+ * other lists.
+ */
+.week {
+  --week-w: min(1200px, calc(100vw - 32px));
+  margin-top: var(--space-5);
+}
+
+@media (min-width: 1024px) {
+  .week {
+    width: var(--week-w);
+    margin-left: calc(50% - var(--week-w) / 2);
+  }
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  padding: 0 var(--space-1);
+}
+
+.range {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 24px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.navBtn,
+.todayBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  transition:
+    background-color var(--t-fast),
+    border-color var(--t-theme),
+    color var(--t-fast),
+    var(--t-press);
+}
+
+.navBtn {
+  width: 28px;
+  padding: 0;
+}
+
+.todayBtn {
+  padding: 0 var(--space-3);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.navBtn:hover,
+.todayBtn:not(:disabled):hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.todayBtn:disabled {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.6;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+/* Desktop: the week, seven columns wide. */
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+}
+
+.day {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  transition:
+    background-color var(--t-theme),
+    border-color var(--t-theme),
+    box-shadow var(--t-theme);
+}
+
+@media (min-width: 1024px) {
+  .day {
+    min-height: 240px;
+  }
+}
+
+/* A row dragged over this day. */
+.day[data-over] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--surface) 90%, var(--accent));
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* Today: an accent edge and a tinted head. */
+.day[data-today] {
+  border-color: var(--ring);
+}
+
+.dayHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  transition: background-color var(--t-theme);
+}
+
+.day[data-today] .dayHead {
+  background: var(--accent-soft);
+}
+
+/* Weekday and date: a link to the day in By deadline. */
+.dayLink {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: -2px -4px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--t-fast);
+}
+
+.dayLink:hover {
+  background: var(--surface-2);
+}
+
+.dow {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 16px;
+  text-transform: uppercase;
+  transition: color var(--t-theme);
+}
+
+.date {
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+  transition: color var(--t-theme);
+}
+
+.day[data-past] .date {
+  color: var(--text-2);
+}
+
+.day[data-today] .date,
+.day[data-today] .dow {
+  color: var(--accent-ink);
+}
+
+.points {
+  margin-left: auto;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* "0 pts": quieter than a day with work, but no fade, so it keeps 4.5:1. */
+.points[data-zero] {
+  color: var(--muted);
+}
+
+/* Add a task on this day: quiet, shown on hover with a mouse and always on narrow screens. */
+.add {
+  display: inline-flex;
+  align-self: center;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: -3px -4px -3px 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    background-color var(--t-fast),
+    color var(--t-fast);
+}
+
+.day:hover .add,
+.add:focus-visible {
+  opacity: 1;
+}
+
+.add:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+@media (max-width: 1023px), (hover: none) {
+  .add {
+    opacity: 1;
+  }
+}
+
+/*
+ * Seven columns with a mouse: no room for the "+" beside the points, so it takes their place
+ * while the day is hovered.
+ */
+@media (min-width: 1024px) and (hover: hover) {
+  .dayHead {
+    position: relative;
+  }
+
+  .add {
+    position: absolute;
+    top: calc(var(--space-3) - 1px);
+    right: var(--space-2);
+    margin: 0;
+  }
+
+  .points {
+    transition: opacity var(--dur-fast) var(--ease-out);
+  }
+
+  .day:hover .points,
+  .day:has(.add:focus-visible) .points {
+    opacity: 0;
+  }
+}
+
+.rows {
+  flex: 1;
+  margin: 0;
+  padding: 0 2px var(--space-2);
+  list-style: none;
+}
+
+.rows:empty {
+  padding: 0;
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: var(--space-6) 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+/*
+ * Phone: no cards. Each day is a section with a sticky label on the blurred page, pinned just
+ * under the compact bar and the view row, like the headers in By deadline.
+ */
+@media (max-width: 480px) {
+  .week {
+    margin-top: var(--space-4);
+  }
+
+  .bar {
+    padding: 0;
+  }
+
+  .grid {
+    gap: 0;
+    margin: 0 calc(-1 * var(--gutter-r)) 0 calc(-1 * var(--gutter-l));
+  }
+
+  .day {
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .dayHead {
+    position: sticky;
+    top: var(--sticky-2);
+    z-index: 2;
+    margin-top: var(--space-3);
+    padding: var(--space-2) var(--gutter-r) var(--space-2) var(--gutter-l);
+    border-radius: 0;
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
+  }
+
+  .day[data-today] .dayHead {
+    background: color-mix(in srgb, var(--bg) 78%, var(--accent) 10%);
+  }
+
+  .day:first-child .dayHead {
+    margin-top: 0;
+  }
+
+  .rows {
+    padding: 0;
+  }
+}

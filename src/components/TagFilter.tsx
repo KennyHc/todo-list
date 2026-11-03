@@ -1,14 +1,37 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { Check, Filter } from 'lucide-react';
-import { useAllTags } from '../store/tasks';
+import { Check, Filter, Palette } from 'lucide-react';
+import { useAllTags, useTagColors } from '../store/tasks';
 import { useUIStore } from '../store/ui';
 import { Popover } from './Popover';
 import { TagChip } from './TagChip';
 import { tagColor } from '../lib/tags';
 import styles from './TagFilter.module.css';
 
+/**
+ * One line under the toolbar while a tag filter is on, in every view: "Filtered by #work · Clear".
+ * The toolbar row has no room for the chip next to the views, so it lives here.
+ */
+export function FilterBanner() {
+  const tagFilter = useUIStore((s) => s.tagFilter);
+  const setTagFilter = useUIStore((s) => s.setTagFilter);
+  if (tagFilter === null) return null;
+  return (
+    <div className={styles.banner} role="status">
+      <span className={styles.bannerText}>Filtered by</span>
+      <TagChip tag={tagFilter} hash />
+      <span className={styles.bannerDot} aria-hidden="true">
+        {'·'}
+      </span>
+      <button type="button" className={styles.clear} onClick={() => setTagFilter(null)}>
+        Clear
+      </button>
+    </div>
+  );
+}
+
 export function TagFilter() {
   const tags = useAllTags();
+  const tagColors = useTagColors();
   const tagFilter = useUIStore((s) => s.tagFilter);
   const setTagFilter = useUIStore((s) => s.setTagFilter);
   const open = useUIStore((s) => s.filterOpen);
@@ -26,17 +49,17 @@ export function TagFilter() {
 
   return (
     <div className={styles.filter}>
-      {tagFilter !== null && <TagChip tag={tagFilter} hash onRemove={() => setTagFilter(null)} />}
       <button
         ref={anchorRef}
         type="button"
         className={`${styles.button} ${tagFilter !== null ? styles.active : ''}`}
+        aria-label="Filter"
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
         <Filter size={13} strokeWidth={1.75} aria-hidden="true" />
-        <span>Filter</span>
+        <span className={styles.buttonLabel}>Filter</span>
       </button>
       <Popover
         open={open}
@@ -61,7 +84,10 @@ export function TagFilter() {
                     close();
                   }}
                 >
-                  <span className={styles.dot} style={{ background: tagColor(tag) }} />
+                  <span
+                    className={styles.dot}
+                    style={{ background: tagColors[tag] ?? tagColor(tag) }}
+                  />
                   <span className={styles.name}>#{tag}</span>
                   <span className={styles.count}>{count}</span>
                   <Check size={13} strokeWidth={2} className={styles.check} aria-hidden="true" />
@@ -69,6 +95,19 @@ export function TagFilter() {
               </li>
             ))}
           </ul>
+        )}
+        {tags.length > 0 && (
+          <button
+            type="button"
+            className={styles.editColors}
+            onClick={() => {
+              close();
+              useUIStore.getState().setTagColorsOpen(true);
+            }}
+          >
+            <Palette size={13} strokeWidth={1.75} aria-hidden="true" />
+            <span>Edit colours</span>
+          </button>
         )}
       </Popover>
     </div>

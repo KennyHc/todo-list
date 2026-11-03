@@ -1,0 +1,399 @@
+/* The day's load: one line of text over a slim bar. */
+.head {
+  margin: var(--space-6) 0 0;
+  padding: 0 var(--space-2);
+}
+
+.line {
+  margin: 0 0 var(--space-2);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 550;
+  line-height: 20px;
+  transition: color var(--t-theme);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.planned {
+  color: var(--muted);
+  font-weight: 450;
+  font-variant-numeric: tabular-nums;
+}
+
+.meter {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+  overflow: hidden;
+  transition:
+    background-color var(--t-theme),
+    box-shadow var(--t-theme);
+}
+
+.done,
+.open,
+.overSegment {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transition:
+    left var(--dur-slow) var(--ease-out),
+    width var(--dur-slow) var(--ease-out);
+}
+
+/* The meter clips its segments, so only its own ends are round. */
+.done {
+  left: 0;
+  background: var(--accent);
+}
+
+.open {
+  background: var(--accent-soft);
+  /* A hairline keeps it readable on dark surfaces, where 14% is faint. */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* Work past the capacity: the same segment, but danger at about 70%. */
+.overSegment {
+  background: var(--danger);
+  opacity: 0.7;
+}
+
+/* The capacity mark: a hairline that stays readable on every fill. */
+.mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text-2);
+  opacity: 0.45;
+  transition: left var(--dur-slow) var(--ease-out);
+}
+
+.overLine {
+  margin: var(--space-2) 0 0;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.link {
+  position: relative;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--accent-ink);
+  font: inherit;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 480px), (hover: none) {
+  .link::after {
+    content: '';
+    position: absolute;
+    inset: -12px -4px;
+  }
+}
+
+/* The rows share the By deadline card. */
+.list {
+  margin: var(--space-4) 0 0;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  list-style: none;
+  transition:
+    background-color var(--t-theme),
+    border-color var(--t-theme);
+}
+
+.list:empty {
+  display: none;
+}
+
+/* Nothing planned: a quiet invitation instead of an empty card. */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: var(--space-4);
+  padding: var(--space-8) var(--space-6) var(--space-6);
+  text-align: center;
+  animation: fade 240ms var(--ease-out) 200ms backwards;
+}
+
+.emptyIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: var(--space-3);
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 550;
+  letter-spacing: -0.005em;
+}
+
+.emptyHint {
+  max-width: 280px;
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.emptyHint kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+}
+
+.emptyAction {
+  min-height: 32px;
+  margin-top: var(--space-3);
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  transition:
+    background-color var(--t-fast),
+    var(--t-press);
+}
+
+.emptyAction:hover {
+  background: var(--surface-2);
+}
+
+/* Suggested: lighter than the list, nothing a task has to be. */
+.suggest {
+  margin-top: var(--space-6);
+}
+
+.suggest[hidden] {
+  display: none;
+}
+
+.suggestHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 0 var(--space-1);
+  padding: 0 var(--space-4);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 16px;
+  text-transform: uppercase;
+}
+
+.suggestLeft {
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.suggestList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.suggestion {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  margin-top: 2px;
+  padding: 6px var(--space-2) 6px var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-md);
+  list-style: none;
+  transition: border-color var(--t-fast);
+}
+
+.suggestion:hover {
+  border-color: var(--accent);
+}
+
+.add {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--accent-ink);
+  cursor: pointer;
+  transition:
+    background-color var(--t-fast),
+    var(--t-press);
+}
+
+.add::after {
+  content: '';
+  position: absolute;
+  inset: -11px;
+}
+
+.add:hover {
+  background: var(--accent-soft);
+}
+
+.suggestText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.suggestTitle {
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestMeta {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sum {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.dismiss {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0.7;
+  transition:
+    background-color var(--t-fast),
+    color var(--t-fast),
+    opacity var(--t-fast);
+}
+
+.dismiss::after {
+  content: '';
+  position: absolute;
+  inset: -10px -6px;
+}
+
+.dismiss:hover {
+  background: var(--surface-2);
+  color: var(--text);
+  opacity: 1;
+}
+
+.add:focus-visible,
+.dismiss:focus-visible,
+.link:focus-visible,
+.emptyAction:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .done,
+  .open,
+  .overSegment,
+  .mark {
+    transition: none;
+  }
+
+  .empty {
+    animation: none;
+  }
+}
+
+/* Phone: no card; rows run edge to edge on the blurred page like By deadline. */
+@media (max-width: 480px) {
+  .head {
+    margin-top: var(--space-4);
+    padding: 0;
+  }
+
+  .list {
+    margin: var(--space-3) calc(-1 * var(--gutter-r)) 0 calc(-1 * var(--gutter-l));
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .suggestHead {
+    padding: 0;
+  }
+
+  .suggestion {
+    min-height: 52px;
+    padding-left: var(--space-3);
+  }
+
+  .suggestTitle {
+    font-size: 15px;
+  }
+}

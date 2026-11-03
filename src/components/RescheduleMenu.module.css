@@ -1,0 +1,104 @@
+.heading {
+  margin: 2px 8px 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 16px;
+  text-transform: uppercase;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--t-fast),
+    var(--t-press);
+}
+
+.item:hover,
+.item:focus-visible {
+  background: var(--surface-2);
+  outline: none;
+}
+
+.date {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.item[data-current] .date {
+  color: var(--accent-ink);
+}
+
+.chevron {
+  color: var(--muted);
+}
+
+.divider {
+  height: 1px;
+  margin: 4px -2px;
+  background: var(--border);
+}
+
+@media (max-width: 480px) {
+  .heading {
+    margin: 0 0 8px;
+  }
+
+  .list {
+    gap: 0;
+  }
+
+  /* Full-width rows, 48px tall; the icon-less labels still line up with the heading. */
+  .item {
+    width: calc(100% + 16px);
+    height: 48px;
+    margin: 0 -8px;
+    font-size: 15px;
+  }
+
+  .date {
+    font-size: 14px;
+  }
+
+  .divider {
+    margin: 4px -16px;
+  }
+}
+
+/* "Plan for today" (the Today view): an icon beside the label, accent while it is planned. */
+.planned {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planned svg {
+  color: var(--text-2);
+}
+
+.item[data-current] .planned,
+.item[data-current] .planned svg {
+  color: var(--accent-ink);
+}

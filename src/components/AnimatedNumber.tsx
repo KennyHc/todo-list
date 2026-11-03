@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import styles from './AnimatedNumber.module.css';
+import { spring } from '../styles/motion';
 
 /** A number that slides up and crossfades whenever its value changes. */
 export function AnimatedNumber({ value }: { value: number }) {
@@ -12,7 +13,7 @@ export function AnimatedNumber({ value }: { value: number }) {
           initial={{ y: '60%', opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: '-60%', opacity: 0 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 34 }}
+          transition={spring.snappy}
         >
           {value}
         </motion.span>

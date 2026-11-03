@@ -15,7 +15,7 @@
   pointer-events: none;
   transform: scale(1.02) rotate(0.5deg);
   transform-origin: 50% 50%;
-  animation: lift 160ms var(--ease-out);
+  animation: lift var(--dur-base) var(--ease-out);
 }
 
 @keyframes lift {

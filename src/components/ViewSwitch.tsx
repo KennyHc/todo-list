@@ -1,34 +1,41 @@
 import type { KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
-import { CalendarClock, History, ListTree, type LucideIcon } from 'lucide-react';
-import { useUIStore, type View } from '../store/ui';
+import { CalendarClock, CalendarDays, History, ListTree, Sun, type LucideIcon } from 'lucide-react';
+import { useTaskStore } from '../store/tasks';
+import { useUIStore, useView, viewOrder, type View } from '../store/ui';
 import styles from './ViewSwitch.module.css';
+import { spring } from '../styles/motion';
 
-const OPTIONS: { value: View; label: string; Icon: LucideIcon }[] = [
-  { value: 'tree', label: 'Tree', Icon: ListTree },
-  { value: 'deadline', label: 'By deadline', Icon: CalendarClock },
-  { value: 'history', label: 'History', Icon: History },
-];
+const OPTION: Record<View, { label: string; Icon: LucideIcon }> = {
+  today: { label: 'Today', Icon: Sun },
+  tree: { label: 'Tree', Icon: ListTree },
+  deadline: { label: 'By deadline', Icon: CalendarClock },
+  history: { label: 'History', Icon: History },
+  week: { label: 'Week', Icon: CalendarDays },
+};
 
 const STEPS: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 
 export function ViewSwitch() {
-  const view = useUIStore((s) => s.view);
+  const view = useView();
   const setView = useUIStore((s) => s.setView);
+  const todayView = useTaskStore((s) => s.settings.todayView);
+  // Today comes first, and only exists while the feature is on.
+  const options = viewOrder(todayView).map((value) => ({ value, ...OPTION[value] }));
 
   const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
     const step = STEPS[e.key];
     if (!step) return;
     e.preventDefault();
-    const i = OPTIONS.findIndex((o) => o.value === view);
-    const n = (i + step + OPTIONS.length) % OPTIONS.length;
-    setView(OPTIONS[n].value);
+    const i = options.findIndex((o) => o.value === view);
+    const n = (i + step + options.length) % options.length;
+    setView(options[n].value);
     (e.currentTarget.parentElement?.children[n] as HTMLElement | undefined)?.focus();
   };
 
   return (
-    <div role="radiogroup" aria-label="View" className={styles.track}>
-      {OPTIONS.map(({ value, label, Icon }) => {
+    <div role="radiogroup" aria-label="View" className={styles.track} data-count={options.length}>
+      {options.map(({ value, label, Icon }) => {
         const active = view === value;
         return (
           <button
@@ -47,7 +54,7 @@ export function ViewSwitch() {
               <motion.span
                 layoutId="view-thumb"
                 className={styles.thumb}
-                transition={{ type: 'spring', stiffness: 500, damping: 36 }}
+                transition={spring.snappy}
               />
             )}
             <Icon size={14} strokeWidth={1.75} className={styles.icon} aria-hidden="true" />

@@ -1,23 +1,30 @@
 import { migrateTasksState, useTaskStore, type PersistedTasks } from '../store/tasks';
+import type { Settings } from '../types';
 
 export type Backup = {
   app: 'tasks';
-  version: 2;
+  /** 3 adds tagColors and makes task colour nullable; 2 is still accepted on import. */
+  version: 3;
   exportedAt: string;
   tasks: Record<string, unknown>;
   rootIds: unknown[];
   history: unknown[];
+  tagColors: Record<string, string>;
+  /** Optional: files from before settings existed don't have it (the import keeps yours). */
+  settings?: Settings;
 };
 
 /** Serialize task data to a pretty JSON string. */
 export function serializeBackup(data: PersistedTasks, now = new Date()): string {
   const backup: Backup = {
     app: 'tasks',
-    version: 2,
+    version: 3,
     exportedAt: now.toISOString(),
     tasks: data.tasks,
     rootIds: data.rootIds,
     history: data.history,
+    tagColors: data.tagColors,
+    settings: data.settings,
   };
   return JSON.stringify(backup, null, 2);
 }
@@ -31,7 +38,7 @@ export function backupFilename(now = new Date()): string {
 }
 
 /** Format ISO timestamp as a locale-specific date string (e.g. "Oct 19, 2026"). */
-function formatExportDate(exportedAt: string): string {
+export function formatExportDate(exportedAt: string): string {
   const date = new Date(exportedAt);
   const formatter = new Intl.DateTimeFormat(undefined, {
     month: 'short',
@@ -59,6 +66,12 @@ export function parseBackup(text: string): ParseResult {
     return { ok: false, error: 'not-a-backup' };
   }
 
+  // Versions up to 3 are understood: 2 lacks tagColors and 1 also lacks tags, due dates and
+  // history; their default blue becomes "automatic". A newer file is not guessed at.
+  if (typeof backup.version === 'number' && backup.version > 3) {
+    return { ok: false, error: 'not-a-backup' };
+  }
+
   const exportedAt = typeof backup.exportedAt === 'string' ? backup.exportedAt : null;
 
   // Migrate the data to ensure it has all required fields.
@@ -68,7 +81,12 @@ export function parseBackup(text: string): ParseResult {
       tasks: backup.tasks,
       rootIds: backup.rootIds,
       history: backup.history,
+      tagColors: backup.tagColors,
+      settings: backup.settings,
     });
+    // A backup without settings leaves the current ones alone.
+    if (backup.settings === undefined)
+      data = { ...data, settings: useTaskStore.getState().settings };
   } catch {
     return { ok: false, error: 'corrupt' };
   }
@@ -123,8 +141,8 @@ export function formatBackupDescription(exportedAt: string | null, taskCount: nu
 export function exportBackup(): boolean {
   try {
     // Read on demand so callers don't re-render on every task change.
-    const { tasks, rootIds, history } = useTaskStore.getState();
-    const blob = new Blob([serializeBackup({ tasks, rootIds, history })], {
+    const { tasks, rootIds, history, tagColors, settings } = useTaskStore.getState();
+    const blob = new Blob([serializeBackup({ tasks, rootIds, history, tagColors, settings })], {
       type: 'application/json',
     });
     const url = URL.createObjectURL(blob);

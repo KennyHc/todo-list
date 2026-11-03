@@ -1,28 +1,23 @@
 import { arrayMove } from '@dnd-kit/sortable';
 import type { TaskTree } from '../types';
-import { sortedChildIds, type MoveTarget } from './tree';
-import { visibleTreeIds } from './views';
+import type { MoveTarget } from './tree';
+import { treeRows } from './views';
 
 /** Indent step of one nesting level in px. Mirrors `--indent` in TaskItem.module.css (desktop). */
-export const INDENT = 22;
+export const INDENT = 24;
 
 /** A row of the flattened tree: what is needed to project a drop. */
 export type FlatItem = { id: string; depth: number; parentId: string | null };
 
-/** Visible rows in render order: undone before done, collapsed subtrees and filtered rows skipped. */
-export function flattenTree(tree: TaskTree, { tag }: { tag: string | null }): string[] {
-  const visible = visibleTreeIds(tree, tag);
-  const out: string[] = [];
-  const walk = (ids: string[]) => {
-    for (const id of sortedChildIds(tree, ids)) {
-      const task = tree.tasks[id];
-      if (!task || (visible && !visible.has(id))) continue;
-      out.push(id);
-      if (!task.collapsed) walk(task.childIds);
-    }
-  };
-  walk(tree.rootIds);
-  return out;
+/**
+ * Visible rows in render order: open tasks only, collapsed subtrees, filtered rows and (unless
+ * `showUpcoming`) tasks that have not started yet skipped.
+ */
+export function flattenTree(
+  tree: TaskTree,
+  { tag, today, showUpcoming }: { tag: string | null; today?: string; showUpcoming?: boolean },
+): string[] {
+  return treeRows(tree, tag, { today, showUpcoming });
 }
 
 /** Depth and parent for each id, keeping the given order. Unknown ids are dropped. */
@@ -147,8 +142,8 @@ export function projectionTarget(
 }
 
 /**
- * Where Alt+Up / Alt+Down puts a task: past its neighbouring sibling as shown. Null when there
- * is none, or when the neighbour is in the other done-group (the order wouldn't visibly change).
+ * Where Alt+Up / Alt+Down puts a task: past its neighbouring open sibling as shown (done
+ * siblings are hidden in History). Null when there is none.
  */
 export function siblingMoveTarget(
   tree: TaskTree,
@@ -159,9 +154,11 @@ export function siblingMoveTarget(
   const task = tree.tasks[id];
   if (!task) return null;
   const raw = task.parentId === null ? tree.rootIds : tree.tasks[task.parentId].childIds;
-  const shown = sortedChildIds(tree, raw).filter((sibling) => !visible || visible.has(sibling));
+  const shown = raw.filter(
+    (sibling) => !tree.tasks[sibling].done && (!visible || visible.has(sibling)),
+  );
   const neighbor = shown[shown.indexOf(id) + step];
-  if (neighbor === undefined || tree.tasks[neighbor].done !== task.done) return null;
+  if (neighbor === undefined) return null;
   const at = raw.filter((sibling) => sibling !== id).indexOf(neighbor);
   return { parentId: task.parentId, index: step < 0 ? at : at + 1 };
 }

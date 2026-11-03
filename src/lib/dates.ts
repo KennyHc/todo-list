@@ -1,6 +1,11 @@
 import type { Task } from '../types';
 import { todayISO } from './views';
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** True for a 'YYYY-MM-DD' string (shape only, as the Firestore rules check it). */
+export const isISODate = (v: unknown): v is string => typeof v === 'string' && ISO_DATE.test(v);
+
 export function parseISO(iso: string): Date {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d);
@@ -34,6 +39,11 @@ const dayHeaderFormat = new Intl.DateTimeFormat(undefined, {
   month: 'short',
   day: 'numeric',
 });
+const weekdayDateFormat = new Intl.DateTimeFormat(undefined, {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+});
 const timeFormat = new Intl.DateTimeFormat(undefined, {
   hour: '2-digit',
   minute: '2-digit',
@@ -50,6 +60,24 @@ export function dueLabel(dueDate: string, today: string = todayISO()): string {
   const sameYear = date.getFullYear() === parseISO(today).getFullYear();
   return (sameYear ? shortDate : longDate).format(date);
 }
+
+const weekdayShort = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+
+/** "Starts tomorrow", "Starts Mon" (within 6 days), otherwise "Starts Nov 2": a start date's pill. */
+export function startsLabel(startDate: string, today: string = todayISO()): string {
+  const days = daysBetween(today, startDate);
+  if (days === 1) return 'Starts tomorrow';
+  const date = parseISO(startDate);
+  if (days >= 2 && days <= 6) return `Starts ${weekdayShort.format(date)}`;
+  const sameYear = date.getFullYear() === parseISO(today).getFullYear();
+  return `Starts ${(sameYear ? shortDate : longDate).format(date)}`;
+}
+
+/** "Friday": just the weekday, for a date already known to fall within the week. */
+export const weekdayName = (iso: string): string => weekdayFormat.format(parseISO(iso));
+
+/** "Sun, Oct 25". */
+export const weekdayDate = (iso: string): string => weekdayDateFormat.format(parseISO(iso));
 
 /** "Today", "Yesterday", otherwise "Mon, Oct 12". */
 export function dayHeader(timestamp: number, now: Date = new Date()): string {

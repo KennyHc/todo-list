@@ -1,0 +1,82 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Deny everything by default; only the paths below are reachable.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // `repeat` is absent, null, or { every, weekday?, anchorDay? }: `every` one of day, weekday,
+    // week, month; `weekday` an int 0-6; `anchorDay` an int 1-31; no other keys.
+    function validRepeat(r) {
+      return r == null
+        || (r is map
+          && r.keys().hasOnly(['every', 'weekday', 'anchorDay'])
+          && r.every in ['day', 'weekday', 'week', 'month']
+          && (!('weekday' in r) || (r.weekday is int && r.weekday >= 0 && r.weekday <= 6))
+          && (!('anchorDay' in r) || (r.anchorDay is int && r.anchorDay >= 1 && r.anchorDay <= 31)));
+    }
+
+    // `plannedFor` (the Today view) is absent, null, or a 'YYYY-MM-DD' string.
+    function validPlannedFor(p) {
+      return p == null || (p is string && p.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'));
+    }
+
+    // `startDate` (hidden until) is absent, null, or a 'YYYY-MM-DD' string, like `dueDate`.
+    function validStartDate(d) {
+      return d == null || (d is string && d.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'));
+    }
+
+    // `settings`, if present, is a map; its `dailyCapacity`, if present, an int from 1 to 50.
+    function validSettings(s) {
+      return s is map
+        && (!('dailyCapacity' in s)
+          || (s.dailyCapacity is int && s.dailyCapacity >= 1 && s.dailyCapacity <= 50));
+    }
+
+    function validTask(id) {
+      let t = request.resource.data;
+      return t.id == id
+        && t.title is string && t.title.size() <= 500
+        && t.difficulty is int && t.difficulty >= 1 && t.difficulty <= 5
+        && t.tags is list && t.tags.size() <= 20
+        && t.done is bool
+        && (!('repeat' in t) || validRepeat(t.repeat))
+        && (!('plannedFor' in t) || validPlannedFor(t.plannedFor))
+        && (!('startDate' in t) || validStartDate(t.startDate))
+        && (!('notes' in t) || (t.notes is string && t.notes.size() <= 5000))
+        && (!('spawnedFrom' in t) || t.spawnedFrom is string);
+    }
+
+    // users/{uid} is the meta document: rootIds, tagColors (a map, tag -> hex), settings (a map),
+    // schemaVersion, updatedAt.
+    function validMeta() {
+      let m = request.resource.data;
+      return m.rootIds is list
+        && (!('tagColors' in m) || m.tagColors is map)
+        && (!('settings' in m) || validSettings(m.settings));
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) && validMeta();
+      allow delete: if isOwner(uid);
+
+      match /tasks/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validTask(id);
+      }
+
+      // Completion log. Shape is owned by the client; only ownership is enforced.
+      match /history/{id} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+  }
+}

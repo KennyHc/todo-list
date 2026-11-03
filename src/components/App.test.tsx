@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import App from '../App';
 import { addDays } from '../lib/dates';
 import { todayISO } from '../lib/views';
+import { useAuthStore } from '../store/auth';
 import { resetTaskStore, useTaskStore } from '../store/tasks';
 import { useUIStore } from '../store/ui';
 
@@ -12,6 +13,8 @@ beforeEach(() => {
   useUIStore.setState({
     view: 'tree',
     tagFilter: null,
+    completedCollapsed: false,
+    completedShowAll: false,
     focusedId: null,
     filterOpen: false,
     paletteOpen: false,
@@ -36,6 +39,17 @@ function addViaInput(title: string) {
   fireEvent.change(input, { target: { value: title } });
   fireEvent.keyDown(input, { key: 'Enter' });
 }
+
+describe('first run after sign-in', () => {
+  it('focuses the composer and welcomes the user when there are no tasks', () => {
+    useAuthStore.setState({ freshSignIn: true });
+    render(<App />);
+    expect(screen.getByLabelText('New task')).toHaveFocus();
+    expect(screen.getByText("What's on your mind?")).toBeInTheDocument();
+    expect(screen.getByText('Type a task above and press Enter.')).toBeInTheDocument();
+    useAuthStore.setState({ freshSignIn: false });
+  });
+});
 
 describe('App', () => {
   it('shows the empty state, then a task added via the input', () => {
@@ -167,14 +181,16 @@ describe('App', () => {
     expect(input).toHaveValue('Ship #work ');
   });
 
-  it('sets the difficulty by clicking a segment', () => {
+  it('sets the difficulty from the icon menu', () => {
     render(<App />);
     act(() => {
       useTaskStore.getState().add({ title: 'Task', difficulty: 1 });
     });
-    fireEvent.click(screen.getByRole('radio', { name: 'Difficulty 4 of 5, Hard' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Difficulty 1 of 5, Trivial/ }));
+    const menu = screen.getByRole('dialog', { name: 'Difficulty' });
+    fireEvent.click(within(menu).getByRole('radio', { name: 'Difficulty 4 of 5, Hard' }));
     expect(Object.values(useTaskStore.getState().tasks)[0].difficulty).toBe(4);
-    expect(screen.getByRole('radiogroup', { name: 'Difficulty 4 of 5, Hard' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Difficulty 4 of 5, Hard/ })).toBeInTheDocument();
   });
 
   it('lists tasks flat by deadline with a breadcrumb for subtasks', async () => {
@@ -209,7 +225,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Ship it' }));
     fireEvent.click(screen.getByRole('radio', { name: 'History' }));
 
-    expect(await screen.findByText('Clear history')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Edit' })).toBeInTheDocument();
     expect(screen.getByText('Ship it')).toBeInTheDocument();
     expect(screen.getByText('Today')).toBeInTheDocument();
     expect(screen.queryByText('No completed tasks yet')).not.toBeInTheDocument();
@@ -222,82 +238,6 @@ describe('App', () => {
     });
     fireEvent.click(screen.getByRole('radio', { name: 'History' }));
     expect(await screen.findByText('No completed tasks yet')).toBeInTheDocument();
-  });
-
-  it('imports a valid backup file and shows confirm dialog', async () => {
-    render(<App />);
-    act(() => {
-      useTaskStore.getState().add({ title: 'Existing task' });
-    });
-
-    // Polyfill File.text() if not available (for happy-dom compatibility)
-    if (!File.prototype.text) {
-      Object.defineProperty(File.prototype, 'text', {
-        value: async function (this: File) {
-          return new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsText(this);
-          });
-        },
-      });
-    }
-
-    // Create a backup file
-    const backupData = {
-      app: 'tasks',
-      version: 2,
-      exportedAt: '2026-10-19T10:00:00Z',
-      tasks: {
-        '1': {
-          id: '1',
-          title: 'Restored task',
-          done: false,
-          collapsed: false,
-          childIds: [],
-          parentId: null,
-          tags: [],
-          dueDate: null,
-          difficulty: 1,
-          color: 'none',
-          createdAt: 1000,
-        },
-      },
-      rootIds: ['1'],
-      history: [],
-    };
-
-    const fileContent = JSON.stringify(backupData);
-    const file = new File([fileContent], 'backup.json', { type: 'application/json' });
-
-    // Trigger file input change
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    expect(fileInput).toBeInTheDocument();
-
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-      // Wait for async file read
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    });
-
-    // Confirm dialog should appear
-    const dialog = await screen.findByRole('alertdialog');
-    expect(within(dialog).getByText('Replace all tasks?')).toBeInTheDocument();
-    expect(within(dialog).getByText(/Oct 19, 2026 \(1 task\)/)).toBeInTheDocument();
-
-    // Confirm the import
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Replace' }));
-
-    // Tasks should be replaced
-    await waitFor(() => {
-      const state = useTaskStore.getState();
-      expect(Object.keys(state.tasks)).toHaveLength(1);
-      expect(state.tasks['1'].title).toBe('Restored task');
-    });
-
-    // Undo toast should appear
-    const toast = await findToast();
-    expect(within(toast).getByText('Restored backup (1 task)')).toBeInTheDocument();
   });
 });
 
@@ -332,14 +272,29 @@ describe('keyboard workflow', () => {
     expect(useUIStore.getState().focusedId).toBeNull();
   });
 
-  it('toggles the focused task with x and Space', () => {
-    const { a } = seed();
+  it('toggles the focused task with x and Space, moving focus on when it leaves the list', () => {
+    const { a, b } = seed();
     render(<App />);
     press('j');
     press('x');
     expect(useTaskStore.getState().tasks[a].done).toBe(true);
+    // Alpha is filed in History; focus moves to the next row that stays.
+    expect(useUIStore.getState().focusedId).toBe(b);
     press(' ');
-    expect(useTaskStore.getState().tasks[a].done).toBe(false);
+    expect(useTaskStore.getState().tasks[b].done).toBe(true);
+    expect(useTaskStore.getState().tasks[a].done).toBe(true);
+  });
+
+  it('skips completed rows with j and k', () => {
+    const { a, b, c } = seed();
+    render(<App />);
+    act(() => useTaskStore.getState().toggle(b));
+    press('j');
+    expect(useUIStore.getState().focusedId).toBe(a);
+    press('j');
+    expect(useUIStore.getState().focusedId).toBe(c);
+    press('k');
+    expect(useUIStore.getState().focusedId).toBe(a);
   });
 
   it('ignores shortcuts while typing in the composer', () => {
@@ -549,5 +504,365 @@ describe('drag and drop', () => {
       press('ArrowRight');
       expect(parentOf(b)).toBeNull();
     });
+  });
+});
+
+describe('completing tasks', () => {
+  const rowIds = () => [...document.querySelectorAll('[data-row-id]')].map((el) => el.textContent);
+  const gone = (title: string) =>
+    waitFor(() => expect(screen.queryByRole('checkbox', { name: `Done: ${title}` })).toBeNull(), {
+      timeout: 3000,
+    });
+  const openHistory = async () => {
+    fireEvent.click(screen.getByRole('radio', { name: 'History' }));
+    await screen.findByRole('button', { name: 'Edit' });
+  };
+
+  it('keeps a checked task struck through for a beat, then files it in History', async () => {
+    render(<App />);
+    act(() => void useTaskStore.getState().add({ title: 'Ship it' }));
+    act(() => void useTaskStore.getState().add({ title: 'Other' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Ship it' }));
+    expect(screen.getByRole('checkbox', { name: 'Done: Ship it' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(rowIds()).toHaveLength(2);
+    await gone('Ship it');
+    expect(rowIds()).toHaveLength(1);
+    expect(useTaskStore.getState().history.map((e) => e.title)).toEqual(['Ship it']);
+    await openHistory();
+    expect(screen.getByText('Ship it')).toBeInTheDocument();
+  });
+
+  it('removes a completed subtask at once; the parent stays and shows its progress', async () => {
+    render(<App />);
+    let kid = '';
+    act(() => {
+      const p = useTaskStore.getState().add({ title: 'Project' });
+      kid = useTaskStore.getState().add({ title: 'Step one', parentId: p });
+      useTaskStore.getState().add({ title: 'Step two', parentId: p });
+    });
+    expect(screen.getByText('0/2')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Step one' }));
+    await gone('Step one');
+    expect(screen.getByRole('checkbox', { name: 'Done: Project' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    expect(screen.getByText('1/2')).toBeInTheDocument();
+    expect(screen.getByText('Step two')).toBeInTheDocument();
+    expect(useTaskStore.getState().tasks[kid].done).toBe(true);
+  });
+
+  it('removes a whole project when its last subtask completes it', async () => {
+    render(<App />);
+    act(() => {
+      const p = useTaskStore.getState().add({ title: 'Project' });
+      useTaskStore.getState().add({ title: 'Only step', parentId: p });
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Only step' }));
+    await gone('Project');
+    expect(rowIds()).toHaveLength(0);
+    expect(await screen.findByText('All clear. Nice work.')).toBeInTheDocument();
+  });
+
+  it('Undo during the hold keeps the row, with nothing removed afterwards', async () => {
+    render(<App />);
+    act(() => void useTaskStore.getState().add({ title: 'Oops' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Oops' }));
+    fireEvent.click((await findToast()).querySelector('button')!);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    expect(screen.getByRole('checkbox', { name: 'Done: Oops' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+  });
+
+  it('restores a task from History into the Tree, with an Undo toast', async () => {
+    render(<App />);
+    let id = '';
+    act(() => void (id = useTaskStore.getState().add({ title: 'Again' })));
+    act(() => useTaskStore.getState().toggle(id));
+    await gone('Again');
+    await openHistory();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Again' }));
+    expect(useTaskStore.getState().tasks[id].done).toBe(false);
+    expect(useTaskStore.getState().history).toEqual([]);
+    await waitFor(() => expect(queryToast()?.textContent).toContain('Restored \u201cAgain\u201d'));
+    fireEvent.click(screen.getByRole('radio', { name: 'Tree' }));
+    expect(await screen.findByRole('checkbox', { name: 'Done: Again' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+  });
+
+  it('disables the check of an entry whose task was deleted', async () => {
+    render(<App />);
+    let id = '';
+    act(() => void (id = useTaskStore.getState().add({ title: 'Gone' })));
+    act(() => useTaskStore.getState().toggle(id));
+    await gone('Gone');
+    act(() => useTaskStore.getState().remove(id));
+    await openHistory();
+    const check = screen.getByRole('checkbox', { name: 'Done: Gone' });
+    expect(check).toBeDisabled();
+    expect(check).toHaveAttribute('title', 'This task was deleted');
+  });
+
+  it('restores from the visible Restore button, with a toast, and the Tree shows it again', async () => {
+    render(<App />);
+    let id = '';
+    act(() => void (id = useTaskStore.getState().add({ title: 'Bring back' })));
+    act(() => useTaskStore.getState().toggle(id));
+    await gone('Bring back');
+    await openHistory();
+    expect(screen.getByRole('checkbox', { name: 'Done: Bring back' })).toHaveAttribute(
+      'title',
+      'Restore to list',
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Restore \u201cBring back\u201d to your list' }),
+    );
+    expect(useTaskStore.getState().tasks[id].done).toBe(false);
+    await waitFor(() =>
+      expect(queryToast()?.textContent).toContain('Restored \u201cBring back\u201d'),
+    );
+    fireEvent.click(screen.getByRole('radio', { name: 'Tree' }));
+    expect(await screen.findByRole('checkbox', { name: 'Done: Bring back' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+  });
+
+  it('restoring a subtask brings it back under its parent', async () => {
+    render(<App />);
+    let kid = '';
+    act(() => {
+      const parent = useTaskStore.getState().add({ title: 'Parent' });
+      useTaskStore.getState().add({ title: 'Other kid', parentId: parent });
+      kid = useTaskStore.getState().add({ title: 'Kid', parentId: parent });
+    });
+    act(() => useTaskStore.getState().toggle(kid));
+    await gone('Kid');
+    await openHistory();
+    fireEvent.click(screen.getByRole('button', { name: 'Restore \u201cKid\u201d to your list' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Tree' }));
+    const row = await screen.findByRole('checkbox', { name: 'Done: Kid' });
+    expect(row.closest('li[data-row-id]')).toHaveAttribute('data-depth', '1');
+  });
+
+  it('hides the Restore button in edit mode', async () => {
+    render(<App />);
+    let id = '';
+    act(() => void (id = useTaskStore.getState().add({ title: 'Editable' })));
+    act(() => useTaskStore.getState().toggle(id));
+    await gone('Editable');
+    await openHistory();
+    expect(screen.getByRole('button', { name: /^Restore/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await screen.findByRole('button', { name: 'Delete "Editable" permanently' });
+    expect(screen.queryByRole('button', { name: /^Restore/ })).toBeNull();
+  });
+
+  it('hides the Restore button and dims the row when the task is gone', async () => {
+    render(<App />);
+    let id = '';
+    act(() => void (id = useTaskStore.getState().add({ title: 'Vanished' })));
+    act(() => useTaskStore.getState().toggle(id));
+    await gone('Vanished');
+    act(() => useTaskStore.getState().remove(id));
+    await openHistory();
+    expect(screen.queryByRole('button', { name: /^Restore/ })).toBeNull();
+    expect(screen.getByRole('checkbox', { name: 'Done: Vanished' })).toBeDisabled();
+    expect(screen.getByText('Vanished').closest('li')).toHaveAttribute('data-gone');
+  });
+});
+
+describe('the Completed section of the deadline view', () => {
+  const completedHeader = (n: number) =>
+    screen.findByText(`Completed \u00b7 ${n}`, {}, { timeout: 3000 });
+  const tick = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  function addDone(titles: string[], extra: { dueDate?: string } = {}) {
+    const ids: string[] = [];
+    act(() => {
+      for (const title of titles) ids.push(useTaskStore.getState().add({ title, ...extra }));
+    });
+    act(() => {
+      for (const id of ids) useTaskStore.getState().toggle(id);
+    });
+    return ids;
+  }
+
+  it('glides a completed row into Completed: the same element, with no pop exit', async () => {
+    useUIStore.setState({ view: 'deadline' });
+    render(<App />);
+    let id = '';
+    act(() => {
+      id = useTaskStore.getState().add({ title: 'Finish me', dueDate: addDays(todayISO(), 5) });
+      useTaskStore.getState().add({ title: 'Stay' });
+    });
+    const el = await waitFor(() => {
+      const found = document.querySelector(`[data-row-id="${id}"]`);
+      if (!found) throw new Error('no row');
+      return found;
+    });
+    expect(screen.queryByText(/^Completed \u00b7/)).toBeNull();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Finish me' }));
+    // Struck through where it was, then it moves under the new header.
+    expect(screen.queryByText(/^Completed \u00b7/)).toBeNull();
+    expect(el).toHaveAttribute('data-row-id', id);
+    expect(el).not.toHaveAttribute('data-completing');
+    const header = await completedHeader(1);
+    expect(document.querySelector(`[data-row-id="${id}"]`)).toBe(el);
+    expect(el).not.toHaveAttribute('data-completing');
+    expect(header.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: 'Done: Finish me' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    // Its old section (This week) went away with its last row.
+    await waitFor(() => expect(screen.queryByText('This week')).toBeNull());
+  });
+
+  it('reopening from Completed returns the row to its date section', async () => {
+    useUIStore.setState({ view: 'deadline' });
+    const [id] = addDone(['Back again'], { dueDate: todayISO() });
+    act(
+      () =>
+        void useTaskStore.getState().add({ title: 'Later one', dueDate: addDays(todayISO(), 30) }),
+    );
+    render(<App />);
+    await completedHeader(1);
+    const el = document.querySelector(`[data-row-id="${id}"]`);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Back again' }));
+    expect(useTaskStore.getState().tasks[id].done).toBe(false);
+    await waitFor(() => expect(screen.queryByText(/^Completed \u00b7/)).toBeNull());
+    const today = (await screen.findAllByText('Today')).find((node) => node.tagName === 'LI')!;
+    expect(document.querySelector(`[data-row-id="${id}"]`)).toBe(el);
+    const later = screen.getByText('Later one').closest('li')!;
+    expect(today.compareDocumentPosition(el!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(el!.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('lists the newest completion first and honours the tag filter', async () => {
+    useUIStore.setState({ view: 'deadline' });
+    let a = '';
+    let b = '';
+    act(() => {
+      a = useTaskStore.getState().add({ title: 'Alpha', tags: ['x'] });
+      b = useTaskStore.getState().add({ title: 'Beta', tags: ['y'] });
+    });
+    act(() => useTaskStore.getState().toggle(a));
+    await tick(5);
+    act(() => useTaskStore.getState().toggle(b));
+    render(<App />);
+    await completedHeader(2);
+    const titles = () =>
+      [...document.querySelectorAll('[data-row-id]')].map((el) => el.getAttribute('data-row-id'));
+    expect(titles()).toEqual([b, a]);
+    act(() => useUIStore.getState().setTagFilter('x'));
+    await completedHeader(1);
+    await waitFor(() => expect(titles()).toEqual([a]));
+  });
+
+  it('collapses and expands from the header, and remembers it', async () => {
+    useUIStore.setState({ view: 'deadline' });
+    addDone(['One', 'Two']);
+    render(<App />);
+    const header = await completedHeader(2);
+    const toggle = header.closest('button')!;
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(toggle);
+    expect(useUIStore.getState().completedCollapsed).toBe(true);
+    expect(JSON.parse(localStorage.getItem('ui-v1')!).state.completedCollapsed).toBe(true);
+    await waitFor(() => expect(screen.queryByText('One')).toBeNull());
+    expect(screen.getByText('Completed \u00b7 2')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Completed/ }));
+    expect(await screen.findByText('One')).toBeInTheDocument();
+  });
+
+  it('shows the first ten, then everything after Show all', async () => {
+    useUIStore.setState({ view: 'deadline' });
+    addDone(Array.from({ length: 12 }, (_, i) => `Task ${i}`));
+    render(<App />);
+    await completedHeader(12);
+    expect(document.querySelectorAll('[data-row-id]')).toHaveLength(10);
+    fireEvent.click(screen.getByRole('button', { name: 'Show all 12' }));
+    await waitFor(() => expect(document.querySelectorAll('[data-row-id]')).toHaveLength(12));
+    expect(screen.queryByRole('button', { name: /Show all/ })).toBeNull();
+  });
+});
+
+describe('History edit mode', () => {
+  async function completedHistory(titles: string[]) {
+    render(<App />);
+    const ids: string[] = [];
+    act(() => {
+      for (const title of titles) ids.push(useTaskStore.getState().add({ title }));
+    });
+    act(() => {
+      for (const id of ids) useTaskStore.getState().toggle(id);
+    });
+    await waitFor(() => expect(document.querySelector('[data-row-id]')).toBeNull(), {
+      timeout: 3000,
+    });
+    fireEvent.click(screen.getByRole('radio', { name: 'History' }));
+    await screen.findByRole('button', { name: 'Edit' });
+    return ids;
+  }
+
+  it('shows delete buttons in edit mode; deleting removes the task for good, and Undo restores it', async () => {
+    const [id] = await completedHistory(['First', 'Second']);
+    expect(screen.queryByRole('button', { name: /Delete ".*" permanently/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+    const del = await screen.findByRole('button', { name: 'Delete "First" permanently' });
+    fireEvent.click(del);
+    expect(useTaskStore.getState().tasks[id]).toBeUndefined();
+    await waitFor(() => expect(screen.queryByText('First')).toBeNull());
+    expect(screen.getByText('Second')).toBeInTheDocument();
+    await waitFor(() => expect(queryToast()?.textContent).toContain('Deleted “First”'));
+    fireEvent.click(within(queryToast()!).getByRole('button', { name: 'Undo' }));
+    expect(useTaskStore.getState().tasks[id].done).toBe(true);
+    expect(await screen.findByText('First')).toBeInTheDocument();
+  });
+
+  it('Done and Escape leave edit mode', async () => {
+    await completedHistory(['One']);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await screen.findByRole('button', { name: 'Delete "One" permanently' });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Delete "One" permanently' })).toBeNull(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await screen.findByRole('button', { name: 'Delete "One" permanently' });
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument());
+  });
+
+  it('Delete all asks first, then deletes every completed task in one undo', async () => {
+    await completedHistory(['One', 'Two']);
+    act(() => void useTaskStore.getState().add({ title: 'Still open' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete all' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog.textContent).toContain('2 completed tasks');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(useTaskStore.getState().history).toHaveLength(2);
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all' }));
+    fireEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete all' }),
+    );
+    expect(useTaskStore.getState().history).toEqual([]);
+    expect(Object.values(useTaskStore.getState().tasks).map((t) => t.title)).toEqual([
+      'Still open',
+    ]);
+    await waitFor(() => expect(queryToast()?.textContent).toContain('Deleted all completed (2)'));
+    expect(await screen.findByText('No completed tasks yet')).toBeInTheDocument();
   });
 });

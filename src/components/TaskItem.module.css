@@ -1,24 +1,68 @@
 .item {
-  --indent: 22px;
-  /* Horizontal centre of a row's checkbox: padding 8 + chevron 20 + gap 8 + half the 18px box. */
-  --guide-x: 45px;
+  --indent: 24px;
+  /* Horizontal centre of a row's checkbox: the row's 8px padding plus half the 18px box. */
+  --guide-x: 17px;
+  position: relative;
   list-style: none;
   min-width: 0;
 }
 
+.pop {
+  min-width: 0;
+}
+
+/* A completed row leaving: it can't be grabbed, and its card tints toward the surface as it
+   shrinks (beat 2), on the same clock as the content's scale. */
+.item[data-completing] {
+  pointer-events: none;
+}
+
+.item[data-completing] .row {
+  background: var(--surface-2);
+  transition: background-color 220ms var(--ease-in-out) var(--pop-delay, 0s);
+}
+
 .row {
+  /*
+   * Every row is a first-line band: the checkbox, title and the trailing cluster all centre on
+   * the first line (40px tall on desktop, 52px on phones for a row without a meta line), so a
+   * title that wraps or grows a meta line never drags them away from it. Rows are top-aligned
+   * to make that so. The title's top padding is derived from the same numbers.
+   */
+  --pad-y: 6px;
+  --lh: 20px;
+  --band: 40px;
+  /* Pulls a 28px control up/down so its centre sits on the band's centre. */
+  --nudge: calc(var(--band) / 2 - 14px - var(--pad-y));
+  /* What the row sits on, so the hover actions can fade into it. */
+  --row-bg: var(--surface);
   position: relative;
   display: flex;
-  align-items: center;
-  gap: 0 8px;
+  align-items: flex-start;
+  gap: 0 var(--space-2);
   min-width: 0;
-  min-height: 40px;
-  padding: 0 6px 0 8px;
+  min-height: var(--band);
+  padding: var(--pad-y) var(--space-2);
   border-radius: var(--r-md);
   isolation: isolate;
   transition:
     background-color var(--t-fast),
+    box-shadow var(--dur-base) var(--ease-in-out),
     opacity var(--t-fast);
+}
+
+/* Touch has no hover, so a finger on a row tints it instead of scaling it (a scale would fight
+   the swipe and the long-press drag). */
+@media (hover: none) {
+  .row:active {
+    background: var(--surface-2);
+  }
+}
+
+/* A task that starts later, shown on request from the Tree's footer. On the row, so children
+   (which are dimmed by their own rows) don't compound. */
+.row[data-upcoming] {
+  opacity: 0.55;
 }
 
 /* Context-only ancestors under a tag filter. On the row, not the item, so children don't compound. */
@@ -28,11 +72,13 @@
 
 .row:hover,
 .row:has(:focus-visible) {
+  --row-bg: var(--surface-2);
   background: var(--surface-2);
 }
 
 .rowFocused,
 .rowFocused:hover {
+  --row-bg: var(--surface-2);
   background: var(--surface-2);
 }
 
@@ -95,9 +141,14 @@
   pointer-events: none;
 }
 
-.chevronSpacer {
-  flex: none;
-  width: 20px;
+/* The 44px checkbox hit area is centred on the first-line band without growing the row. */
+.row > [role='checkbox'] {
+  margin-top: calc(var(--band) / 2 - 22px - var(--pad-y));
+  margin-bottom: -24px;
+}
+
+.row > .meta {
+  margin-top: var(--nudge);
 }
 
 .iconBtn {
@@ -133,28 +184,76 @@
   color: var(--danger);
 }
 
+/* The meta line: due date first, then tags, in quiet 13px text. Inline after the title where it fits. */
 .tail {
   display: inline-flex;
   flex: 0 1 auto;
   min-width: 0;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  margin-top: 0;
+  gap: 0 var(--space-2);
+  min-height: 20px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.starts {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 450;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+/* The small note icon on the meta line; it opens and closes the note under the title. */
+.noteBtn {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    color var(--t-fast),
+    var(--t-press);
+}
+
+.noteBtn:hover,
+.noteBtn[aria-expanded='true'] {
+  color: var(--accent-ink);
+}
+
+@media (max-width: 480px), (hover: none) {
+  .noteBtn::after {
+    content: '';
+    position: absolute;
+    inset: -8px -6px;
+  }
 }
 
 .more {
-  padding: 2px 4px;
   color: var(--muted);
-  font-size: 11.5px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 450;
   line-height: 16px;
 }
 
 .crumb {
+  flex: 1 0 100%;
+  min-width: 0;
   overflow: hidden;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -165,24 +264,22 @@
   outline-offset: 1px;
 }
 
-.chevron {
-  width: 20px;
-}
-
 .title {
   flex: 1 1 0;
   min-width: 0;
+  /* Centres the first line on the band (see .row). */
+  padding-top: calc(var(--band) / 2 - var(--pad-y) - var(--lh) / 2);
   font-size: 14.5px;
   font-weight: 450;
   letter-spacing: -0.005em;
-  line-height: 20px;
+  line-height: var(--lh);
 }
 
 .titleLine {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 4px 8px;
+  gap: var(--space-1) var(--space-2);
   min-width: 0;
   cursor: text;
 }
@@ -205,9 +302,10 @@
 /* Seamless inline editing: same type as the label, only the caret and row tint show. */
 .titleInput {
   display: block;
+  flex: 1;
   width: 100%;
   min-width: 0;
-  height: 20px;
+  height: var(--lh);
   padding: 0;
   margin: 0;
   border: 0;
@@ -223,57 +321,108 @@
   outline: none;
 }
 
+/* Phone: the title editor ends in a ⋯, which is how a phone row reaches its options sheet. */
+.editorLine {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  min-width: 0;
+}
+
+.editorMenu {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  /* Taller than the line: pull the extra height back so the row does not grow. */
+  margin: calc(var(--lh) / 2 - 14px) -6px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.editorMenu::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+/* The trailing cluster: difficulty (or sum, progress and disclosure chevron), at the far edge. */
 .meta {
+  position: relative;
   display: flex;
   flex: none;
   align-items: center;
+  /* The 28px glyph button carries 6px of air each side; this puts the glyph itself on the row's
+     8px inset, the same as the checkbox on the left. */
+  margin-right: -6px;
+  min-height: 28px;
 }
 
 .summary {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
+  margin-right: 6px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   transition: color var(--t-theme);
 }
 
 .badge {
-  padding: 2px 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
   color: var(--text-2);
-  font-size: 11.5px;
   font-weight: 550;
-  line-height: 16px;
-  transition:
-    background-color var(--t-fast),
-    border-color var(--t-theme),
-    color var(--t-theme);
 }
 
-.row:hover .badge {
-  background: var(--surface);
+.chevron {
+  margin-left: -4px;
 }
 
+/*
+ * Hover actions (more, add subtask, delete) appear to the LEFT of the trailing cluster and overlay
+ * the row's empty space, fading in from the row's own background. At rest the row is balanced:
+ * checkbox, title, then difficulty at the far edge.
+ */
 .actions {
+  position: absolute;
+  top: 50%;
+  right: 100%;
   display: flex;
-  flex: none;
   align-items: center;
+  padding-left: var(--space-6);
+  background: linear-gradient(to right, transparent, var(--row-bg) var(--space-5));
   opacity: 0;
-  transition: opacity var(--t-fast);
+  transform: translateY(-50%);
+  /* Hover reveals fade out quicker than they fade in. */
+  transition: opacity var(--dur-instant) var(--ease-out);
 }
 
 .row:hover .actions,
 .row:has(:focus-visible) .actions,
 .actions:has([aria-expanded='true']) {
   opacity: 1;
+  transition-duration: var(--dur-fast);
 }
 
-@media (hover: none) {
+.rowEditing .actions {
+  display: none;
+}
+
+/* Touch tablets have no hover: the ⋯ stays put, in line after the difficulty. */
+@media (hover: none) and (min-width: 481px) {
   .actions {
+    position: static;
+    padding: 0;
+    background: none;
     opacity: 1;
+    transform: none;
+    order: 2;
   }
 }
 
@@ -314,11 +463,11 @@
   bottom: 14px;
 }
 
-/* Drag handle in the left gutter, before the chevron. */
+/* Drag handle: hangs in the card's left padding on hover, so it never takes layout width. */
 .grip {
   position: absolute;
-  top: 50%;
-  left: -6px;
+  top: calc(var(--band) / 2);
+  left: -8px;
   z-index: 1;
   display: inline-flex;
   align-items: center;
@@ -336,7 +485,7 @@
   touch-action: manipulation;
   user-select: none;
   transition:
-    opacity var(--t-fast),
+    opacity var(--dur-instant) var(--ease-out),
     color var(--t-fast);
 }
 
@@ -352,6 +501,7 @@
 .row:has(:focus-visible) .grip,
 .grip:focus-visible {
   opacity: 1;
+  transition-duration: var(--dur-fast);
 }
 
 @media (hover: none) {
@@ -367,60 +517,102 @@
   inset: -8px -6px;
 }
 
+/*
+ * Phone: no card. Rows sit edge to edge on the page with a hairline between them that starts at
+ * the title (the iOS inset separator) and runs to the screen edge, none after the last row.
+ */
 @media (max-width: 480px) {
   .item {
-    --indent: 10px;
+    --indent: 16px;
+    /* The checkbox centre: the gutter plus half the 20px box. */
+    --guide-x: calc(var(--gutter-l) + 10px);
+    /* Where the title starts: the gutter, the 20px checkbox and a 12px gap. */
+    --title-x: calc(var(--gutter-l) + 32px);
+  }
+
+  .item::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: calc(var(--title-x) + var(--depth, 0) * var(--indent));
+    height: 1px;
+    background: var(--border);
+    pointer-events: none;
+  }
+
+  .item:last-of-type::after,
+  .item:has(+ [data-header])::after {
+    display: none;
   }
 
   .row {
-    flex-wrap: wrap;
-    gap: 2px 8px;
-    min-height: 0;
-    padding: 6px 4px 6px 8px;
+    --pad-y: 10px;
+    --lh: 21.6px;
+    --band: 52px;
+    --row-bg: var(--bg);
+    gap: 0 var(--space-3);
+    padding: var(--pad-y) var(--gutter-r) var(--pad-y) var(--gutter-l);
+    border-radius: 0;
+    -webkit-touch-callout: none;
   }
 
-  .chevron {
-    height: 24px;
+  /* With a meta line the row is as tall as its text; the first line still centres the controls. */
+  .row[data-meta] {
+    --band: calc(var(--pad-y) * 2 + var(--lh));
   }
 
-  /* Line 1: chevron + checkbox + title, which takes the rest of the width. */
+  .flash,
+  .reveal,
+  .tint {
+    border-radius: 0;
+  }
+
   .title {
-    order: 1;
-    flex: 1 1 calc(100% - 54px);
+    font-size: 16px;
+    letter-spacing: -0.011em;
   }
 
-  /* Tags and due date drop under the title text. */
+  .titleLine {
+    gap: 2px 0;
+  }
+
+  /* Line 2: the meta line, under the title. */
   .titleBtn {
     flex: 1 1 100%;
   }
 
-  /* Line 2: meta on the left, a compact action cluster on the right. */
+  /* One non-wrapping line: due date first, then the tags, cut off at the edge. */
+  .tail {
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+    min-height: 16px;
+    overflow: hidden;
+  }
+
+  .tail > * {
+    flex: none;
+  }
+
   .meta {
-    order: 2;
-    /* Auto basis: when meta and actions don't fit side by side, the actions wrap below. */
-    flex: 1 1 auto;
-    min-width: 0;
-    /* Line up under the title: chevron 20 + checkbox 18 + two 8px gaps. */
-    margin-left: 54px;
+    min-height: 28px;
   }
 
-  .actions {
-    order: 3;
-    margin-left: auto;
+  .summary {
+    gap: var(--space-2);
   }
 
-  /* Three actions plus the 158px difficulty bar must fit side by side, even two levels deep. */
-  .actions .iconBtn {
-    width: 26px;
+  .grip {
+    left: 0;
+    width: 14px;
+    height: 28px;
+    opacity: 0.5;
   }
 
-  /* No chevron in the flat list, so everything shifts left by its width. */
-  .item[data-flat] .title {
-    flex-basis: calc(100% - 26px);
-  }
-
-  .item[data-flat] .meta {
-    margin-left: 26px;
+  .row:hover .grip,
+  .row:has(:focus-visible) .grip,
+  .grip:focus-visible {
+    opacity: 0.5;
   }
 
   /* 44px touch target around each 28px button. */
@@ -429,4 +621,41 @@
     position: absolute;
     inset: -8px;
   }
+}
+
+/* Today view: the reason a row is there, only when it adds something. */
+.reason {
+  flex: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 450;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.reason[data-danger] {
+  color: var(--danger-text);
+  font-weight: 500;
+}
+
+/* Week view: a plan for this day (its due date is another) reads quieter than a deadline. Once
+   done it reads like any done row: the done fade on a lighter colour would fall below 4.5:1. */
+.row[data-quiet]:not([data-done]) .titleBtn {
+  color: var(--text-2);
+}
+
+/* Week view: a narrow column, so the row gives up a little padding to the title. Below 1024px
+   the days are full width and the row keeps its usual insets. */
+@media (min-width: 1024px) {
+  .row[data-compact] {
+    gap: 0 var(--space-1);
+    padding-right: var(--space-1);
+    padding-left: var(--space-1);
+  }
+}
+
+/* The planned rows that push the day over capacity, when "move something" is pressed. */
+.row[data-over],
+.row[data-over]:hover {
+  background: var(--danger-soft);
 }

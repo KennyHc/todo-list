@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Task, TaskTree } from '../types';
-import { toggleDelay } from './cascade';
+import { PARENT_POP_LAG, popDelays, strikeHoldMs, toggleDelay } from './cascade';
 
 const task = (id: string, parentId: string | null, childIds: string[] = []): Task => ({
   id,
@@ -11,6 +11,9 @@ const task = (id: string, parentId: string | null, childIds: string[] = []): Tas
   collapsed: false,
   tags: [],
   dueDate: null,
+  repeat: null,
+  plannedFor: null,
+  startDate: null,
   parentId,
   childIds,
   createdAt: 0,
@@ -72,5 +75,39 @@ describe('toggleDelay', () => {
       );
     }
     expect(toggleDelay(chain, 'n5', 'n0')).toBeCloseTo(0.6);
+  });
+});
+
+describe('popDelays', () => {
+  it('pops a lone row at once', () => {
+    expect([...popDelays(tree, 'b', ['b'])]).toEqual([['b', 0]]);
+  });
+
+  it('pops children in order and a parent PARENT_POP_LAG after its last child', () => {
+    const out = popDelays(tree, 'a', ['a', 'a1', 'a2', 'a2x']);
+    expect(out.get('a1')).toBeCloseTo(0.04);
+    expect(out.get('a2x')).toBeCloseTo(0.12);
+    expect(out.get('a2')).toBeCloseTo(0.12 + PARENT_POP_LAG);
+    expect(out.get('a')).toBeCloseTo(0.12 + PARENT_POP_LAG * 2);
+    expect(out.get('a1')!).toBeLessThan(out.get('a2x')!);
+  });
+
+  it('pops an auto-completed ancestor after the subtask that completed it', () => {
+    const out = popDelays(tree, 'a2x', ['a2x', 'a2']);
+    expect(out.get('a2x')).toBe(0);
+    expect(out.get('a2')).toBeCloseTo(PARENT_POP_LAG);
+  });
+
+  it('does not stagger without a toggled task', () => {
+    expect(popDelays(tree, null, ['a1', 'a2x']).get('a2x')).toBe(0);
+  });
+});
+
+describe('strikeHoldMs', () => {
+  it('rests 420ms after the latest strike starts', () => {
+    expect(strikeHoldMs(tree, 'b', ['b'])).toBe(420);
+    expect(strikeHoldMs(tree, null, ['a'])).toBe(420);
+    // a2x is the toggled task's third descendant: its strike starts 0.12s in.
+    expect(strikeHoldMs(tree, 'a', ['a', 'a1', 'a2', 'a2x'])).toBe(540);
   });
 });

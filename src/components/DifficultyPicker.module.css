@@ -1,24 +1,34 @@
-/* Five joined numbered segments, 22px square with a 2px gap (118px wide). */
+/* Five numbered segments (32px, 40px on touch) with a live name underneath. */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.fill {
+  align-items: stretch;
+}
+
 .group {
-  position: relative;
-  display: inline-flex;
-  flex: none;
-  gap: 2px;
+  display: flex;
+  gap: 4px;
 }
 
 .seg {
   position: relative;
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   background: var(--surface-2);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -26,15 +36,13 @@
   transition:
     background-color var(--t-theme),
     border-color var(--t-fast),
-    color var(--t-fast);
+    color var(--t-fast),
+    var(--t-press);
 }
 
-.seg:first-child {
-  border-radius: var(--r-sm) 2px 2px var(--r-sm);
-}
-
-.seg:last-of-type {
-  border-radius: 2px var(--r-sm) var(--r-sm) 2px;
+.fill .seg {
+  flex: 1 1 0;
+  width: auto;
 }
 
 .seg:focus-visible {
@@ -43,11 +51,11 @@
   outline-offset: 1px;
 }
 
-.fill {
+.fillBg {
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  background: var(--task-color);
+  background: var(--accent);
   opacity: 0;
   pointer-events: none;
 }
@@ -61,32 +69,32 @@
   color: var(--check-ink);
 }
 
-.tip {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
-  z-index: 5;
-  padding: 3px 8px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r-sm);
-  background: var(--elevated);
-  box-shadow: var(--shadow-pop);
+.label {
+  min-height: 16px;
+  margin: 0;
   color: var(--text-2);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   line-height: 16px;
-  white-space: nowrap;
-  pointer-events: none;
+  text-align: center;
 }
 
 @media (max-width: 480px), (hover: none) {
-  .seg {
-    width: 30px;
-    height: 28px;
+  .group {
+    gap: 8px;
   }
 
-  /* No hover on touch, so the tooltip would only get stuck after a tap. */
-  .tip {
-    display: none;
+  .seg {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+  }
+
+  .fill .seg {
+    width: auto;
+  }
+
+  .label {
+    font-size: 13px;
   }
 }

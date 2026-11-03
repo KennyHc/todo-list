@@ -46,7 +46,9 @@
   border: 0;
   background: transparent;
   cursor: pointer;
-  transition: background-color var(--t-fast);
+  transition:
+    background-color var(--t-fast),
+    var(--t-press);
 }
 
 .undo {
@@ -102,9 +104,29 @@
 }
 
 @media (max-width: 480px) {
+  /* Sits just above the docked composer: 12px gap + the 48px bar + 8px of air. */
+  .region {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 68px);
+    /* Under the composer dock (z 40): an expanded composer covers it rather than the reverse. */
+    z-index: 39;
+    padding: 0 12px;
+  }
+
   .card {
     width: 100%;
     min-width: 0;
     max-width: none;
+  }
+}
+
+/* Phones: let the label wrap to two lines instead of cutting off "· next on Sun". */
+@media (max-width: 480px) {
+  .label {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    line-height: 1.35;
   }
 }

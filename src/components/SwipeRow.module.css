@@ -37,7 +37,7 @@
   align-items: center;
   border-radius: var(--r-md);
   pointer-events: none;
-  transition: background-color 140ms var(--ease-out);
+  transition: background-color var(--t-fast);
 }
 
 .complete {
@@ -63,6 +63,57 @@
   color: #fff;
 }
 
+/* Two-stage left swipe: the revealed Later and Delete buttons, right-aligned behind the row. */
+.layer[data-open] {
+  pointer-events: auto;
+}
+
+.tray {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.trayBtn {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 76px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 550;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: filter var(--t-fast);
+}
+
+.trayBtn:active {
+  filter: brightness(0.94);
+}
+
+.later {
+  background: var(--accent);
+  color: var(--check-ink);
+}
+
+/* Delete takes whatever the pull adds beyond the two buttons. */
+.delete {
+  flex: 1 0 76px;
+  background: var(--danger);
+  color: #fff;
+}
+
 .action {
   display: inline-flex;
   align-items: center;
@@ -74,4 +125,17 @@
 
 .pop {
   display: inline-flex;
+}
+
+/* Phone lists are edge to edge: square corners, and the page itself behind a swiping row. */
+@media (max-width: 480px) {
+  .swipe,
+  .surface,
+  .layer {
+    border-radius: 0;
+  }
+
+  .swipe[data-swiping] .surface {
+    background: var(--bg);
+  }
 }

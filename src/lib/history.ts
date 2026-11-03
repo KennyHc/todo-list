@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
 import type { TaskTree } from '../types';
+import { effectiveColor } from './colorResolve';
 import { taskPath } from './views';
 import { effectiveDifficulty, progress } from './tree';
 
@@ -7,7 +8,8 @@ export type HistoryEntry = {
   id: string;
   taskId: string;
   title: string;
-  color: string;
+  /** The colour the row showed when it was completed; null for none (or the old default blue). */
+  color: string | null;
   tags: string[];
   dueDate: string | null;
   /** effectiveDifficulty at completion time. */
@@ -45,6 +47,7 @@ export function diffCompletions(
   after: TaskTree,
   toggledId: string,
   now: number,
+  tagColors: Readonly<Record<string, string>> = {},
 ): CompletionDiff {
   const completed: HistoryEntry[] = [];
   const reopenedTaskIds: string[] = [];
@@ -63,7 +66,7 @@ export function diffCompletions(
       id: nanoid(),
       taskId: id,
       title: task.title,
-      color: task.color,
+      color: effectiveColor(after, tagColors, id).color,
       tags: task.tags,
       dueDate: task.dueDate,
       difficulty: effectiveDifficulty(after, id),
@@ -92,4 +95,47 @@ export function applyHistory(history: HistoryEntry[], diff: CompletionDiff): His
     }
   }
   return [...next, ...diff.completed];
+}
+
+/**
+ * Done tasks are hidden from the Tree and live in History, so a done task without any History
+ * entry would be invisible. This gives each one an entry (completedAt from the task, else
+ * `now`). Ids are derived from the task id, so devices repairing the same data agree. Returns
+ * the same array when nothing is missing.
+ */
+export function synthesizeHistory(
+  data: TaskTree & { history: HistoryEntry[]; tagColors: Record<string, string> },
+  now: number = Date.now(),
+): HistoryEntry[] {
+  const have = new Set(data.history.map((entry) => entry.taskId));
+  const made: HistoryEntry[] = [];
+  for (const id of postOrder(data)) {
+    const task = data.tasks[id];
+    if (!task.done || have.has(id)) continue;
+    const isParent = task.childIds.length > 0;
+    made.push({
+      id: `h-${id}`,
+      taskId: id,
+      title: task.title,
+      color: effectiveColor(data, data.tagColors, id).color,
+      tags: task.tags,
+      dueDate: task.dueDate,
+      difficulty: effectiveDifficulty(data, id),
+      isParent,
+      subtaskCount: isParent ? progress(data, id).total : 0,
+      path: taskPath(data, id),
+      createdAt: task.createdAt,
+      completedAt: task.completedAt ?? now,
+      auto: false,
+    });
+  }
+  if (made.length === 0) return data.history;
+  // Stable merge by completedAt: existing entries win a tie, new ones keep tree order.
+  const merged = [...data.history];
+  for (const entry of made) {
+    let at = merged.length;
+    while (at > 0 && merged[at - 1].completedAt > entry.completedAt) at -= 1;
+    merged.splice(at, 0, entry);
+  }
+  return merged;
 }

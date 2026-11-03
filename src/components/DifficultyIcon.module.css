@@ -1,0 +1,36 @@
+.button {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  cursor: pointer;
+  transition:
+    background-color var(--t-fast),
+    opacity var(--t-fast),
+    var(--t-press);
+}
+
+.button:hover,
+.button[aria-expanded='true'] {
+  background: var(--surface-2);
+}
+
+.dimmed {
+  opacity: 0.4;
+}
+
+/* 44px touch target around the 28px button. */
+@media (max-width: 480px), (hover: none) {
+  .button::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+}

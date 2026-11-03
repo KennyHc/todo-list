@@ -57,7 +57,8 @@
   transition:
     background-color var(--t-fast),
     border-color var(--t-fast),
-    filter var(--t-fast);
+    filter var(--t-fast),
+    var(--t-press);
 }
 
 .cancel {

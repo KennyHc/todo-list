@@ -29,7 +29,12 @@ export const resolveTheme = (pref: ThemePref): ResolvedTheme =>
 function apply(pref: ThemePref) {
   const theme = resolveTheme(pref);
   document.documentElement.dataset.theme = theme;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOR[theme]);
+  // index.html ships one tag per colour scheme (media-aware). A forced theme sets both to its
+  // colour; 'system' restores each tag's own colour so the OS decides.
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+    const own = /dark/.test(meta.getAttribute('media') ?? '') ? 'dark' : 'light';
+    meta.setAttribute('content', THEME_COLOR[pref === 'system' ? own : theme]);
+  });
 }
 
 type ThemeState = { pref: ThemePref; setPref: (pref: ThemePref) => void };

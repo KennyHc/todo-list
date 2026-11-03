@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { Difficulty, TaskTree } from '../types';
-import { DEFAULT_COLOR } from './colors';
+import {
+  MAX_NOTES_LENGTH,
+  MAX_TAGS,
+  MAX_TITLE_LENGTH,
+  type Difficulty,
+  type TaskTree,
+} from '../types';
+import { mkState, mkTask } from '../test/factories';
 import {
   addTask,
   clearCompleted,
@@ -9,9 +15,11 @@ import {
   emptyTree,
   getAncestors,
   getDescendants,
+  hiddenUntilStart,
   indentTask,
   isLeaf,
   moveTask,
+  notStarted,
   outdentTask,
   progress,
   sortedChildIds,
@@ -51,7 +59,7 @@ describe('addTask', () => {
     expect(tree.tasks[id]).toMatchObject({
       title: 'Hello',
       difficulty: 1,
-      color: DEFAULT_COLOR,
+      color: null,
       done: false,
       collapsed: false,
       parentId: null,
@@ -74,11 +82,12 @@ describe('addTask', () => {
     expect(c.tree.rootIds).toEqual([p.id]);
   });
 
-  it('inherits the parent color, unless one is given', () => {
+  it('never copies a stored colour: children are automatic unless one is given', () => {
+    // Inheritance is computed at render time (lib/colorResolve), not written.
     const p = add(emptyTree(), 'parent', { color: '#123456' });
-    const inherited = add(p.tree, 'a', { parentId: p.id });
-    const explicit = add(inherited.tree, 'b', { parentId: p.id, color: '#abcdef' });
-    expect(explicit.tree.tasks[inherited.id].color).toBe('#123456');
+    const plain = add(p.tree, 'a', { parentId: p.id });
+    const explicit = add(plain.tree, 'b', { parentId: p.id, color: '#abcdef' });
+    expect(explicit.tree.tasks[plain.id].color).toBeNull();
     expect(explicit.tree.tasks[explicit.id].color).toBe('#abcdef');
   });
 
@@ -770,5 +779,137 @@ describe('moveTask', () => {
     // The input is never mutated.
     expect(before.tasks[x].childIds).toEqual([x1]);
     expect(before.tasks[y].childIds).toEqual([y1]);
+  });
+});
+
+describe('limits mirrored from firestore.rules', () => {
+  it('clamps titles and tag counts so cloud writes are never rejected', () => {
+    const long = 'x'.repeat(600);
+    const tags = Array.from({ length: 25 }, (_, i) => `t${i}`);
+    const { tree, id } = addTask(emptyTree(), { title: long, tags });
+    expect(tree.tasks[id].title).toHaveLength(MAX_TITLE_LENGTH);
+    expect(tree.tasks[id].tags).toHaveLength(MAX_TAGS);
+    const updated = updateTask(tree, id, { title: 'y'.repeat(700) });
+    expect(updated.tasks[id].title).toHaveLength(MAX_TITLE_LENGTH);
+  });
+});
+
+describe('repeat in the tree logic', () => {
+  it('addTask defaults repeat to null and stores a copy of the given one', () => {
+    const plain = addTask(emptyTree(), { title: 'a' });
+    expect(plain.tree.tasks[plain.id].repeat).toBeNull();
+    const repeat = { every: 'week', weekday: 1 } as const;
+    const withRepeat = addTask(emptyTree(), { title: 'b', dueDate: '2026-10-26', repeat });
+    expect(withRepeat.tree.tasks[withRepeat.id].repeat).toEqual(repeat);
+    expect(withRepeat.tree.tasks[withRepeat.id].repeat).not.toBe(repeat);
+  });
+
+  it('updateTask sets the repeat, and an equal repeat is a no-op', () => {
+    const { tree, id } = addTask(emptyTree(), { title: 'a', dueDate: '2026-10-26' });
+    const next = updateTask(tree, id, { repeat: { every: 'day' } });
+    expect(next.tasks[id].repeat).toEqual({ every: 'day' });
+    expect(updateTask(next, id, { repeat: { every: 'day' } })).toBe(next);
+    expect(updateTask(next, id, { repeat: null }).tasks[id].repeat).toBeNull();
+  });
+
+  it('clearing the due date also clears the repeat', () => {
+    const { tree, id } = addTask(emptyTree(), {
+      title: 'a',
+      dueDate: '2026-10-26',
+      repeat: { every: 'week' },
+    });
+    const next = updateTask(tree, id, { dueDate: null });
+    expect(next.tasks[id]).toMatchObject({ dueDate: null, repeat: null });
+    // Unless the same patch says otherwise.
+    const kept = updateTask(tree, id, { dueDate: null, repeat: { every: 'week' } });
+    expect(kept.tasks[id].repeat).toEqual({ every: 'week' });
+  });
+
+  it('moving the due date drops a monthly anchor, which belonged to the old date', () => {
+    const { tree, id } = addTask(emptyTree(), {
+      title: 'a',
+      dueDate: '2026-02-28',
+      repeat: { every: 'month', anchorDay: 31 },
+    });
+    const next = updateTask(tree, id, { dueDate: '2026-03-15' });
+    expect(next.tasks[id].repeat).toEqual({ every: 'month' });
+    expect(tree.tasks[id].repeat).toEqual({ every: 'month', anchorDay: 31 });
+  });
+});
+
+describe('notes', () => {
+  it('addTask stores clamped notes, and nothing for blank ones', () => {
+    const { tree, id } = addTask(emptyTree(), {
+      title: 'a',
+      notes: 'x'.repeat(MAX_NOTES_LENGTH + 50),
+    });
+    expect(tree.tasks[id].notes).toHaveLength(MAX_NOTES_LENGTH);
+    const blank = addTask(emptyTree(), { title: 'b', notes: '  \n ' });
+    expect('notes' in blank.tree.tasks[blank.id]).toBe(false);
+    const none = addTask(emptyTree(), { title: 'c' });
+    expect('notes' in none.tree.tasks[none.id]).toBe(false);
+  });
+
+  it('updateTask sets, changes and clamps notes', () => {
+    const { tree, id } = addTask(emptyTree(), { title: 'a' });
+    const set = updateTask(tree, id, { notes: 'line 1\nline 2' });
+    expect(set.tasks[id].notes).toBe('line 1\nline 2');
+    const changed = updateTask(set, id, { notes: 'y'.repeat(MAX_NOTES_LENGTH + 1) });
+    expect(changed.tasks[id].notes).toHaveLength(MAX_NOTES_LENGTH);
+  });
+
+  it('a blank notes patch removes the key; removing nothing is a no-op', () => {
+    const { tree, id } = addTask(emptyTree(), { title: 'a', notes: 'keep me' });
+    const removed = updateTask(tree, id, { notes: '   ' });
+    expect('notes' in removed.tasks[id]).toBe(false);
+    expect(updateTask(removed, id, { notes: '' })).toBe(removed);
+    expect(updateTask(tree, id, { notes: 'keep me' })).toBe(tree);
+  });
+});
+
+describe('startDate', () => {
+  it('defaults to null; addTask and updateTask set and clear it', () => {
+    const plain = addTask(emptyTree(), { title: 'a' });
+    expect(plain.tree.tasks[plain.id].startDate).toBeNull();
+    const dated = addTask(emptyTree(), { title: 'b', startDate: '2026-11-01' });
+    expect(dated.tree.tasks[dated.id].startDate).toBe('2026-11-01');
+    const cleared = updateTask(dated.tree, dated.id, { startDate: null });
+    expect(cleared.tasks[dated.id].startDate).toBeNull();
+    expect(updateTask(cleared, dated.id, { startDate: null })).toBe(cleared);
+  });
+
+  it('notStarted is true only for a start date after today', () => {
+    const task = (startDate: string | null) => mkTask('a', { startDate });
+    expect(notStarted(task(null), '2026-10-20')).toBe(false);
+    expect(notStarted(task('2026-10-20'), '2026-10-20')).toBe(false);
+    expect(notStarted(task('2026-10-19'), '2026-10-20')).toBe(false);
+    expect(notStarted(task('2026-10-21'), '2026-10-20')).toBe(true);
+  });
+
+  it('a hidden parent hides its subtree, but a hidden child does not hide its parent', () => {
+    const tree = mkState([
+      mkTask('p', { childIds: ['c'], startDate: '2026-11-01' }),
+      mkTask('c', { parentId: 'p', childIds: ['g'] }),
+      mkTask('g', { parentId: 'c' }),
+      mkTask('q', { childIds: ['r'] }),
+      mkTask('r', { parentId: 'q', startDate: '2026-11-01' }),
+    ]);
+    const hidden = (id: string) => hiddenUntilStart(tree, id, '2026-10-20');
+    expect(['p', 'c', 'g', 'q', 'r'].map(hidden)).toEqual([true, true, true, false, true]);
+    expect(hiddenUntilStart(tree, 'nope', '2026-10-20')).toBe(false);
+    expect(hiddenUntilStart(tree, 'p', '2026-11-01')).toBe(false);
+  });
+
+  it('does not touch difficulty sums or progress', () => {
+    const b = addTask(emptyTree(), { title: 'p' });
+    const c1 = addTask(b.tree, { title: 'a', parentId: b.id, difficulty: 2 });
+    const c2 = addTask(c1.tree, {
+      title: 'b',
+      parentId: b.id,
+      difficulty: 3,
+      startDate: '2999-01-01',
+    });
+    expect(effectiveDifficulty(c2.tree, b.id)).toBe(5);
+    expect(progress(c2.tree, b.id)).toEqual({ done: 0, total: 2 });
   });
 });

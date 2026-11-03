@@ -7,11 +7,13 @@ type Props = {
   children: ReactNode;
   /** Seconds to wait before animating a done-state change (cascade timing). */
   delay?: number;
+  /** Let a long title wrap onto up to three lines instead of being cut off. */
+  wrap?: boolean;
 };
 
 const EASE = [0.65, 0, 0.35, 1] as const;
 
-export function StrikeText({ done, children, delay = 0 }: Props) {
+export function StrikeText({ done, children, delay = 0, wrap = false }: Props) {
   // The strike is a background gradient on an inline element, so it follows every wrapped line.
   // Its width (0–100%) is animated; the anchor side flips so it grows from the left on check
   // and retracts toward the right on uncheck.
@@ -31,14 +33,14 @@ export function StrikeText({ done, children, delay = 0 }: Props) {
 
   return (
     <span className={styles.wrap}>
-      <span className={styles.text}>
+      <span className={`${styles.text} ${wrap ? styles.wrapped : ''}`}>
         <motion.span
           className={styles.strike}
           style={{ backgroundSize, backgroundPosition: done ? '0% 58%' : '100% 58%' }}
         >
           <motion.span
             initial={false}
-            animate={{ opacity: done ? 0.55 : 1 }}
+            animate={{ opacity: done ? 0.62 : 1 }}
             transition={{ duration: 0.3, delay: done ? delay + 0.08 : delay }}
           >
             {children}

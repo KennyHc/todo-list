@@ -27,7 +27,9 @@
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
-  transition: color var(--t-fast);
+  transition:
+    color var(--t-fast),
+    var(--t-press);
 }
 
 .option:hover {
@@ -52,18 +54,65 @@
   z-index: 1;
 }
 
+/* Phone: a 36px control, icons only until there is room for the labels. */
 @media (max-width: 480px) {
+  .track {
+    height: 36px;
+    padding: 2px;
+    border-radius: 12px;
+  }
+
   .option {
-    width: 34px;
+    width: 44px;
+    height: 30px;
     padding: 0;
+    border-radius: 10px;
+  }
+
+  .thumb {
+    border-radius: 10px;
   }
 
   .label {
     display: none;
   }
+
+  .option::after {
+    content: '';
+    position: absolute;
+    inset: -7px -1px;
+  }
 }
 
-@media (max-width: 480px), (hover: none) {
+@media (min-width: 400px) and (max-width: 480px) {
+  .option {
+    width: auto;
+    padding: 0 var(--space-3);
+  }
+
+  .label {
+    display: inline;
+  }
+}
+
+/*
+ * Four views don't fit with every label on a phone, or next to Search and Filter on a narrow
+ * window: only the active one keeps its.
+ */
+@media (max-width: 720px) {
+  .track[data-count='4'] .option:not(.active),
+  .track[data-count='5'] .option:not(.active) {
+    width: 40px;
+    padding: 0;
+  }
+
+  .track[data-count='4'] .option:not(.active) .label,
+  .track[data-count='5'] .option:not(.active) .label {
+    display: none;
+  }
+}
+
+@media (hover: none) and (min-width: 481px) {
   .option::after {
     content: '';
     position: absolute;
