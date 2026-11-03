@@ -49,3 +49,11 @@
     font-size: 13px;
   }
 }
+
+/* Touch: segments a fingertip tall. */
+@media (pointer: coarse) {
+  .seg {
+    min-width: var(--tap);
+    height: var(--tap);
+  }
+}

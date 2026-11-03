@@ -10,3 +10,5 @@ that made it.
 - Reopening a completed repeating task removes the copy it spawned if that copy is untouched
   (`isUntouchedCopy`); if the copy was edited or worked on, the copy is kept and the reopened
   task becomes a one-off (`repeat: null`). A series has at most one open occurrence. (#40)
+- Touch targets: in `(pointer: coarse)` blocks, use `--tap` (44px) for sizes and
+  `::after { inset: var(--tap-inset) }` for hit boxes; never fine-pointer rules for this. (#44)

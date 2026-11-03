@@ -76,3 +76,11 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+/* Touch on phones: an anchored popover spans the screen (less its 8px margin), so fingertip-sized
+   controls fit in it. */
+@media (pointer: coarse) and (max-width: 480px) {
+  .panel {
+    min-width: calc(100vw - 16px);
+  }
+}

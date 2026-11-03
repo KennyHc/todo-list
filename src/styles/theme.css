@@ -61,6 +61,14 @@
   --space-7: 32px;
   --space-8: 40px;
 
+  /*
+   * Touch targets, for (pointer: coarse) blocks: the smallest hit area for a finger. Inset a
+   * control's ::after by --tap-inset to grow its hit area to at least --tap on both axes, centred,
+   * without changing its size (the control needs position: relative). Bigger controls get 0.
+   */
+  --tap: 44px;
+  --tap-inset: min(0px, calc((100% - var(--tap)) / 2));
+
   --font: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 

@@ -170,3 +170,10 @@
     display: none;
   }
 }
+
+/* Touch: results a fingertip tall. */
+@media (pointer: coarse) {
+  .item {
+    min-height: var(--tap);
+  }
+}
