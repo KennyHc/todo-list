@@ -76,16 +76,25 @@ function CompactBar({ y }: { y: ReturnType<typeof useMotionValue<number>> }) {
 
 function Controls() {
   const { openDifficulty, done, total } = useTotals();
+  // Spelled out for screen readers and the hover title; "points" is the effort unit Today and Week use.
+  const doneLabel = `${done} of ${total} ${total === 1 ? 'task' : 'tasks'} done`;
+  const loadLabel = `${openDifficulty} ${openDifficulty === 1 ? 'point' : 'points'} left`;
   return (
     <div className={styles.controls}>
       {total > 0 && (
         <div className={styles.stats}>
-          <ProgressRing value={done / total} />
-          <span className={styles.count}>
-            <AnimatedNumber value={done} />/<AnimatedNumber value={total} />
+          <ProgressRing value={done / total} label={doneLabel} />
+          <span className={styles.count} title={doneLabel}>
+            <span aria-hidden="true">
+              <AnimatedNumber value={done} />/<AnimatedNumber value={total} />
+            </span>
+            <span className={styles.srOnly}>{doneLabel}</span>
           </span>
-          <span className={styles.pill}>
-            Load <AnimatedNumber value={openDifficulty} />
+          <span className={styles.pill} title={loadLabel}>
+            <span aria-hidden="true">
+              Load <AnimatedNumber value={openDifficulty} />
+            </span>
+            <span className={styles.srOnly}>{loadLabel}</span>
           </span>
         </div>
       )}

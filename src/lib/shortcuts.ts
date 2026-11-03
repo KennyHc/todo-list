@@ -73,6 +73,7 @@ const GROUPS: ShortcutGroup[] = [
     items: [
       { label: 'Command palette', keys: [['mod', 'K']] },
       { label: 'Undo', keys: [['mod', 'Z']] },
+      { label: 'Redo', keys: [['mod', '⇧', 'Z']] },
       { label: 'Keyboard shortcuts', keys: [['?']] },
       { label: 'Close', keys: [['Esc']] },
     ],

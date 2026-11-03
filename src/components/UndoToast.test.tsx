@@ -59,4 +59,41 @@ describe('UndoToast', () => {
     expect(useTaskStore.getState().tagColors).toEqual({});
     expect(useTaskStore.getState().undo).toBeNull();
   });
+
+  it('keeps undoing on ⌘Z after the toast has gone, and redoes on ⇧⌘Z and Ctrl+Y', () => {
+    render(<UndoToast />);
+    act(() => useTaskStore.getState().setTagColor('work', '#c0333a'));
+    act(() => useTaskStore.getState().setTagColor('home', '#3d5fc2'));
+    act(() => {
+      fireEvent.animationEnd(bar(toasts()[0]));
+    });
+    expect(useTaskStore.getState().undo).toBeNull();
+    act(() => {
+      fireEvent.keyDown(window, { key: 'z', metaKey: true });
+      fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
+    });
+    expect(useTaskStore.getState().tagColors).toEqual({});
+    act(() => {
+      fireEvent.keyDown(window, { key: 'Z', metaKey: true, shiftKey: true });
+    });
+    expect(useTaskStore.getState().tagColors).toEqual({ work: '#c0333a' });
+    act(() => {
+      fireEvent.keyDown(window, { key: 'y', ctrlKey: true });
+    });
+    expect(useTaskStore.getState().tagColors).toEqual({ work: '#c0333a', home: '#3d5fc2' });
+  });
+
+  it('leaves ⌘Z to text fields', () => {
+    render(
+      <>
+        <input aria-label="field" />
+        <UndoToast />
+      </>,
+    );
+    act(() => useTaskStore.getState().setTagColor('work', '#c0333a'));
+    act(() => {
+      fireEvent.keyDown(screen.getByLabelText('field'), { key: 'z', metaKey: true });
+    });
+    expect(useTaskStore.getState().tagColors).toEqual({ work: '#c0333a' });
+  });
 });

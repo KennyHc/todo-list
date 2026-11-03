@@ -1,0 +1,15 @@
+/* Sits on its own line under the title input (the title line wraps). */
+.chips {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 2px 0 4px;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  max-width: 100%;
+}

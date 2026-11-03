@@ -13,7 +13,7 @@ const GLOW_MS = 600;
  * Circular progress indicator. The arc eases to its new length with a gentle spring, and when the
  * value goes up the ring gives off a brief, soft glow in the accent colour.
  */
-export function ProgressRing({ value }: { value: number }) {
+export function ProgressRing({ value, label }: { value: number; label?: string }) {
   const v = Math.min(1, Math.max(0, value));
   const ref = useRef<SVGSVGElement>(null);
   const previous = useRef(v);
@@ -50,6 +50,7 @@ export function ProgressRing({ value }: { value: number }) {
       viewBox={`0 0 ${SIZE} ${SIZE}`}
       aria-hidden="true"
     >
+      {label && <title>{label}</title>}
       <circle className={styles.track} cx={SIZE / 2} cy={SIZE / 2} r={R} strokeWidth={STROKE} />
       <motion.circle
         className={styles.arc}
