@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid';
 import type { Repeat, Task, TaskTree } from '../types';
 import { addDays, daysBetween, parseISO } from './dates';
-import { createDraft, reevaluateFrom } from './tree';
+import { createDraft, reevaluateFrom, sameRepeat } from './tree';
 import { todayISO } from './views';
 
 /**
@@ -150,6 +150,13 @@ export function repeatWord(repeat: Repeat): string {
   return { day: 'daily', weekday: 'weekdays', week: 'weekly', month: 'monthly' }[repeat.every];
 }
 
+/** The repeat a spawned copy gets: the same rule, with a monthly anchor pinned to `dueDate`. */
+function copyRepeat(source: Repeat, dueDate: string): Repeat {
+  const repeat: Repeat = { ...source };
+  if (repeat.every === 'month') repeat.anchorDay = repeat.anchorDay ?? Number(dueDate.slice(8, 10));
+  return repeat;
+}
+
 /**
  * Creates the next occurrence of a repeating task right after it among its siblings and returns
  * the new tree and the copy's id. The copy has a new id, the same title, tags, difficulty, colour,
@@ -184,9 +191,7 @@ export function spawnNextOccurrence(
   const shift = daysBetween(task.dueDate, next);
   const draft = createDraft(tree);
 
-  const repeat: Repeat = { ...task.repeat };
-  if (repeat.every === 'month')
-    repeat.anchorDay = repeat.anchorDay ?? Number(task.dueDate.slice(8, 10));
+  const repeat = copyRepeat(task.repeat, task.dueDate);
 
   const copy = (source: Task, parentId: string | null, root: boolean): string => {
     const newId = nanoid();
@@ -218,6 +223,51 @@ export function spawnNextOccurrence(
   // New open work: a done parent (and done ancestors) reopen.
   reevaluateFrom(draft, task.parentId, now);
   return { tree: draft.finish(), newId };
+}
+
+const sameList = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && a.every((value, i) => value === b[i]);
+
+/**
+ * Whether the spawned copy `copyId` is still exactly what spawnNextOccurrence made from its
+ * original: open, in the same place, with no field and no subtask changed, added, removed or
+ * completed. Only then may reopening the original take it away (nothing the user did is lost).
+ * The copy's `createdAt` is the spawn time, so its due date can be recomputed exactly.
+ * Collapsing or expanding is not counted as an edit.
+ */
+export function isUntouchedCopy(tree: TaskTree, copyId: string): boolean {
+  const copy = tree.tasks[copyId];
+  const original = copy?.spawnedFrom === undefined ? undefined : tree.tasks[copy.spawnedFrom];
+  if (!copy || !original || original.repeat === null || original.dueDate === null) return false;
+  if (copy.parentId !== original.parentId) return false;
+  const next = nextOccurrence(
+    original.dueDate,
+    original.repeat,
+    todayISO(new Date(copy.createdAt)),
+  );
+  if (copy.dueDate !== next) return false;
+  const shift = daysBetween(original.dueDate, next);
+  const shifted = (iso: string | null) => (iso === null ? null : addDays(iso, shift));
+
+  const matches = (source: Task, made: Task, root: boolean): boolean =>
+    !made.done &&
+    made.createdAt === copy.createdAt &&
+    made.title === source.title &&
+    made.difficulty === source.difficulty &&
+    made.color === source.color &&
+    sameList(made.tags, source.tags) &&
+    made.notes === source.notes &&
+    made.plannedFor === null &&
+    made.startDate === shifted(source.startDate) &&
+    (root || made.dueDate === shifted(source.dueDate)) &&
+    sameRepeat(made.repeat, root ? copyRepeat(source.repeat!, source.dueDate!) : source.repeat) &&
+    made.childIds.length === source.childIds.length &&
+    made.childIds.every((childId, i) => {
+      const child = tree.tasks[childId];
+      const from = tree.tasks[source.childIds[i]];
+      return !!child && !!from && matches(from, child, false);
+    });
+  return matches(original, copy, true);
 }
 
 const shortWeekday = new Intl.DateTimeFormat(undefined, { weekday: 'short' });

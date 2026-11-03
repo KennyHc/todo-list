@@ -5,6 +5,9 @@ import { useTaskStore, type UndoEntry } from '../store/tasks';
 import styles from './UndoToast.module.css';
 import { dur, ease, spring } from '../styles/motion';
 
+/** How long the toast stays up (paused while hovered or focused). */
+const UNDO_MS = 8000;
+
 function isTextEntry(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
@@ -29,16 +32,28 @@ function Toast({ entry }: { entry: UndoEntry }) {
       }
       transition={reduced ? { duration: dur.fast } : spring.snappy}
     >
-      <span className={styles.label}>{entry.label}</span>
+      {/* A newer action swaps the label in place, so rapid actions never stack two cards. */}
+      <motion.span
+        key={`label-${entry.id}`}
+        className={styles.label}
+        initial={reduced ? false : { opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: dur.fast, ease: ease.out }}
+      >
+        {entry.label}
+      </motion.span>
       <button type="button" className={styles.undo} onClick={undo}>
         Undo
       </button>
       <button type="button" className={styles.close} aria-label="Dismiss" onClick={dismiss}>
         <X size={14} strokeWidth={1.75} aria-hidden="true" />
       </button>
-      {/* The 5s timer is this CSS animation; hover and focus-within pause it in the stylesheet. */}
+      {/* The timer is this CSS animation; hover and focus-within pause it in the stylesheet.
+          Keyed by entry so a newer action restarts it. */}
       <span
+        key={`bar-${entry.id}`}
         className={styles.bar}
+        style={{ animationDuration: `${UNDO_MS}ms` }}
         aria-hidden="true"
         onAnimationEnd={() => {
           if (useTaskStore.getState().undo?.id === entry.id) dismiss();
@@ -67,7 +82,7 @@ export function UndoToast() {
 
   return (
     <div className={styles.region}>
-      <AnimatePresence>{entry && <Toast key={entry.id} entry={entry} />}</AnimatePresence>
+      <AnimatePresence>{entry && <Toast key="undo" entry={entry} />}</AnimatePresence>
     </div>
   );
 }

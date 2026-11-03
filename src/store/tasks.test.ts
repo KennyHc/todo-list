@@ -548,10 +548,99 @@ describe('recurring tasks', () => {
     const rep = get().add({ title: 'Rep', dueDate: '2026-10-18', repeat: sunday });
     get().toggle(rep); // done: one copy
     expect(Object.keys(get().tasks)).toHaveLength(4);
-    get().toggle(rep); // reopen: no new copy, the existing one stays
-    expect(Object.keys(get().tasks)).toHaveLength(4);
+    get().toggle(rep); // reopen: no new copy, and the untouched one goes away
+    expect(Object.keys(get().tasks)).toHaveLength(3);
     expect(get().tasks[rep].done).toBe(false);
-    expect(copiesOf(rep)).toHaveLength(1);
+    expect(copiesOf(rep)).toHaveLength(0);
+  });
+
+  it('reopening removes the untouched copy in the same update, with History and undo intact', () => {
+    const id = get().add({ title: 'Water plants', dueDate: '2026-10-18', repeat: sunday });
+    get().toggle(id);
+    const completed = get().tasks;
+    get().toggle(id);
+    expect(Object.keys(get().tasks)).toEqual([id]);
+    expect(get().rootIds).toEqual([id]);
+    expect(get().tasks[id]).toMatchObject({ done: false, repeat: sunday });
+    expect(get().history).toEqual([]);
+    expect(get().undo?.label).toBe('Reopened “Water plants”');
+    // Undo brings back the completed task and its copy together.
+    get().undoLast();
+    expect(get().tasks).toBe(completed);
+    expect(get().history).toHaveLength(1);
+  });
+
+  it('complete, reopen, complete leaves exactly one copy', () => {
+    const id = get().add({ title: 'Water plants', dueDate: '2026-10-18', repeat: sunday });
+    for (let i = 0; i < 5; i++) get().toggle(id);
+    expect(get().tasks[id].done).toBe(true);
+    expect(copiesOf(id)).toHaveLength(1);
+    expect(copiesOf(id)[0]).toMatchObject({ done: false, dueDate: '2026-10-25' });
+    expect(Object.keys(get().tasks)).toHaveLength(2);
+    expect(get().history).toHaveLength(1);
+  });
+
+  it('reopening keeps an edited copy and turns the original into a one-off', () => {
+    const id = get().add({ title: 'Water plants', dueDate: '2026-10-18', repeat: sunday });
+    get().toggle(id);
+    const [copy] = copiesOf(id);
+    get().setNotes(copy.id, 'Use the rain water');
+    get().toggle(id);
+    expect(get().tasks[copy.id]).toMatchObject({ notes: 'Use the rain water', repeat: sunday });
+    expect(get().tasks[id]).toMatchObject({ done: false, repeat: null });
+    expect(get().undo?.label).toBe('Reopened “Water plants” · no longer repeats');
+    // Undo of the reopen restores the repeat on the original.
+    get().undoLast();
+    expect(get().tasks[id]).toMatchObject({ done: true, repeat: sunday });
+    // Reopened again and completed again, the one-off spawns nothing.
+    get().toggle(id);
+    get().toggle(id);
+    expect(copiesOf(id)).toHaveLength(1);
+    expect(Object.keys(get().tasks)).toHaveLength(2);
+  });
+
+  it('reopening keeps a copy whose subtask was completed', () => {
+    const parent = get().add({ title: 'Weekly review', dueDate: '2026-10-20', repeat: sunday });
+    get().add({ title: 'Inbox', parentId: parent });
+    get().add({ title: 'Calendar', parentId: parent });
+    get().toggle(parent);
+    const [copy] = copiesOf(parent);
+    get().toggle(copy.childIds[0]);
+    get().toggle(parent);
+    expect(get().tasks[copy.id]).toBeDefined();
+    expect(get().tasks[copy.childIds[0]].done).toBe(true);
+    expect(get().tasks[parent]).toMatchObject({ done: false, repeat: null });
+  });
+
+  it('reopening a repeating parent, or one of its subtasks, removes the untouched copy subtree', () => {
+    const parent = get().add({ title: 'Weekly review', dueDate: '2026-10-20', repeat: sunday });
+    const a = get().add({ title: 'Inbox', parentId: parent });
+    const b = get().add({ title: 'Calendar', parentId: parent });
+    const count = Object.keys(get().tasks).length;
+
+    get().toggle(parent);
+    expect(Object.keys(get().tasks)).toHaveLength(count * 2);
+    get().toggle(parent);
+    expect(Object.keys(get().tasks)).toHaveLength(count);
+    expect(get().tasks[parent]).toMatchObject({ done: false, repeat: sunday });
+
+    // Done through the cascade, reopened by unchecking one subtask.
+    get().toggle(a);
+    get().toggle(b);
+    expect(copiesOf(parent)).toHaveLength(1);
+    get().toggle(b);
+    expect(copiesOf(parent)).toHaveLength(0);
+    expect(Object.keys(get().tasks)).toHaveLength(count);
+    expect(get().tasks[parent].done).toBe(false);
+    expect(get().history.map((e) => e.title)).toEqual(['Inbox']);
+  });
+
+  it('restoring from History removes the untouched copy too', () => {
+    const id = get().add({ title: 'Water plants', dueDate: '2026-10-18', repeat: sunday });
+    get().toggle(id);
+    get().restoreFromHistory(get().history[0].id);
+    expect(Object.keys(get().tasks)).toEqual([id]);
+    expect(get().undo?.label).toBe('Restored “Water plants”');
   });
 
   it('a double toggle (done, undone, done) does not create a second copy for the same date', () => {

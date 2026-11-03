@@ -11,7 +11,7 @@ type Props = {
   repeat?: Repeat | null;
   /**
    * How much of the date to say. 'full' is the usual label; 'weekday' just the weekday, and
-   * 'icon' only the repeat icon, for rows under a section header (Today, This week) that already
+   * 'icon' only the repeat icon, for rows under a section header (Today, Next 7 days) that already
    * says it.
    */
   display?: 'full' | 'weekday' | 'icon';

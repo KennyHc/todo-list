@@ -3,6 +3,7 @@ import { mkTask } from '../test/factories';
 import type { Repeat, Task, TaskTree } from '../types';
 import {
   firstOccurrence,
+  isUntouchedCopy,
   nextLabel,
   nextOccurrence,
   normalizeRepeat,
@@ -459,5 +460,76 @@ describe('spawnNextOccurrence: notes and start dates', () => {
     const copy = result.tree.tasks[result.newId];
     const sub = result.tree.tasks[copy.childIds[0]];
     expect(sub).toMatchObject({ notes: 'sub note', startDate: '2026-10-20', done: false });
+  });
+});
+
+describe('isUntouchedCopy', () => {
+  const spawn = (tasks: Task[], id = 'r') => {
+    const result = spawnNextOccurrence(treeOf(tasks), id, NOW)!;
+    return { ...result, copy: result.tree.tasks[result.newId] };
+  };
+  const edit = (tree: TaskTree, id: string, patch: Partial<Task>): TaskTree => ({
+    ...tree,
+    tasks: { ...tree.tasks, [id]: { ...tree.tasks[id], ...patch } },
+  });
+  const rent = mkTask('r', {
+    title: 'Pay rent',
+    tags: ['home'],
+    notes: 'Landlord',
+    dueDate: '2026-10-18',
+    startDate: '2026-10-11',
+    repeat: mondays,
+    done: true,
+    completedAt: 5,
+  });
+
+  it('is true for a fresh copy, including a caught-up and a monthly one', () => {
+    const { tree, newId } = spawn([rent]);
+    expect(isUntouchedCopy(tree, newId)).toBe(true);
+    const monthly = spawn([mkTask('m', { dueDate: '2026-01-31', repeat: month })], 'm');
+    expect(isUntouchedCopy(monthly.tree, monthly.newId)).toBe(true);
+  });
+
+  it('is false once the copy is edited, rescheduled, planned, moved or completed', () => {
+    const { tree, newId, copy } = spawn([rent]);
+    const edits: Partial<Task>[] = [
+      { title: 'Pay rent (late)' },
+      { tags: ['home', 'money'] },
+      { notes: 'Landlord, new account' },
+      { difficulty: 4 },
+      { color: '#C9B8F2' },
+      { dueDate: '2026-10-27' },
+      { startDate: null },
+      { repeat: day },
+      { plannedFor: '2026-10-20' },
+      { parentId: 'elsewhere' },
+      { done: true },
+    ];
+    for (const patch of edits) expect(isUntouchedCopy(edit(tree, newId, patch), newId)).toBe(false);
+    // Collapsing is not an edit.
+    expect(isUntouchedCopy(edit(tree, newId, { collapsed: !copy.collapsed }), newId)).toBe(true);
+  });
+
+  it('is false when a subtask of the copy is done, edited, added or removed', () => {
+    const parent = mkTask('r', { ...rent, childIds: ['a', 'b'] });
+    const a = mkTask('a', { parentId: 'r', title: 'A', done: true });
+    const b = mkTask('b', { parentId: 'r', title: 'B', done: true });
+    const { tree, newId, copy } = spawn([parent, a, b]);
+    const [ca, cb] = copy.childIds;
+    expect(isUntouchedCopy(tree, newId)).toBe(true);
+    expect(isUntouchedCopy(edit(tree, ca, { done: true }), newId)).toBe(false);
+    expect(isUntouchedCopy(edit(tree, cb, { title: 'B2' }), newId)).toBe(false);
+    expect(isUntouchedCopy(edit(tree, newId, { childIds: [ca] }), newId)).toBe(false);
+    const added = edit(tree, newId, { childIds: [ca, cb, 'x'] });
+    added.tasks.x = mkTask('x', { parentId: newId, createdAt: NOW });
+    expect(isUntouchedCopy(added, newId)).toBe(false);
+  });
+
+  it('is false for a task that is not a copy or whose original is gone', () => {
+    const { tree, newId } = spawn([rent]);
+    expect(isUntouchedCopy(tree, 'r')).toBe(false);
+    const orphan = { tasks: { [newId]: tree.tasks[newId] }, rootIds: [newId] };
+    expect(isUntouchedCopy(orphan, newId)).toBe(false);
+    expect(isUntouchedCopy(tree, 'ghost')).toBe(false);
   });
 });

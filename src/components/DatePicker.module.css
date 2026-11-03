@@ -6,7 +6,7 @@
 
 .quick {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -114,12 +114,5 @@
     content: '';
     position: absolute;
     inset: var(--tap-inset);
-  }
-}
-
-/* Small phones: four picks in a row would clip "Next week". */
-@media (pointer: coarse) and (max-width: 359px) {
-  .quick {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

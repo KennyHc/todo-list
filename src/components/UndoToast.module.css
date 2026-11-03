@@ -10,7 +10,6 @@
   pointer-events: none;
 }
 
-/* Swapping toasts overlap in one grid cell. */
 .card {
   position: relative;
   grid-area: 1 / 1;
@@ -86,7 +85,8 @@
   background: var(--accent);
   opacity: 0.6;
   transform-origin: left;
-  animation: drain 5s linear forwards;
+  /* Duration is set inline from UNDO_MS in UndoToast.tsx. */
+  animation: drain 8s linear forwards;
 }
 
 .card:hover .bar,

@@ -84,7 +84,7 @@ type Props = {
   exitStyle?: 'pop' | 'move';
   /**
    * Deadline view: the section this row sits under. Today and Tomorrow already say when, so a
-   * row there shows no date (just the repeat icon); This week shows only the weekday.
+   * row there shows no date (just the repeat icon); Next 7 days shows only the weekday.
    */
   section?: DeadlineBucket;
   /**

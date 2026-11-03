@@ -109,7 +109,7 @@ describe('Repeat in the task menu', () => {
         .add({ title: 'Gym', dueDate: '2026-10-26', repeat: { every: 'day' } });
     });
     const menu = openMenu('Gym');
-    fireEvent.click(within(menu).getByRole('button', { name: 'Clear date' }));
+    fireEvent.click(within(menu).getByRole('button', { name: 'Remove date' }));
     expect(byTitle('Gym')[0]).toMatchObject({ dueDate: null, repeat: null });
     expect(within(menu).getByRole('radio', { name: 'None' })).toBeChecked();
   });
