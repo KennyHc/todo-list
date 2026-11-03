@@ -112,12 +112,58 @@ describe('signInWithGoogle', () => {
     expect(hasAuthHint()).toBe(true); // so the splash, not the landing page, shows on return
   });
 
-  it('uses the popup on touch devices too (redirect breaks under storage partitioning)', async () => {
-    window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as never;
+  it('uses the popup in a browser tab, including touch devices', async () => {
+    window.matchMedia = vi.fn((q: string) => ({ matches: q === '(pointer: coarse)' })) as never;
     fb.signInWithPopup.mockResolvedValue({ user: fakeUser });
     await useAuthStore.getState().signInWithGoogle();
+    expect(window.matchMedia).toHaveBeenCalledWith('(display-mode: standalone)');
     expect(fb.signInWithPopup).toHaveBeenCalled();
     expect(fb.signInWithRedirect).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('auth-redirecting')).toBeNull();
+  });
+
+  it('redirects without a popup when installed (display-mode: standalone)', async () => {
+    window.matchMedia = vi.fn((q: string) => ({
+      matches: q === '(display-mode: standalone)',
+    })) as never;
+    fb.signInWithRedirect.mockResolvedValue(undefined);
+    await useAuthStore.getState().signInWithGoogle();
+    expect(fb.signInWithRedirect).toHaveBeenCalled();
+    expect(fb.signInWithRedirect.mock.calls[0]).toHaveLength(3);
+    expect(fb.signInWithPopup).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('auth-redirecting')).toBe('1');
+    expect(useAuthStore.getState().error).toBeNull();
+  });
+
+  it('redirects when installed on iOS (navigator.standalone)', async () => {
+    Object.defineProperty(navigator, 'standalone', { value: true, configurable: true });
+    try {
+      fb.signInWithRedirect.mockResolvedValue(undefined);
+      await useAuthStore.getState().signInWithGoogle();
+      expect(fb.signInWithRedirect).toHaveBeenCalled();
+      expect(fb.signInWithPopup).not.toHaveBeenCalled();
+      expect(hasAuthHint()).toBe(true);
+    } finally {
+      delete (navigator as { standalone?: boolean }).standalone;
+    }
+  });
+
+  it('clears the redirect marker when the installed redirect fails', async () => {
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as never;
+    fb.signInWithRedirect.mockRejectedValue({ code: 'auth/network-request-failed' });
+    await useAuthStore.getState().signInWithGoogle();
+    expect(sessionStorage.getItem('auth-redirecting')).toBeNull();
+    expect(useAuthStore.getState().error).toMatch(/connection/i);
+  });
+
+  it('finishes an installed-app redirect on return', async () => {
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as never;
+    fb.signInWithRedirect.mockResolvedValue(undefined);
+    await useAuthStore.getState().signInWithGoogle();
+    fb.getRedirectResult.mockResolvedValue({ user: fakeUser });
+    initAuth();
+    expect(fb.getRedirectResult).toHaveBeenCalled();
+    await vi.waitFor(() => expect(useAuthStore.getState().freshSignIn).toBe(true));
   });
 
   it('handles the redirect result on startup when a redirect sign-in is pending', async () => {
