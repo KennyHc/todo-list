@@ -163,6 +163,10 @@ export function SettingsPopover() {
   const user = useAuthStore((s) => s.user);
   const signOut = useAuthStore((s) => s.signOut);
   const syncStatus = useSyncStore((s) => s.syncStatus);
+  const synced = syncStatus === 'ready' || syncStatus === 'loading';
+  // Announce "Synced" only on the way back, not on every load.
+  const [wasOff, setWasOff] = useState(false);
+  if (!synced && !wasOff) setWasOff(true);
   const [photoFailed, setPhotoFailed] = useState(false);
   const installable = useSyncExternalStore(subscribeInstall, canPromptInstall, () => false);
   const [standalone] = useState(isStandalone);
@@ -193,7 +197,7 @@ export function SettingsPopover() {
       <button
         ref={buttonRef}
         type="button"
-        aria-label="Account"
+        aria-label={synced ? 'Account' : `Account, ${SYNC_LABELS[syncStatus]}`}
         title={user?.email || 'Account'}
         aria-haspopup="menu"
         aria-expanded={popoverOpen}
@@ -213,7 +217,12 @@ export function SettingsPopover() {
             {initialsOf(user?.name ?? '', user?.email ?? '')}
           </span>
         )}
+        {/* Shown by CSS off <main data-sync>, so it is visible without opening the menu. */}
+        <span className={styles.syncBadge} data-sync-badge aria-hidden="true" />
       </button>
+      <span className={styles.srOnly} role="status">
+        {synced ? (wasOff ? SYNC_LABELS.ready : '') : SYNC_LABELS[syncStatus]}
+      </span>
 
       <Popover
         open={popoverOpen}
