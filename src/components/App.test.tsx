@@ -722,8 +722,8 @@ describe('the Completed section of the deadline view', () => {
       'aria-checked',
       'true',
     );
-    // Its old section (This week) went away with its last row.
-    await waitFor(() => expect(screen.queryByText('This week')).toBeNull());
+    // Its old section (Next 7 days) went away with its last row.
+    await waitFor(() => expect(screen.queryByText('Next 7 days')).toBeNull());
   });
 
   it('reopening from Completed returns the row to its date section', async () => {
