@@ -77,6 +77,9 @@ describe('auth state', () => {
     fb.listener!(null);
     expect(calls).toEqual(['stop']);
     expect(useTaskStore.getState().rootIds).toEqual([]);
+    // An account switch passes through here: the old account's undo history must not survive.
+    expect(useTaskStore.getState().past).toEqual([]);
+    expect(useTaskStore.getState().future).toEqual([]);
   });
 });
 
@@ -201,6 +204,8 @@ describe('signOut', () => {
     expect(s.rootIds).toEqual([]);
     expect(s.editingId).toBeNull();
     expect(s.undo).toBeNull();
+    expect(s.past).toEqual([]);
+    expect(s.future).toEqual([]);
     expect(useAuthStore.getState().status).toBe('signedOut');
     expect(hasAuthHint()).toBe(false);
   });

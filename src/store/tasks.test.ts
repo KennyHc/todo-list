@@ -4,6 +4,7 @@ import {
   migrateTasksState,
   readLegacyLocalTasks,
   resetTaskStore,
+  UNDO_DEPTH,
   useTaskStore,
 } from './tasks';
 import { mkTask } from '../test/factories';
@@ -196,20 +197,26 @@ describe('undo', () => {
     expect(get().undo).toBeNull();
   });
 
-  it('only undoes the latest action, and non-undoable actions keep the entry', () => {
+  it('keeps the toast entry through quiet edits, and the toast undoes back to its action', () => {
     const a = get().add({ title: 'A' });
     const b = get().add({ title: 'B' });
     get().remove(a);
     get().remove(b);
     const entry = get().undo;
-    get().add({ title: 'C' });
-    get().update(b, {});
+    const c = get().add({ title: 'C' });
+    get().update(c, { title: 'C2' });
     expect(get().undo).toBe(entry);
-    get().undoLast();
+    get().undoToast();
     expect(get().tasks[b]).toBeDefined();
     expect(get().tasks[a]).toBeUndefined();
-    get().undoLast();
-    expect(get().tasks[a]).toBeUndefined();
+    expect(get().tasks[c]).toBeUndefined();
+    expect(get().undo).toBeNull();
+    // Redo walks forward again, the toast's action first.
+    get().redoLast();
+    expect(get().tasks[b]).toBeUndefined();
+    get().redoLast();
+    get().redoLast();
+    expect(get().tasks[c]?.title).toBe('C2');
   });
 
   it('undoes history clearing and replaceAll', () => {
@@ -226,6 +233,132 @@ describe('undo', () => {
     expect(get().rootIds).toEqual([]);
     get().undoLast();
     expect(get().tasks[a]).toBeDefined();
+  });
+});
+
+describe('undo history', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-02T12:00:00'));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('undoes one step at a time after the toast is dismissed', () => {
+    const a = get().add({ title: 'A' });
+    get().add({ title: 'B' });
+    get().update(a, { title: 'A2' });
+    get().remove(a);
+    get().dismissUndo();
+    expect(get().undo).toBeNull();
+    get().undoLast();
+    expect(get().tasks[a]?.title).toBe('A2');
+    get().undoLast();
+    expect(get().tasks[a]?.title).toBe('A');
+    get().undoLast();
+    get().undoLast();
+    expect(get().tasks).toEqual({});
+    // Nothing left: a further undo is a no-op.
+    const tasks = get().tasks;
+    get().undoLast();
+    expect(get().tasks).toBe(tasks);
+  });
+
+  it('keeps at most UNDO_DEPTH steps, dropping the oldest', () => {
+    for (let i = 0; i < UNDO_DEPTH + 5; i++) get().add({ title: `T${i}` });
+    expect(get().past).toHaveLength(UNDO_DEPTH);
+    for (let i = 0; i < UNDO_DEPTH + 5; i++) get().undoLast();
+    // The first five adds are out of reach.
+    expect(get().rootIds.map((id) => get().tasks[id].title)).toEqual([
+      'T0',
+      'T1',
+      'T2',
+      'T3',
+      'T4',
+    ]);
+  });
+
+  it('redoes undone steps, and a new action empties the redo list', () => {
+    const a = get().add({ title: 'A' });
+    get().setTagColor('work', '#c0333a');
+    get().undoLast();
+    get().undoLast();
+    expect(get().tasks[a]).toBeUndefined();
+    get().redoLast();
+    expect(get().tasks[a]).toBeDefined();
+    get().add({ title: 'B' });
+    expect(get().future).toEqual([]);
+    get().redoLast();
+    expect(get().tagColors).toEqual({});
+  });
+
+  it('does not record expanding or collapsing, or no-op edits', () => {
+    const p = get().add({ title: 'P' });
+    get().add({ title: 'C', parentId: p });
+    const steps = get().past.length;
+    get().update(p, { collapsed: true });
+    get().update(p, { title: 'P' });
+    expect(get().past).toHaveLength(steps);
+  });
+
+  it('folds the first title of a just-added row into its add', () => {
+    const draft = get().add({ title: '' });
+    get().update(draft, { title: 'Named' });
+    expect(get().past).toHaveLength(1);
+    get().undoLast();
+    expect(get().tasks[draft]).toBeUndefined();
+  });
+
+  it('records indent and outdent', () => {
+    get().add({ title: 'A' });
+    const b = get().add({ title: 'B' });
+    get().indent(b);
+    expect(get().tasks[b].parentId).not.toBeNull();
+    get().undoLast();
+    expect(get().tasks[b].parentId).toBeNull();
+  });
+
+  it('forgets an abandoned draft entirely', () => {
+    const a = get().add({ title: 'A' });
+    get().remove(a);
+    const draft = get().add({ title: '', parentId: null });
+    get().remove(draft);
+    get().undoLast();
+    // The step back is the deletion of A, not the draft's add.
+    expect(get().tasks[a]).toBeDefined();
+  });
+
+  it('is emptied by a reset (sign-out or account switch)', () => {
+    const a = get().add({ title: 'A' });
+    get().remove(a);
+    get().undoLast();
+    expect(get().past.length).toBeGreaterThan(0);
+    expect(get().future.length).toBeGreaterThan(0);
+    resetTaskStore();
+    expect(get().past).toEqual([]);
+    expect(get().future).toEqual([]);
+    get().undoLast();
+    get().redoLast();
+    expect(get().tasks).toEqual({});
+  });
+
+  it('drops steps older than remote content, keeping only the toast entry', () => {
+    const a = get().add({ title: 'A' });
+    get().setTagColor('work', '#c0333a');
+    const entry = get().undo;
+    get().hydrate({ tasks: { ...get().tasks, [a]: { ...get().tasks[a], title: 'Remote' } } });
+    expect(get().past).toEqual([entry]);
+    expect(get().future).toEqual([]);
+    get().undoLast();
+    expect(get().tagColors).toEqual({});
+    // The add of A predates the remote edit, so it is out of reach.
+    get().undoLast();
+    expect(get().tasks[a]).toBeDefined();
+  });
+
+  it('keeps the history when only settings arrive', () => {
+    get().add({ title: 'A' });
+    get().hydrate({ settings: { ...DEFAULT_SETTINGS, hints: {} } });
+    expect(get().past).toHaveLength(1);
   });
 });
 

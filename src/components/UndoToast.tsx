@@ -15,7 +15,7 @@ function isTextEntry(target: EventTarget | null): boolean {
 
 function Toast({ entry }: { entry: UndoEntry }) {
   const reduced = useReducedMotion();
-  const undo = useTaskStore((s) => s.undoLast);
+  const undo = useTaskStore((s) => s.undoToast);
   const dismiss = useTaskStore((s) => s.dismissUndo);
 
   return (
@@ -63,22 +63,26 @@ function Toast({ entry }: { entry: UndoEntry }) {
   );
 }
 
-/** Toast for the latest undoable action. Cmd/Ctrl+Z also undoes, except inside text fields. */
+/**
+ * Toast for the latest undoable action. Cmd/Ctrl+Z steps back through the undo history, toast or
+ * not, and Shift+Cmd/Ctrl+Z or Ctrl+Y redoes; text fields keep their own undo.
+ */
 export function UndoToast() {
   const entry = useTaskStore((s) => s.undo);
-  const active = entry !== null;
 
   useEffect(() => {
-    if (!active) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
-      if (e.key.toLowerCase() !== 'z' || isTextEntry(e.target)) return;
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || isTextEntry(e.target)) return;
+      const key = e.key.toLowerCase();
+      const redo = (key === 'z' && e.shiftKey) || (key === 'y' && e.ctrlKey && !e.shiftKey);
+      if (!redo && (key !== 'z' || e.shiftKey)) return;
       e.preventDefault();
-      useTaskStore.getState().undoLast();
+      if (redo) useTaskStore.getState().redoLast();
+      else useTaskStore.getState().undoLast();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [active]);
+  }, []);
 
   return (
     <div className={styles.region}>
