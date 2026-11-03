@@ -202,7 +202,7 @@ cp .env.example .env.local
 | `VITE_USE_EMULATORS`                | Set to `1` to use the local auth and Firestore emulators |
 
 `VITE_FIREBASE_AUTH_DOMAIN` must be the domain the app is served from (production:
-`tasks-app-956r6.web.app`), not the `firebaseapp.com` default that `sdkconfig` prints. Firebase
+`writeitdown.web.app`), not the `firebaseapp.com` default that `sdkconfig` prints. Firebase
 Hosting serves the sign-in handler at `/__/auth/handler` on that domain, so sign-in stays
 same-origin. With a different domain, phones come back from Google signed out. The domain's
 `https://<domain>/__/auth/handler` must be an authorized redirect URI on the OAuth client in Google
