@@ -49,9 +49,11 @@ export function DemoCard({ autoplay = true }: { autoplay?: boolean }) {
   const { tree } = demo;
 
   return (
-    <div className={styles.stage}>
+    <div className={styles.stage} role="img" aria-label="Preview">
       <div className={styles.glow} aria-hidden="true" />
-      <div ref={ref} className={styles.card} role="group" aria-label="Interactive demo">
+      {/* A picture of the app, not the app: out of the Tab order and the accessibility tree.
+          React 18 only passes `inert` through as a string attribute. */}
+      <div ref={ref} className={styles.card} {...{ inert: '' }}>
         <div className={styles.composer} aria-hidden="true">
           <Plus size={16} strokeWidth={2} className={styles.plus} />
           {demo.typed ? (

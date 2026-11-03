@@ -48,27 +48,38 @@ function Logo() {
   );
 }
 
-/** Fades and rises its children in once, staggered, when scrolled into view. */
+/**
+ * Staggers its children in. The hero fades and rises on load; sections further down only rise
+ * when scrolled into view, so their content is visible even if that never happens (print,
+ * screenshots, link previews).
+ */
 function Reveal({
   children,
   className,
   as = 'div',
+  immediate = false,
 }: {
   children: ReactNode;
   className?: string;
   as?: 'div' | 'section';
+  immediate?: boolean;
 }) {
   const reduced = useReducedMotion();
   const Tag = as === 'section' ? motion.section : motion.div;
   const container: Variants = {
     hidden: {},
+    rise: {},
     show: { transition: { staggerChildren: reduced ? 0 : 0.08 } },
   };
-  return (
+  return immediate ? (
+    <Tag className={className} variants={container} initial="hidden" animate="show">
+      {children}
+    </Tag>
+  ) : (
     <Tag
       className={className}
       variants={container}
-      initial="hidden"
+      initial="rise"
       whileInView="show"
       viewport={{ once: true, margin: '0px 0px -10% 0px' }}
     >
@@ -80,9 +91,10 @@ function Reveal({
 function Item({ children, className }: { children: ReactNode; className?: string }) {
   const reduced = useReducedMotion();
   const variants: Variants = reduced
-    ? { hidden: { opacity: 1 }, show: { opacity: 1 } }
+    ? { hidden: { opacity: 1 }, rise: { opacity: 1 }, show: { opacity: 1 } }
     : {
         hidden: { opacity: 0, y: 12 },
+        rise: { y: 12 },
         show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: ease.out } },
       };
   return (
@@ -111,13 +123,13 @@ export function LandingPage({ onSignIn, signingIn = false, error = null, notice 
             <span className={styles.wordmark}>Tasks</span>
           </a>
           <button type="button" className={styles.ghost} onClick={onSignIn} disabled={signingIn}>
-            Sign in
+            Continue with Google
           </button>
         </div>
       </header>
 
       <main>
-        <Reveal as="section" className={`${styles.hero} ${styles.wrap}`}>
+        <Reveal as="section" className={`${styles.hero} ${styles.wrap}`} immediate>
           <Item className={styles.chip}>
             <span>Free · Private · Synced</span>
           </Item>
