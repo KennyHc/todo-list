@@ -47,7 +47,19 @@
     inset: -4px;
   }
 
-  .label,
+  .keys {
+    display: none;
+  }
+}
+
+/* Narrow window (phones are above): icon only, so the toolbar fits the column. */
+@media (min-width: 481px) and (max-width: 720px) {
+  .button {
+    justify-content: center;
+    width: 30px;
+    padding: 0;
+  }
+
   .keys {
     display: none;
   }

@@ -95,8 +95,11 @@
   }
 }
 
-/* Four views don't fit with every label on a phone: only the active one keeps its. */
-@media (max-width: 480px) {
+/*
+ * Four views don't fit with every label on a phone, or next to Search and Filter on a narrow
+ * window: only the active one keeps its.
+ */
+@media (max-width: 720px) {
   .track[data-count='4'] .option:not(.active),
   .track[data-count='5'] .option:not(.active) {
     width: 40px;
