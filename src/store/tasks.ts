@@ -10,7 +10,7 @@ import { isHexColor, isSafeTagKey, normalizeTagColors, normalizeTaskColor } from
 import { normalizeTag } from '../lib/tags';
 import { isISODate } from '../lib/dates';
 import { applySettingsPatch, normalizeSettings, type SettingsPatch } from '../lib/settings';
-import { nextLabel, normalizeRepeat, spawnNextOccurrence } from '../lib/recur';
+import { isUntouchedCopy, nextLabel, normalizeRepeat, spawnNextOccurrence } from '../lib/recur';
 import { hideUntilLabel, overdueIds, overdueMoveLabel, rescheduleLabel } from '../lib/reschedule';
 import {
   applyHistory,
@@ -353,6 +353,7 @@ export const createTaskStore = () =>
       // auto-completed) leave their next occurrence behind, inside this same update and undo.
       let after = toggled;
       const spawned = new Map<string, string>();
+      let madeOneOff = false;
       if (toggled.tasks[id]?.done) {
         const affected = [id, ...getDescendants(before, id), ...getAncestors(before, id)];
         const becameDone = (taskId: string) =>
@@ -370,6 +371,24 @@ export const createTaskStore = () =>
           after = result.tree;
           spawned.set(taskId, result.newId);
         }
+      } else {
+        // Reopening takes back what completing spawned, so a series keeps one open occurrence: an
+        // untouched copy goes away; one the user edited or worked on stays and the reopened task
+        // becomes a one-off, so completing it again spawns nothing.
+        const affected = [id, ...getDescendants(before, id), ...getAncestors(before, id)];
+        for (const taskId of affected) {
+          if (!before.tasks[taskId]?.done || before.tasks[taskId].repeat === null) continue;
+          let kept = false;
+          for (const copy of Object.values(before.tasks)) {
+            if (copy.spawnedFrom !== taskId || !after.tasks[copy.id]) continue;
+            if (isUntouchedCopy(before, copy.id)) after = deleteTask(after, copy.id, now);
+            else kept = true;
+          }
+          if (kept) {
+            after = updateTask(after, taskId, { repeat: null });
+            if (taskId === id) madeOneOff = true;
+          }
+        }
       }
 
       const diff = diffCompletions(before, after, id, now, state.tagColors);
@@ -382,7 +401,7 @@ export const createTaskStore = () =>
           ? `Completed ${diff.completed.length} tasks`
           : `${toggled.tasks[id]?.done ? 'Completed' : 'Reopened'} \u201c${title}\u201d${
               next === null ? '' : ` \u00b7 ${nextLabel(next, todayISO(new Date(now)))}`
-            }`;
+            }${madeOneOff ? ' \u00b7 no longer repeats' : ''}`;
       set({
         tasks: after.tasks,
         rootIds: after.rootIds,
