@@ -40,7 +40,7 @@ export function StrikeText({ done, children, delay = 0, wrap = false }: Props) {
         >
           <motion.span
             initial={false}
-            animate={{ opacity: done ? 0.55 : 1 }}
+            animate={{ opacity: done ? 0.62 : 1 }}
             transition={{ duration: 0.3, delay: done ? delay + 0.08 : delay }}
           >
             {children}

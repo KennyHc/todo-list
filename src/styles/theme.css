@@ -11,19 +11,22 @@
 
   --text: #0f172a;
   --text-2: #475569;
-  /* 4.5:1 on white cards (AA for small text), still clearly lighter than --text-2. */
-  --muted: #6b778a;
+  /* 4.9:1 or better on the page, cards and surface-2 (AA for small text), still lighter than --text-2. */
+  --muted: #5f6b7d;
 
   --accent: #7c9cf0;
   --accent-soft: rgba(124, 156, 240, 0.14);
   --ring: rgba(124, 156, 240, 0.45);
-  /* Text-weight accent for small links: --accent itself is too light on white. */
-  --accent-ink: #4466c9;
+  /* Text-weight accent for small links: --accent itself is too light on white. 4.8:1 or better
+     on accent-soft too (avatar initial, today's Week header). */
+  --accent-ink: #3d5fc2;
 
   --check-ink: #0f172a;
 
   --danger: #e5484d;
   --danger-soft: rgba(229, 72, 77, 0.1);
+  /* Danger as text (overdue): 4.5:1 or better on every surface and on danger-soft. */
+  --danger-text: #c0333a;
 
   --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.08);
   --shadow-lift: 0 2px 4px rgba(15, 23, 42, 0.05), 0 14px 28px -12px rgba(15, 23, 42, 0.16);
@@ -90,6 +93,8 @@
 
   --danger: #f2555a;
   --danger-soft: rgba(242, 85, 90, 0.14);
+  /* A step lighter than --danger so the overdue pill passes on a hovered row too. */
+  --danger-text: #f46468;
 
   --shadow-card:
     inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.4),
