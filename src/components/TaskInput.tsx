@@ -87,6 +87,22 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const phone = useIsPhone();
   // The phone's composer docks to the bottom edge; lift it above the keyboard while it has focus.
   const keyboard = useKeyboardInset(phone && focused);
+  // The docked composer's measured height, as --dock-h on the root: the list's bottom padding
+  // and the undo toast clear it however tall it grows (chips, tools, hints).
+  const dockRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const dock = dockRef.current;
+    if (!phone || !dock || typeof ResizeObserver === 'undefined') return;
+    const root = document.documentElement.style;
+    const observer = new ResizeObserver(() =>
+      root.setProperty('--dock-h', `${Math.ceil(dock.getBoundingClientRect().height)}px`),
+    );
+    observer.observe(dock, { box: 'border-box' });
+    return () => {
+      observer.disconnect();
+      root.removeProperty('--dock-h');
+    };
+  }, [phone]);
   // First run after sign-in: ready to type. Skipped on touch so the keyboard doesn't pop up.
   useEffect(() => {
     if (autoFocus && !isTouch) inputRef.current?.focus();
@@ -278,6 +294,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
 
   return (
     <div
+      ref={dockRef}
       className={styles.dock}
       data-intro="2"
       data-keyboard={keyboard > 0 || undefined}

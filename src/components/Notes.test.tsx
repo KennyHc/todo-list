@@ -36,7 +36,12 @@ const seed = (title: string, notes?: string) => {
   });
   return id;
 };
-const rowOf = (title: string) => screen.getByText(title).closest('li') as HTMLElement;
+// The phone sheet repeats the title, so pick the copy inside a row.
+const rowOf = (title: string) =>
+  screen
+    .getAllByText(title)
+    .map((el) => el.closest('li'))
+    .find(Boolean) as HTMLElement;
 
 /** The row's options sheet: ⋯ on the row, or on a phone the title editor's ⋯. */
 const openMenu = (title: string) => {
