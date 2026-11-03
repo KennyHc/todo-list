@@ -130,3 +130,19 @@
     line-height: 1.35;
   }
 }
+
+/* Touch: Undo and close a fingertip tall (the card clips, so not with hit boxes). */
+@media (pointer: coarse) {
+  .card {
+    padding-block: 0;
+  }
+
+  .undo {
+    min-height: var(--tap);
+  }
+
+  .close {
+    width: var(--tap);
+    height: var(--tap);
+  }
+}
