@@ -28,7 +28,7 @@ import { addSubtask } from '../lib/addSubtask';
 import { splitTitleLinks } from '../lib/links';
 import { ignoreTextEntry } from '../lib/textEntry';
 import { primeKeyboard } from '../lib/focusProxy';
-import { rowControls, TEXT_ENTRY } from '../hooks/useHotkeys';
+import { rowControls, TEXT_ENTRY, toggleKeepingFocus } from '../hooks/useHotkeys';
 import { getAncestors, getDescendants, hiddenUntilStart } from '../lib/tree';
 import {
   isContextOnly,
@@ -639,7 +639,12 @@ function TaskItemInner({
                   checked={task.done}
                   label={`Done: ${task.title}`}
                   delay={delay}
-                  onToggle={() => store.toggle(id)}
+                  onToggle={() => {
+                    // From the keyboard (or a click, which focuses the button), the focus must not
+                    // fall to <body> when the completed row leaves the list.
+                    if (rowRef.current?.contains(document.activeElement)) toggleKeepingFocus(id);
+                    else store.toggle(id);
+                  }}
                   tabIndex={-1}
                 />
                 <div className={styles.title}>
