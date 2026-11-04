@@ -7,7 +7,7 @@ import { appendAiTasks, type AiImportTask } from '../lib/ai';
 import { toggleDelay } from '../lib/cascade';
 import { effectiveColor } from '../lib/colorResolve';
 import { isHexColor, isSafeTagKey, normalizeTagColors, normalizeTaskColor } from '../lib/colors';
-import { normalizeTag } from '../lib/tags';
+import { normalizeTag, normalizeTags } from '../lib/tags';
 import { isISODate } from '../lib/dates';
 import { applySettingsPatch, normalizeSettings, type SettingsPatch } from '../lib/settings';
 import { isUntouchedCopy, nextLabel, normalizeRepeat, spawnNextOccurrence } from '../lib/recur';
@@ -29,6 +29,7 @@ import {
   indentTask,
   isLeaf,
   moveTask,
+  clampTitle,
   normalizeNotes,
   outdentTask,
   progress,
@@ -176,8 +177,13 @@ export function migrateTasksState(persisted: unknown): PersistedTasks {
   for (const [id, task] of Object.entries((old.tasks ?? {}) as Record<string, Task>)) {
     tasks[id] = {
       ...task,
+      // Clamped to the editor's (and the Firestore rules') limits: a hand-made or scripted
+      // backup must not carry a task the server rejects, which would roll back the whole batch.
+      title: clampTitle(typeof task.title === 'string' ? task.title : ''),
       color: normalizeTaskColor(task.color),
-      tags: task.tags ?? [],
+      tags: Array.isArray(task.tags)
+        ? normalizeTags(task.tags.filter((t): t is string => typeof t === 'string'))
+        : [],
       dueDate: task.dueDate ?? null,
       repeat: normalizeRepeat(task.repeat),
       plannedFor: isISODate(task.plannedFor) ? task.plannedFor : null,

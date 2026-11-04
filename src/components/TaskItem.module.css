@@ -707,4 +707,16 @@
   .noteBtn::after {
     inset: var(--tap-inset);
   }
+
+  /* The note icon is 14px wide: room after it so the next tag's hit area doesn't cut into its
+     44px one (#65). */
+  .noteBtn {
+    margin-right: var(--space-2);
+  }
+
+  /* 16px between the ⋯ and the difficulty button, so their 44px hit areas meet without
+     overlapping (#65). */
+  .editorMenu {
+    margin-right: 4px;
+  }
 }
