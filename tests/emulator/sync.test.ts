@@ -459,6 +459,53 @@ describe('initial load and migration', () => {
   });
 });
 
+describe('pending writes (#61)', () => {
+  it('counts a large restore while it uploads, back to 0 once the server has it all', async () => {
+    const first = await signedInDb(true);
+    uid = first.uid;
+    const store = createTaskStore();
+    const seen: number[] = [];
+    const sink = makeSink();
+    const withPending = {
+      getState: () => ({
+        ...sink.getState(),
+        setPendingWrites: (n: number) => void seen.push(n),
+      }),
+    };
+    const stop = startSync(uid, {
+      db: first.db,
+      store: store as unknown as SyncStore,
+      status: withPending as never,
+      legacy: { read: () => null, clear: () => {} },
+      ...FAST,
+      pendingNoticeMs: 0,
+    });
+    clients.push({ app: first.app, db: first.db, store, sink, stop });
+    await vi.waitFor(() => expect(sink.getState().status).toMatch(/ready|offline/), {
+      timeout: 8000,
+    });
+
+    const N = 1200; // three batches
+    const tasks = Object.fromEntries(
+      Array.from({ length: N }, (_, i) => [`r${i}`, mkOld(`r${i}`)]),
+    );
+    const { settings } = store.getState();
+    store
+      .getState()
+      .replaceAll(
+        { tasks, rootIds: Object.keys(tasks), history: [], tagColors: {}, settings },
+        'Restored backup',
+      );
+
+    await vi.waitFor(() => expect(Math.max(0, ...seen)).toBeGreaterThan(0), { timeout: 8000 });
+    await vi.waitFor(() => expect(seen.at(-1)).toBe(0), { timeout: 20000 });
+    expect(Math.max(...seen)).toBeLessThanOrEqual(N + 1); // tasks plus the meta document
+
+    const server = await getDocs(collection(first.db, 'users', uid, 'tasks'));
+    expect(server.size).toBe(N);
+  }, 30000);
+});
+
 describe('restoring a backup that breaks the rules limits (#63)', () => {
   it('keeps all 77 tasks in the app and on the server', async () => {
     const first = await signedInDb(true);

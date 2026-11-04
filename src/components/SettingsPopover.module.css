@@ -45,6 +45,11 @@
   display: block;
 }
 
+:global(main[data-sync='ready'][data-saving]) .syncBadge {
+  display: block;
+  background: var(--accent);
+}
+
 :global(main[data-sync='error']) .syncBadge {
   display: block;
   background: var(--danger);
@@ -172,6 +177,22 @@
 
 .sync[data-status='offline'] .dot {
   background: var(--muted);
+}
+
+.sync[data-status='saving'] .dot {
+  animation: savingPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes savingPulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sync[data-status='saving'] .dot {
+    animation: none;
+  }
 }
 
 .sync[data-status='error'] {

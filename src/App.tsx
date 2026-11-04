@@ -110,6 +110,7 @@ function App() {
   const tagFilter = useUIStore((s) => s.tagFilter);
   const freshSignIn = useAuthStore((s) => s.freshSignIn);
   const syncStatus = useSyncStore((s) => s.syncStatus);
+  const saving = useSyncStore((s) => s.pendingWrites > 0);
   const phone = useIsPhone();
   const { y, scrolled } = useScrollState();
   useHotkeys();
@@ -122,6 +123,7 @@ function App() {
       <main
         className={intro ? 'app intro' : 'app'}
         data-sync={syncStatus}
+        data-saving={saving || undefined}
         data-scrolled={(phone && scrolled) || undefined}
       >
         {phone && <CompactBar y={y} />}
