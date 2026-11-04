@@ -46,7 +46,7 @@ export const sameRepeat = (a: Repeat | null | undefined, b: Repeat | null | unde
   a === b ||
   (!!a && !!b && a.every === b.every && a.weekday === b.weekday && a.anchorDay === b.anchorDay);
 
-const clampTitle = (title: string) => title.slice(0, MAX_TITLE_LENGTH);
+export const clampTitle = (title: string) => title.slice(0, MAX_TITLE_LENGTH);
 /** Notes are clamped like titles; blank ones are no notes at all (''). */
 const clampNotes = (notes: string) => (notes.trim() === '' ? '' : notes.slice(0, MAX_NOTES_LENGTH));
 
