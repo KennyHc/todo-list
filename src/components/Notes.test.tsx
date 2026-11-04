@@ -36,7 +36,12 @@ const seed = (title: string, notes?: string) => {
   });
   return id;
 };
-const rowOf = (title: string) => screen.getByText(title).closest('li') as HTMLElement;
+// The phone sheet repeats the title, so pick the copy inside a row.
+const rowOf = (title: string) =>
+  screen
+    .getAllByText(title)
+    .map((el) => el.closest('li'))
+    .find(Boolean) as HTMLElement;
 
 /** The row's options sheet: ⋯ on the row, or on a phone the title editor's ⋯. */
 const openMenu = (title: string) => {
@@ -110,31 +115,58 @@ describe('writing a note', () => {
     }
   });
 
-  it('Esc reverts and closes without saving', async () => {
+  it('Esc saves the draft and closes the editor, like blur', async () => {
     const id = seed('Call Sam', 'original');
     render(<App />);
     fireEvent.click(within(openMenu('Call Sam')).getByRole('button', { name: 'Edit note' }));
     expect(editor()).toHaveValue('original');
-    fireEvent.change(editor(), { target: { value: 'changed my mind' } });
+    fireEvent.change(editor(), { target: { value: 'changed it\n' } });
     fireEvent.keyDown(editor(), { key: 'Escape' });
+    expect(get().tasks[id].notes).toBe('changed it');
     await waitFor(() => noEditor());
+    // Saved once, with an undo, and shown read-only.
+    expect(get().undo?.label).toBe('Edited note on \u201cCall Sam\u201d');
+    expect(await screen.findByText('changed it')).toBeInTheDocument();
+    act(() => get().undoLast());
     expect(get().tasks[id].notes).toBe('original');
-    expect(get().undo).toBeNull();
-    // The note is closed, not read-only: the row is back to its icon.
-    expect(screen.queryByText('original')).toBeNull();
-    expect(
-      within(rowOf('Call Sam')).getByRole('button', { name: 'Show note' }),
-    ).toBeInTheDocument();
   });
 
-  it('Esc on a new note leaves the task without one', async () => {
+  it('Esc on a new note keeps the draft', async () => {
     const id = seed('Call Sam');
     render(<App />);
     fireEvent.click(within(openMenu('Call Sam')).getByRole('button', { name: 'Add note' }));
     fireEvent.change(editor(), { target: { value: 'draft' } });
     fireEvent.keyDown(editor(), { key: 'Escape' });
     await waitFor(() => noEditor());
+    expect(get().tasks[id].notes).toBe('draft');
+  });
+
+  it('Esc on an empty new note leaves the task without one', async () => {
+    const id = seed('Call Sam');
+    render(<App />);
+    fireEvent.click(within(openMenu('Call Sam')).getByRole('button', { name: 'Add note' }));
+    fireEvent.keyDown(editor(), { key: 'Escape' });
+    await waitFor(() => noEditor());
     expect(get().tasks[id].notes).toBeUndefined();
+    expect(get().undo).toBeNull();
+  });
+
+  it('Esc in the editor keeps the row selected', async () => {
+    const id = seed('Call Sam');
+    render(<App />);
+    act(() => useUIStore.getState().setFocusedId(id));
+    fireEvent.click(within(openMenu('Call Sam')).getByRole('button', { name: 'Add note' }));
+    fireEvent.change(editor(), { target: { value: 'draft' } });
+    fireEvent.keyDown(editor(), { key: 'Escape' });
+    await waitFor(() => noEditor());
+    expect(useUIStore.getState().focusedId).toBe(id);
+  });
+
+  it('shows the save and close keys under the editor', () => {
+    seed('Call Sam');
+    render(<App />);
+    fireEvent.click(within(openMenu('Call Sam')).getByRole('button', { name: 'Add note' }));
+    expect(editor()).toHaveAccessibleDescription(/to save · Esc to close/);
   });
 
   it('saving an empty note removes it, and the icon with it', async () => {
@@ -230,7 +262,6 @@ describe('a task with a note', () => {
     fireEvent.keyDown(editor(), { key: 'Escape' });
     await waitFor(() => noEditor());
 
-    fireEvent.click(within(rowOf('Call Sam')).getByRole('button', { name: 'Show note' }));
     await screen.findByText('hello');
     act(() => get().update(id, { notes: '' }));
     await waitFor(() => expect(screen.queryByText('hello')).toBeNull());

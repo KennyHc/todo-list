@@ -236,3 +236,22 @@
     font-size: 16px;
   }
 }
+
+/* Touch: full-height buttons and a fingertip hit area around the close button. */
+@media (pointer: coarse) {
+  .primary,
+  .secondary {
+    height: var(--tap);
+    font-size: 14px;
+  }
+
+  .close {
+    position: relative;
+  }
+
+  .close::after {
+    content: '';
+    position: absolute;
+    inset: var(--tap-inset);
+  }
+}

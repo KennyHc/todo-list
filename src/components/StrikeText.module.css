@@ -18,6 +18,15 @@
   background-repeat: no-repeat;
 }
 
+/* Narrow columns (Week view): up to three lines. */
+.wrapped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
 /* Titles may wrap to two lines on small screens. */
 @media (max-width: 480px), (hover: none) {
   .text {

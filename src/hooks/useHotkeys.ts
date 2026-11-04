@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { siblingMoveTarget } from '../lib/dnd';
 import { isLeaf } from '../lib/tree';
+import { weekStart, weekStepMove } from '../lib/week';
 import { neighborAfterRemoval, todayISO, visibleOrder, visibleTreeIds } from '../lib/views';
+import { useDragStore } from '../store/drag';
 import { useTaskStore } from '../store/tasks';
 import { currentView, useUIStore, viewOrder, type View } from '../store/ui';
 import type { Difficulty } from '../types';
@@ -13,6 +15,7 @@ export type HotkeyAction =
   | { type: 'filter' }
   | { type: 'view'; view: View }
   | { type: 'move'; step: 1 | -1 }
+  | { type: 'edge'; last: boolean }
   | { type: 'toggle' }
   | { type: 'edit' }
   | { type: 'delete' }
@@ -22,6 +25,7 @@ export type HotkeyAction =
   | { type: 'collapse'; collapsed: boolean }
   | { type: 'reorder'; step: 1 | -1 }
   | { type: 'nest'; direction: 'in' | 'out' }
+  | { type: 'day'; step: 1 | -1 }
   | { type: 'help' };
 
 export type HotkeyEvent = {
@@ -40,6 +44,8 @@ export type HotkeyContext = {
   modalOpen: boolean;
   /** Focus is on a button, link or other control that owns Enter, Space and the arrows. */
   interactive?: boolean;
+  /** That control is one of a row's own buttons: ↑/↓ still move between rows. */
+  inRow?: boolean;
   view: View;
   /** A visible row is focused. */
   hasFocus: boolean;
@@ -86,6 +92,7 @@ export function matchHotkey(e: HotkeyEvent, ctx: HotkeyContext): HotkeyAction | 
 
   const rows = ctx.view !== 'history';
   const own = ctx.interactive === true;
+  const rowControl = own && ctx.inRow === true;
   switch (e.key) {
     case 'n':
       return { type: 'composer' };
@@ -94,7 +101,8 @@ export function matchHotkey(e: HotkeyEvent, ctx: HotkeyContext): HotkeyAction | 
     case '1':
     case '2':
     case '3':
-    case '4': {
+    case '4':
+    case '5': {
       const view = viewOrder(ctx.todayView === true)[Number(e.key) - 1];
       return view ? { type: 'view', view } : null;
     }
@@ -103,9 +111,12 @@ export function matchHotkey(e: HotkeyEvent, ctx: HotkeyContext): HotkeyAction | 
     case 'k':
       return rows ? { type: 'move', step: -1 } : null;
     case 'ArrowDown':
-      return rows && !own ? { type: 'move', step: 1 } : null;
+      return rows && (!own || rowControl) ? { type: 'move', step: 1 } : null;
     case 'ArrowUp':
-      return rows && !own ? { type: 'move', step: -1 } : null;
+      return rows && (!own || rowControl) ? { type: 'move', step: -1 } : null;
+    case 'Home':
+    case 'End':
+      return rows && !own ? { type: 'edge', last: e.key === 'End' } : null;
     case 'x':
       return ctx.hasFocus ? { type: 'toggle' } : null;
     case ' ':
@@ -121,9 +132,14 @@ export function matchHotkey(e: HotkeyEvent, ctx: HotkeyContext): HotkeyAction | 
     case 'Backspace':
     case 'Delete':
       return ctx.hasFocus ? { type: 'delete' } : null;
+    case '[':
+    case ']':
+      return ctx.hasFocus && ctx.view === 'week'
+        ? { type: 'day', step: e.key === ']' ? 1 : -1 }
+        : null;
     case 'ArrowRight':
     case 'ArrowLeft':
-      return ctx.hasFocus && ctx.view === 'tree' && !own
+      return ctx.hasFocus && rows && !own
         ? { type: 'collapse', collapsed: e.key === 'ArrowLeft' }
         : null;
     default:
@@ -131,10 +147,26 @@ export function matchHotkey(e: HotkeyEvent, ctx: HotkeyContext): HotkeyAction | 
   }
 }
 
-const TEXT_ENTRY = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
+export const TEXT_ENTRY =
+  'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
 const CONTROLS =
   'button, a[href], summary, [role="button"], [role="checkbox"], [role="radio"], [role="menuitem"], [role="option"], [role="tab"]';
 const OVERLAYS = '[role="dialog"], [role="alertdialog"]';
+/** The controls inside a row item that ←/→ walk through (see TaskItem). */
+export const ROW_CONTROLS = 'button:not(:disabled), a[href], [data-row-control]';
+
+/** A row item's controls in order, skipping hidden ones (the phone's hidden ⋯, a closed tray). */
+export function rowControls(item: Element): HTMLElement[] {
+  return [...item.querySelectorAll<HTMLElement>(ROW_CONTROLS)].filter(
+    (el) => el.getClientRects().length > 0 && el.closest('[aria-hidden="true"]') === null,
+  );
+}
+
+/** Moves keyboard focus to a shown row's first control (→ on a row). */
+function enterRow(id: string): void {
+  const item = document.querySelector(`[data-row-id="${CSS.escape(id)}"]`);
+  if (item) rowControls(item)[0]?.focus();
+}
 
 /** The visibleOrder options for what the UI currently shows. */
 const orderOf = (ui: ReturnType<typeof useUIStore.getState>) => ({
@@ -143,7 +175,59 @@ const orderOf = (ui: ReturnType<typeof useUIStore.getState>) => ({
   completedCollapsed: ui.completedCollapsed,
   completedShowAll: ui.completedShowAll,
   showUpcoming: ui.showUpcoming,
+  weekAnchor: ui.weekAnchor,
 });
+
+/** Completions that handed the keyboard focus on: undo entry id -> the completed task. */
+const handedOn = new Map<string, string>();
+const HANDED_ON_MAX = 20;
+
+/** Focuses a shown row: through the store, or directly when the store already points at it. */
+function focusRow(id: string | null): void {
+  const ui = useUIStore.getState();
+  if (ui.focusedId !== id) {
+    ui.setFocusedId(id); // TaskItem moves the DOM focus (only out of a row or from nowhere)
+    return;
+  }
+  if (id === null) return;
+  const row = document.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(id)}"] [data-row]`);
+  const active = document.activeElement;
+  if (row && (active === null || active === document.body || active.closest('[data-row-id]'))) {
+    row.focus({ preventScroll: true });
+  }
+}
+
+/**
+ * Toggles a task the keyboard is on (`x`, Space, or its checkbox). A completed row leaves the
+ * list (with its subtree, and maybe its parent), so focus moves on to the next row that stays,
+ * and undoing the completion brings it back (see useHotkeys).
+ */
+export function toggleKeepingFocus(id: string): void {
+  const ui = useUIStore.getState();
+  const order = visibleOrder(useTaskStore.getState(), orderOf(ui));
+  useTaskStore.getState().toggle(id);
+  const after = useTaskStore.getState();
+  const stays = new Set(visibleOrder(after, orderOf(ui)));
+  if (stays.has(id)) return;
+  const entry = after.past.at(-1);
+  if (entry) {
+    handedOn.set(entry.id, id);
+    if (handedOn.size > HANDED_ON_MAX) handedOn.delete(handedOn.keys().next().value!);
+  }
+  const gone = new Set(order.filter((other) => !stays.has(other)));
+  focusRow(neighborAfterRemoval(order, id, gone));
+}
+
+/** After an undo: the task whose completion was just taken back, if it had handed focus on. */
+function restoredByUndo(prevFuture: { id: string }[], future: { id: string }[]): string | null {
+  if (future.length <= prevFuture.length) return null;
+  const before = new Set(prevFuture.map((e) => e.id));
+  for (const entry of future) {
+    const id = !before.has(entry.id) ? handedOn.get(entry.id) : undefined;
+    if (id !== undefined) return id;
+  }
+  return null;
+}
 
 const asElement = (target: EventTarget | null) => (target instanceof Element ? target : null);
 
@@ -157,10 +241,13 @@ export function useHotkeys(): void {
       const tasks = useTaskStore.getState();
       const order = visibleOrder(tasks, orderOf(ui));
       const focusedId = ui.focusedId !== null && order.includes(ui.focusedId) ? ui.focusedId : null;
+      const control = el?.closest(CONTROLS);
       const ctx: HotkeyContext = {
         typing: !!el?.closest(TEXT_ENTRY),
         modalOpen: !!document.querySelector(OVERLAYS),
-        interactive: !!el?.closest(CONTROLS),
+        interactive: !!control,
+        // While a grip carries a row by keyboard, the arrows are the drag's.
+        inRow: !!control?.closest('[data-row-id]') && useDragStore.getState().activeId === null,
         view: currentView(),
         hasFocus: focusedId !== null,
         todayView: tasks.settings.todayView,
@@ -201,18 +288,12 @@ export function useHotkeys(): void {
           ui.setFocusedId(order[next]);
           break;
         }
-        case 'toggle': {
-          if (!focusedId) break;
-          tasks.toggle(focusedId);
-          // A completed row leaves the list (with its subtree, and maybe its parent), so focus
-          // moves on to the next row that stays, and j/k keep working.
-          const stays = new Set(visibleOrder(useTaskStore.getState(), orderOf(ui)));
-          if (!stays.has(focusedId)) {
-            const gone = new Set(order.filter((other) => !stays.has(other)));
-            ui.setFocusedId(neighborAfterRemoval(order, focusedId, gone));
-          }
+        case 'edge':
+          if (order.length > 0) ui.setFocusedId(order[action.last ? order.length - 1 : 0]);
           break;
-        }
+        case 'toggle':
+          if (focusedId) toggleKeepingFocus(focusedId);
+          break;
         case 'edit':
           if (focusedId) tasks.setEditingId(focusedId);
           break;
@@ -242,11 +323,21 @@ export function useHotkeys(): void {
             tasks.update(focusedId, { difficulty: action.value });
           }
           break;
-        case 'collapse':
-          if (focusedId && !isLeaf(tasks, focusedId)) {
+        case 'collapse': {
+          // The tree pattern: → opens a closed row, ← closes an open one or goes to its parent.
+          // → on an open row or a leaf steps into the row's buttons (←/→ there, see TaskItem).
+          if (!focusedId) break;
+          const task = tasks.tasks[focusedId];
+          const nested = ctx.view === 'tree' && task !== undefined;
+          if (nested && !isLeaf(tasks, focusedId) && task.collapsed !== action.collapsed) {
             tasks.update(focusedId, { collapsed: action.collapsed });
+          } else if (!action.collapsed) {
+            enterRow(focusedId);
+          } else if (nested && task.parentId !== null && order.includes(task.parentId)) {
+            ui.setFocusedId(task.parentId);
           }
           break;
+        }
         case 'reorder': {
           if (!focusedId) break;
           const target = siblingMoveTarget(
@@ -272,6 +363,21 @@ export function useHotkeys(): void {
           }
           break;
         }
+        case 'day': {
+          if (!focusedId) break;
+          const task = tasks.tasks[focusedId];
+          if (!task) break;
+          const today = todayISO();
+          const current = weekStart(today);
+          const start = ui.weekAnchor ?? current;
+          const move = weekStepMove(task, action.step, start, today);
+          if (!move) break;
+          tasks.moveToDay(focusedId, move);
+          // Past Sunday or before Monday: the week follows the row, so it stays selected.
+          const shown = weekStart(move.date);
+          if (shown !== start) ui.setWeekAnchor(shown === current ? null : shown);
+          break;
+        }
         case 'help':
           ui.setPaletteOpen(false);
           ui.setSheetOpen(true);
@@ -279,6 +385,37 @@ export function useHotkeys(): void {
       }
     };
     document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    // Undoing a completion (⌘Z or the toast) that had moved focus on puts it back on the row,
+    // when the keyboard is still in the list.
+    const unsubscribe = useTaskStore.subscribe((s, p) => {
+      if (s.future === p.future) return;
+      const id = restoredByUndo(p.future, s.future);
+      if (id === null) return;
+      const active = document.activeElement;
+      const inList = useUIStore.getState().focusedId !== null || !!active?.closest('[data-row-id]');
+      if (inList) focusRow(id);
+    });
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      unsubscribe();
+    };
+  }, []);
+
+  // Roving tabindex: keep tabStopId on the focused row, or the first row while none is focused.
+  useEffect(() => {
+    const sync = () => {
+      const ui = useUIStore.getState();
+      const order = visibleOrder(useTaskStore.getState(), orderOf(ui));
+      const id =
+        ui.focusedId !== null && order.includes(ui.focusedId) ? ui.focusedId : (order[0] ?? null);
+      if (id !== ui.tabStopId) useUIStore.setState({ tabStopId: id });
+    };
+    sync();
+    const offTasks = useTaskStore.subscribe(sync);
+    const offUI = useUIStore.subscribe(sync);
+    return () => {
+      offTasks();
+      offUI();
+    };
   }, []);
 }

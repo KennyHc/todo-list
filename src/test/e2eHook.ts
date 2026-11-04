@@ -10,6 +10,10 @@ declare global {
       deleteAccount: () => Promise<void>;
       /** Sets the due date of the open task with this exact title (e.g. a past date). */
       setDueDate: (title: string, dueDate: string | null) => Promise<void>;
+      /** Replaces the list with `count` plain root tasks in one change, like restoring a backup. */
+      restoreTasks: (count: number) => Promise<void>;
+      /** Sets the note of the open task with this exact title. */
+      setNotes: (title: string, notes: string) => Promise<void>;
     };
   }
 }
@@ -36,6 +40,46 @@ export function installE2eHook(auth: Auth): void {
       const found = Object.values(tasks).find((t) => t.title === title && !t.done);
       if (!found) throw new Error(`no open task titled "${title}"`);
       update(found.id, { dueDate });
+    },
+    async restoreTasks(count) {
+      const { useTaskStore } = await import('../store/tasks');
+      const { settings, replaceAll } = useTaskStore.getState();
+      const now = Date.now();
+      const tasks = Object.fromEntries(
+        Array.from({ length: count }, (_, i) => {
+          const id = `restored-${now}-${i}`;
+          return [
+            id,
+            {
+              id,
+              title: `Restored ${i + 1}`,
+              difficulty: 1 as const,
+              color: null,
+              done: false,
+              collapsed: false,
+              tags: [],
+              dueDate: null,
+              repeat: null,
+              plannedFor: null,
+              startDate: null,
+              parentId: null,
+              childIds: [],
+              createdAt: now,
+            },
+          ];
+        }),
+      );
+      replaceAll(
+        { tasks, rootIds: Object.keys(tasks), history: [], tagColors: {}, settings },
+        `Restored backup (${count} tasks)`,
+      );
+    },
+    async setNotes(title, notes) {
+      const { useTaskStore } = await import('../store/tasks');
+      const { tasks, update } = useTaskStore.getState();
+      const found = Object.values(tasks).find((t) => t.title === title && !t.done);
+      if (!found) throw new Error(`no open task titled "${title}"`);
+      update(found.id, { notes });
     },
   };
 }

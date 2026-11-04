@@ -98,3 +98,14 @@
     font-size: 13px;
   }
 }
+
+@media (pointer: coarse) {
+  .seg {
+    width: var(--tap);
+    height: var(--tap);
+  }
+
+  .fill .seg {
+    width: auto;
+  }
+}

@@ -10,7 +10,6 @@
   pointer-events: none;
 }
 
-/* Swapping toasts overlap in one grid cell. */
 .card {
   position: relative;
   grid-area: 1 / 1;
@@ -86,7 +85,8 @@
   background: var(--accent);
   opacity: 0.6;
   transform-origin: left;
-  animation: drain 5s linear forwards;
+  /* Duration is set inline from UNDO_MS in UndoToast.tsx. */
+  animation: drain 8s linear forwards;
 }
 
 .card:hover .bar,
@@ -104,9 +104,9 @@
 }
 
 @media (max-width: 480px) {
-  /* Sits just above the docked composer: 12px gap + the 48px bar + 8px of air. */
+  /* Sits 8px above the docked composer's card (the dock less its 24px fade), however tall it is. */
   .region {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 68px);
+    bottom: calc(var(--dock-h) - var(--space-6) + var(--space-2));
     /* Under the composer dock (z 40): an expanded composer covers it rather than the reverse. */
     z-index: 39;
     padding: 0 12px;
@@ -128,5 +128,21 @@
     line-clamp: 2;
     white-space: normal;
     line-height: 1.35;
+  }
+}
+
+/* Touch: Undo and close a fingertip tall (the card clips, so not with hit boxes). */
+@media (pointer: coarse) {
+  .card {
+    padding-block: 0;
+  }
+
+  .undo {
+    min-height: var(--tap);
+  }
+
+  .close {
+    width: var(--tap);
+    height: var(--tap);
   }
 }

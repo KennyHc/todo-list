@@ -28,7 +28,18 @@ vi.mock('../sync/syncControl', () => ({
   }),
 }));
 
-import { hasAuthHint, initAuth, isInAppBrowser, useAuthStore } from './auth';
+const resumeDeleteAccount = vi.hoisted(() => vi.fn(async () => null as unknown));
+vi.mock('../sync/deleteAccount', () => ({ resumeDeleteAccount }));
+
+import {
+  DELETE_NOT_CONFIRMED,
+  DELETE_WRONG_ACCOUNT,
+  hasAuthHint,
+  initAuth,
+  isInAppBrowser,
+  useAuthStore,
+} from './auth';
+import { useUIStore } from './ui';
 import { resetTaskStore, useTaskStore } from './tasks';
 
 const reset = () =>
@@ -77,6 +88,9 @@ describe('auth state', () => {
     fb.listener!(null);
     expect(calls).toEqual(['stop']);
     expect(useTaskStore.getState().rootIds).toEqual([]);
+    // An account switch passes through here: the old account's undo history must not survive.
+    expect(useTaskStore.getState().past).toEqual([]);
+    expect(useTaskStore.getState().future).toEqual([]);
   });
 });
 
@@ -112,12 +126,58 @@ describe('signInWithGoogle', () => {
     expect(hasAuthHint()).toBe(true); // so the splash, not the landing page, shows on return
   });
 
-  it('uses the popup on touch devices too (redirect breaks under storage partitioning)', async () => {
-    window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as never;
+  it('uses the popup in a browser tab, including touch devices', async () => {
+    window.matchMedia = vi.fn((q: string) => ({ matches: q === '(pointer: coarse)' })) as never;
     fb.signInWithPopup.mockResolvedValue({ user: fakeUser });
     await useAuthStore.getState().signInWithGoogle();
+    expect(window.matchMedia).toHaveBeenCalledWith('(display-mode: standalone)');
     expect(fb.signInWithPopup).toHaveBeenCalled();
     expect(fb.signInWithRedirect).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('auth-redirecting')).toBeNull();
+  });
+
+  it('redirects without a popup when installed (display-mode: standalone)', async () => {
+    window.matchMedia = vi.fn((q: string) => ({
+      matches: q === '(display-mode: standalone)',
+    })) as never;
+    fb.signInWithRedirect.mockResolvedValue(undefined);
+    await useAuthStore.getState().signInWithGoogle();
+    expect(fb.signInWithRedirect).toHaveBeenCalled();
+    expect(fb.signInWithRedirect.mock.calls[0]).toHaveLength(3);
+    expect(fb.signInWithPopup).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('auth-redirecting')).toBe('1');
+    expect(useAuthStore.getState().error).toBeNull();
+  });
+
+  it('redirects when installed on iOS (navigator.standalone)', async () => {
+    Object.defineProperty(navigator, 'standalone', { value: true, configurable: true });
+    try {
+      fb.signInWithRedirect.mockResolvedValue(undefined);
+      await useAuthStore.getState().signInWithGoogle();
+      expect(fb.signInWithRedirect).toHaveBeenCalled();
+      expect(fb.signInWithPopup).not.toHaveBeenCalled();
+      expect(hasAuthHint()).toBe(true);
+    } finally {
+      delete (navigator as { standalone?: boolean }).standalone;
+    }
+  });
+
+  it('clears the redirect marker when the installed redirect fails', async () => {
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as never;
+    fb.signInWithRedirect.mockRejectedValue({ code: 'auth/network-request-failed' });
+    await useAuthStore.getState().signInWithGoogle();
+    expect(sessionStorage.getItem('auth-redirecting')).toBeNull();
+    expect(useAuthStore.getState().error).toMatch(/connection/i);
+  });
+
+  it('finishes an installed-app redirect on return', async () => {
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as never;
+    fb.signInWithRedirect.mockResolvedValue(undefined);
+    await useAuthStore.getState().signInWithGoogle();
+    fb.getRedirectResult.mockResolvedValue({ user: fakeUser });
+    initAuth();
+    expect(fb.getRedirectResult).toHaveBeenCalled();
+    await vi.waitFor(() => expect(useAuthStore.getState().freshSignIn).toBe(true));
   });
 
   it('handles the redirect result on startup when a redirect sign-in is pending', async () => {
@@ -142,6 +202,37 @@ describe('signInWithGoogle', () => {
   });
 });
 
+describe('delete-account redirect return', () => {
+  beforeEach(() => {
+    sessionStorage.setItem('delete-pending', '1');
+    useUIStore.getState().clearNotice();
+  });
+
+  it('resumes the deletion once the re-authentication succeeded', async () => {
+    fb.getRedirectResult.mockResolvedValue({ user: fakeUser });
+    initAuth();
+    await vi.waitFor(() => expect(resumeDeleteAccount).toHaveBeenCalledTimes(1));
+    expect(useAuthStore.getState().freshSignIn).toBe(false);
+  });
+
+  it('says the account was not deleted when the user came back without confirming', async () => {
+    fb.getRedirectResult.mockResolvedValue(null);
+    initAuth();
+    await vi.waitFor(() => expect(useUIStore.getState().notice?.text).toBe(DELETE_NOT_CONFIRMED));
+    expect(resumeDeleteAccount).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('delete-pending')).toBeNull();
+  });
+
+  it('explains a different Google account and deletes nothing', async () => {
+    fb.getRedirectResult.mockRejectedValue({ code: 'auth/user-mismatch' });
+    initAuth();
+    await vi.waitFor(() => expect(useUIStore.getState().notice?.text).toBe(DELETE_WRONG_ACCOUNT));
+    expect(resumeDeleteAccount).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('delete-pending')).toBeNull();
+    expect(useAuthStore.getState().error).toBeNull();
+  });
+});
+
 describe('signOut', () => {
   it('flushes, stops sync, signs out, then resets the tasks', async () => {
     initAuth();
@@ -155,6 +246,8 @@ describe('signOut', () => {
     expect(s.rootIds).toEqual([]);
     expect(s.editingId).toBeNull();
     expect(s.undo).toBeNull();
+    expect(s.past).toEqual([]);
+    expect(s.future).toEqual([]);
     expect(useAuthStore.getState().status).toBe('signedOut');
     expect(hasAuthHint()).toBe(false);
   });

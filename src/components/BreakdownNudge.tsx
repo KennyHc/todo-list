@@ -3,9 +3,13 @@ import { Sparkles } from 'lucide-react';
 import styles from './BreakdownNudge.module.css';
 import { spring } from '../styles/motion';
 
-type Props = { onBreakdown: () => void };
+type Props = {
+  onBreakdown: () => void;
+  /** -1 inside a task row, which is the Tab stop for its controls (roving tabindex). */
+  tabIndex?: number;
+};
 
-export function BreakdownNudge({ onBreakdown }: Props) {
+export function BreakdownNudge({ onBreakdown, tabIndex }: Props) {
   return (
     <motion.div
       initial={{ height: 0, opacity: 0 }}
@@ -20,7 +24,7 @@ export function BreakdownNudge({ onBreakdown }: Props) {
           <span className={styles.full}>Large task — consider breaking it down</span>
           <span className={styles.short}>Large task</span>
         </span>
-        <button type="button" className={styles.button} onClick={onBreakdown}>
+        <button type="button" className={styles.button} tabIndex={tabIndex} onClick={onBreakdown}>
           Add subtasks →
         </button>
       </div>

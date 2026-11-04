@@ -15,8 +15,10 @@ const GROUPS: ShortcutGroup[] = [
     items: [
       { label: 'Next row', keys: [['j'], ['↓']] },
       { label: 'Previous row', keys: [['k'], ['↑']] },
-      { label: 'Expand', keys: [['→']] },
-      { label: 'Collapse', keys: [['←']] },
+      { label: 'First or last row', keys: [['Home'], ['End']] },
+      { label: 'Expand, then the row’s buttons', keys: [['→']] },
+      { label: 'Collapse, then the parent row', keys: [['←']] },
+      { label: 'Back to the row from its buttons', keys: [['Esc']] },
       { label: 'Clear selection', keys: [['Esc']] },
     ],
   },
@@ -44,6 +46,7 @@ const GROUPS: ShortcutGroup[] = [
           ['alt', '←'],
         ],
       },
+      { label: 'Week: previous or next day', keys: [['['], [']']] },
     ],
   },
   {
@@ -63,6 +66,7 @@ const GROUPS: ShortcutGroup[] = [
       { label: 'Tree', keys: [['2']] },
       { label: 'By deadline', keys: [['3']] },
       { label: 'History', keys: [['4']] },
+      { label: 'Week', keys: [['5']] },
       { label: 'Filter by tag', keys: [['/']] },
     ],
   },
@@ -70,6 +74,8 @@ const GROUPS: ShortcutGroup[] = [
     title: 'General',
     items: [
       { label: 'Command palette', keys: [['mod', 'K']] },
+      { label: 'Undo', keys: [['mod', 'Z']] },
+      { label: 'Redo', keys: [['mod', '⇧', 'Z']] },
       { label: 'Keyboard shortcuts', keys: [['?']] },
       { label: 'Close', keys: [['Esc']] },
     ],
@@ -82,6 +88,7 @@ const VIEW_KEYS_WITHOUT_TODAY: Record<string, string> = {
   Tree: '1',
   'By deadline': '2',
   History: '3',
+  Week: '4',
 };
 
 /**

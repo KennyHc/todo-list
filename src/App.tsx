@@ -23,6 +23,7 @@ import { TaskList } from './components/TaskList';
 import { TodayList } from './components/TodayList';
 import { UndoToast } from './components/UndoToast';
 import { ViewToolbar } from './components/ViewToolbar';
+import { WeekView } from './components/WeekView';
 import { useHotkeys } from './hooks/useHotkeys';
 import { useIsPhone } from './hooks/useMediaQuery';
 import { usePasteImport } from './hooks/usePasteImport';
@@ -75,16 +76,25 @@ function CompactBar({ y }: { y: ReturnType<typeof useMotionValue<number>> }) {
 
 function Controls() {
   const { openDifficulty, done, total } = useTotals();
+  // Spelled out for screen readers and the hover title; "points" is the effort unit Today and Week use.
+  const doneLabel = `${done} of ${total} ${total === 1 ? 'task' : 'tasks'} done`;
+  const loadLabel = `${openDifficulty} ${openDifficulty === 1 ? 'point' : 'points'} left`;
   return (
     <div className={styles.controls}>
       {total > 0 && (
         <div className={styles.stats}>
-          <ProgressRing value={done / total} />
-          <span className={styles.count}>
-            <AnimatedNumber value={done} />/<AnimatedNumber value={total} />
+          <ProgressRing value={done / total} label={doneLabel} />
+          <span className={styles.count} title={doneLabel}>
+            <span aria-hidden="true">
+              <AnimatedNumber value={done} />/<AnimatedNumber value={total} />
+            </span>
+            <span className={styles.srOnly}>{doneLabel}</span>
           </span>
-          <span className={styles.pill}>
-            Load <AnimatedNumber value={openDifficulty} />
+          <span className={styles.pill} title={loadLabel}>
+            <span aria-hidden="true">
+              Load <AnimatedNumber value={openDifficulty} />
+            </span>
+            <span className={styles.srOnly}>{loadLabel}</span>
           </span>
         </div>
       )}
@@ -100,6 +110,7 @@ function App() {
   const tagFilter = useUIStore((s) => s.tagFilter);
   const freshSignIn = useAuthStore((s) => s.freshSignIn);
   const syncStatus = useSyncStore((s) => s.syncStatus);
+  const saving = useSyncStore((s) => s.pendingWrites > 0);
   const phone = useIsPhone();
   const { y, scrolled } = useScrollState();
   useHotkeys();
@@ -112,6 +123,7 @@ function App() {
       <main
         className={intro ? 'app intro' : 'app'}
         data-sync={syncStatus}
+        data-saving={saving || undefined}
         data-scrolled={(phone && scrolled) || undefined}
       >
         {phone && <CompactBar y={y} />}
@@ -153,6 +165,8 @@ function App() {
                   <HistoryList />
                 ) : view === 'today' ? (
                   <TodayList />
+                ) : view === 'week' ? (
+                  <WeekView />
                 ) : isEmpty ? (
                   <EmptyState welcome={freshSignIn} />
                 ) : view === 'deadline' ? (

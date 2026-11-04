@@ -12,7 +12,7 @@ describe('DuePill display', () => {
     expect(screen.getByText('Tomorrow')).toBeInTheDocument();
   });
 
-  it('shows only the weekday under a This week header', () => {
+  it('shows only the weekday under a Next 7 days header', () => {
     const date = addDays(todayISO(), 4);
     render(<DuePill dueDate={date} display="weekday" />);
     expect(screen.getByText(/^[A-Za-z]+$/)).toBeInTheDocument();

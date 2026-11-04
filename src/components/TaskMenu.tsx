@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, type MotionProps } from 'framer-motion';
 import { Eye, EyeOff, MoreHorizontal, Plus, StickyNote, Sun, SunDim, Trash2 } from 'lucide-react';
+import { useIsPhone } from '../hooks/useMediaQuery';
 import { weekdayDate } from '../lib/dates';
 import { nextOccurrence, repeatPatch, repeatPhrase } from '../lib/recur';
 import { todayISO } from '../lib/views';
@@ -36,6 +37,8 @@ type Props = {
   onOpenChange?: (open: boolean) => void;
   /** Render the sheet only; something else opens it. */
   hideTrigger?: boolean;
+  /** The trigger's tabindex: -1 inside a task row, which is the Tab stop (roving tabindex). */
+  tabIndex?: number;
 };
 
 /**
@@ -81,12 +84,14 @@ export function TaskMenu({
   open: controlledOpen,
   onOpenChange,
   hideTrigger = false,
+  tabIndex,
 }: Props) {
   const task = useTask(id);
   const leaf = useIsLeaf(id);
   const sum = useEffectiveDifficulty(id);
   const colorSource = useColorSource(id);
   const todayView = useTaskStore((s) => s.settings.todayView);
+  const phone = useIsPhone();
   const [ownOpen, setOwnOpen] = useState(false);
   const open = onOpenChange ? (controlledOpen ?? false) : ownOpen;
   const setOpen = onOpenChange ?? setOwnOpen;
@@ -118,6 +123,7 @@ export function TaskMenu({
           aria-label="More options"
           aria-haspopup="dialog"
           aria-expanded={open}
+          tabIndex={tabIndex}
           onClick={() => setOpen(!open)}
         >
           <MoreHorizontal size={16} strokeWidth={1.75} aria-hidden="true" />
@@ -131,6 +137,8 @@ export function TaskMenu({
         align="end"
         width={284}
       >
+        {/* A phone sheet covers the row, so it names the task it edits. */}
+        {phone && <h2 className={styles.title}>{task.title}</h2>}
         <div className={styles.sections}>
           <section className={styles.section}>
             <h3 className={styles.heading}>Difficulty</h3>

@@ -71,9 +71,15 @@
 }
 
 .row:hover,
+.row:focus-visible,
 .row:has(:focus-visible) {
   --row-bg: var(--surface-2);
   background: var(--surface-2);
+}
+
+/* The row itself is the Tab stop (roving tabindex); keep its ring inside the list's edges. */
+.row:focus-visible {
+  outline-offset: -2px;
 }
 
 .rowFocused,
@@ -404,6 +410,7 @@
 }
 
 .row:hover .actions,
+.row:focus-visible .actions,
 .row:has(:focus-visible) .actions,
 .actions:has([aria-expanded='true']) {
   opacity: 1;
@@ -634,12 +641,82 @@
 }
 
 .reason[data-danger] {
-  color: var(--danger);
+  color: var(--danger-text);
   font-weight: 500;
+}
+
+/* Week view: a plan for this day (its due date is another) reads quieter than a deadline. Once
+   done it reads like any done row: the done fade on a lighter colour would fall below 4.5:1. */
+.row[data-quiet]:not([data-done]) .titleBtn {
+  color: var(--text-2);
+}
+
+/* Week view: a narrow column, so the row gives up a little padding to the title. Below 1024px
+   the days are full width and the row keeps its usual insets. */
+@media (min-width: 1024px) {
+  .row[data-compact] {
+    gap: 0 var(--space-1);
+    padding-right: var(--space-1);
+    padding-left: var(--space-1);
+  }
 }
 
 /* The planned rows that push the day over capacity, when "move something" is pressed. */
 .row[data-over],
 .row[data-over]:hover {
   background: var(--danger-soft);
+}
+
+/*
+ * Touch on phones: fingertip hit areas without bigger controls. The title's runs the height of
+ * the first-line band (the row's top padding included), and a meta row is a little taller so
+ * the tags' 44px hit areas (TagChip) stay inside it and mostly off the title.
+ */
+@media (pointer: coarse) and (max-width: 480px) {
+  .titleBtn {
+    position: relative;
+  }
+
+  .titleBtn::after {
+    content: '';
+    position: absolute;
+    top: calc(var(--lh) / 2 - var(--band) / 2);
+    right: 0;
+    left: 0;
+    height: max(var(--band), var(--tap));
+  }
+
+  .titleLine {
+    row-gap: var(--space-2);
+  }
+
+  /* The rest of a tag's hit area, under the 16px meta line. */
+  .row[data-meta] {
+    padding-bottom: calc(var(--tap) - 16px - var(--space-2));
+  }
+
+  /* Cut off at the edge, but let the tags' hit areas reach above and below the line: from the
+     title's last line down, so a tap on the title never lands on a tag. */
+  .tail {
+    --tag-hit-inset: calc(-1 * var(--space-2)) var(--tap-inset)
+      calc(16px + var(--space-2) - var(--tap));
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+
+  .noteBtn::after {
+    inset: var(--tap-inset);
+  }
+
+  /* The note icon is 14px wide: room after it so the next tag's hit area doesn't cut into its
+     44px one (#65). */
+  .noteBtn {
+    margin-right: var(--space-2);
+  }
+
+  /* 16px between the ⋯ and the difficulty button, so their 44px hit areas meet without
+     overlapping (#65). */
+  .editorMenu {
+    margin-right: 4px;
+  }
 }

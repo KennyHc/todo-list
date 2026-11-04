@@ -37,6 +37,10 @@ const SYNC_LABELS: Record<SyncStatus, string> = {
   error: 'Sync error',
 };
 
+/** "Saving 5,000 changes…": shown while writes wait for the server, which a reload could lose. */
+export const savingLabel = (count: number) =>
+  `Saving ${count.toLocaleString('en-US')} ${count === 1 ? 'change' : 'changes'}\u2026`;
+
 const initialsOf = (name: string, email: string) => {
   const parts = (name || email).trim().split(/\s+/).filter(Boolean);
   const letters =
@@ -163,6 +167,13 @@ export function SettingsPopover() {
   const user = useAuthStore((s) => s.user);
   const signOut = useAuthStore((s) => s.signOut);
   const syncStatus = useSyncStore((s) => s.syncStatus);
+  const pendingWrites = useSyncStore((s) => s.pendingWrites);
+  const saving = syncStatus === 'ready' && pendingWrites > 0;
+  const synced = (syncStatus === 'ready' || syncStatus === 'loading') && !saving;
+  const statusLabel = saving ? savingLabel(pendingWrites) : SYNC_LABELS[syncStatus];
+  // Announce "Synced" only on the way back, not on every load.
+  const [wasOff, setWasOff] = useState(false);
+  if (!synced && !wasOff) setWasOff(true);
   const [photoFailed, setPhotoFailed] = useState(false);
   const installable = useSyncExternalStore(subscribeInstall, canPromptInstall, () => false);
   const [standalone] = useState(isStandalone);
@@ -193,7 +204,7 @@ export function SettingsPopover() {
       <button
         ref={buttonRef}
         type="button"
-        aria-label="Account"
+        aria-label={synced ? 'Account' : `Account, ${statusLabel}`}
         title={user?.email || 'Account'}
         aria-haspopup="menu"
         aria-expanded={popoverOpen}
@@ -213,7 +224,12 @@ export function SettingsPopover() {
             {initialsOf(user?.name ?? '', user?.email ?? '')}
           </span>
         )}
+        {/* Shown by CSS off <main data-sync>, so it is visible without opening the menu. */}
+        <span className={styles.syncBadge} data-sync-badge aria-hidden="true" />
       </button>
+      <span className={styles.srOnly} role="status">
+        {synced ? (wasOff ? SYNC_LABELS.ready : '') : statusLabel}
+      </span>
 
       <Popover
         open={popoverOpen}
@@ -229,9 +245,13 @@ export function SettingsPopover() {
               <div className={styles.identity}>
                 <div className={styles.name}>{user.name}</div>
                 {user.email && <div className={styles.email}>{user.email}</div>}
-                <div className={styles.sync} data-status={syncStatus} role="status">
+                <div
+                  className={styles.sync}
+                  data-status={saving ? 'saving' : syncStatus}
+                  role="status"
+                >
                   <span className={styles.dot} aria-hidden="true" />
-                  {SYNC_LABELS[syncStatus]}
+                  {statusLabel}
                 </div>
               </div>
               <div className={styles.divider} role="separator" />

@@ -109,27 +109,56 @@ describe('matchHotkey', () => {
     expect(matchHotkey(ev('j'), onButton)).toEqual({ type: 'move', step: 1 });
   });
 
-  it('only expands and collapses in the tree view, and has no rows in history', () => {
-    expect(matchHotkey(ev('ArrowRight'), ctx({ view: 'deadline' }))).toBeNull();
+  it("↑/↓ still move between rows from a row's own buttons, but not from other controls", () => {
+    const inRow = ctx({ interactive: true, inRow: true });
+    expect(matchHotkey(ev('ArrowDown'), inRow)).toEqual({ type: 'move', step: 1 });
+    expect(matchHotkey(ev('ArrowUp'), inRow)).toEqual({ type: 'move', step: -1 });
+    expect(matchHotkey(ev('Enter'), inRow)).toBeNull();
+    expect(matchHotkey(ev(' '), inRow)).toBeNull();
+    expect(matchHotkey(ev('ArrowRight'), inRow)).toBeNull();
+  });
+
+  it('Home and End go to the first and last row', () => {
+    expect(matchHotkey(ev('Home'), ctx())).toEqual({ type: 'edge', last: false });
+    expect(matchHotkey(ev('End'), ctx({ hasFocus: false }))).toEqual({ type: 'edge', last: true });
+    expect(matchHotkey(ev('End'), ctx({ interactive: true }))).toBeNull();
+    expect(matchHotkey(ev('Home'), ctx({ view: 'history' }))).toBeNull();
+  });
+
+  it('←/→ work on rows in every row view, and history has no rows', () => {
+    expect(matchHotkey(ev('ArrowRight'), ctx({ view: 'deadline' }))).toEqual({
+      type: 'collapse',
+      collapsed: false,
+    });
+    expect(matchHotkey(ev('ArrowRight'), ctx({ view: 'history' }))).toBeNull();
     expect(matchHotkey(ev('j'), ctx({ view: 'history' }))).toBeNull();
     expect(matchHotkey(ev('1'), ctx({ view: 'history' }))).toEqual({ type: 'view', view: 'tree' });
+  });
+
+  it('[ and ] move the focused row a day in Week only', () => {
+    expect(matchHotkey(ev('['), ctx({ view: 'week' }))).toEqual({ type: 'day', step: -1 });
+    expect(matchHotkey(ev(']'), ctx({ view: 'week' }))).toEqual({ type: 'day', step: 1 });
+    expect(matchHotkey(ev(']'), ctx({ view: 'tree' }))).toBeNull();
+    expect(matchHotkey(ev(']'), ctx({ view: 'week', hasFocus: false }))).toBeNull();
   });
 });
 
 describe('matchHotkey with the Today view on', () => {
   const on = (extra: Partial<HotkeyContext> = {}) => ctx({ todayView: true, ...extra });
 
-  it('numbers the views from Today: 1 Today, 2 Tree, 3 By deadline, 4 History', () => {
+  it('numbers the views from Today: 1 Today, 2 Tree, 3 By deadline, 4 History, 5 Week', () => {
     expect(matchHotkey(ev('1'), on())).toEqual({ type: 'view', view: 'today' });
     expect(matchHotkey(ev('2'), on())).toEqual({ type: 'view', view: 'tree' });
     expect(matchHotkey(ev('3'), on())).toEqual({ type: 'view', view: 'deadline' });
     expect(matchHotkey(ev('4'), on())).toEqual({ type: 'view', view: 'history' });
+    expect(matchHotkey(ev('5'), on())).toEqual({ type: 'view', view: 'week' });
   });
 
-  it('leaves the numbering alone while it is off, and 4 does nothing', () => {
+  it('leaves the numbering alone while it is off: Week is 4 and 5 does nothing', () => {
     expect(matchHotkey(ev('1'), ctx())).toEqual({ type: 'view', view: 'tree' });
     expect(matchHotkey(ev('3'), ctx())).toEqual({ type: 'view', view: 'history' });
-    expect(matchHotkey(ev('4'), ctx())).toBeNull();
+    expect(matchHotkey(ev('4'), ctx())).toEqual({ type: 'view', view: 'week' });
+    expect(matchHotkey(ev('5'), ctx())).toBeNull();
   });
 
   it('p plans the focused row, only with the feature on', () => {

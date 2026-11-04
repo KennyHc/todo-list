@@ -95,15 +95,28 @@
   }
 }
 
-/* Four views don't fit with every label on a phone: only the active one keeps its. */
-@media (max-width: 480px) {
-  .track[data-count='4'] .option:not(.active) {
+/*
+ * Four views don't fit with every label on a phone, or next to Search and Filter on a narrow
+ * window: only the active one keeps its.
+ */
+@media (max-width: 720px) {
+  .track[data-count='4'] .option:not(.active),
+  .track[data-count='5'] .option:not(.active) {
     width: 40px;
     padding: 0;
   }
 
-  .track[data-count='4'] .option:not(.active) .label {
+  .track[data-count='4'] .option:not(.active) .label,
+  .track[data-count='5'] .option:not(.active) .label {
     display: none;
+  }
+}
+
+/* Touch: every view is a full fingertip wide, labels or not. */
+@media (pointer: coarse) and (max-width: 480px) {
+  .track[data-count='4'] .option:not(.active),
+  .track[data-count='5'] .option:not(.active) {
+    width: var(--tap);
   }
 }
 
@@ -112,5 +125,14 @@
     content: '';
     position: absolute;
     inset: -9px -1px;
+  }
+}
+
+/* Small phones with five views: 40px each (42px to tap, the segments touch) so Search and Filter
+   still fit beside them at 320px. */
+@media (pointer: coarse) and (max-width: 359px) {
+  .track[data-count='5'] .option,
+  .track[data-count='5'] .option:not(.active) {
+    width: 40px;
   }
 }

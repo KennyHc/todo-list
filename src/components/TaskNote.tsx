@@ -1,6 +1,8 @@
-import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { useIsTouch } from '../hooks/useIsTouch';
 import { splitNoteLinks } from '../lib/links';
+import { isMac } from '../lib/platform';
 import { useTaskStore } from '../store/tasks';
 import { MAX_NOTES_LENGTH } from '../types';
 import { LinkChip } from './LinkChip';
@@ -31,6 +33,8 @@ function NoteEditor({
   const [height, setHeight] = useState<number | undefined>(undefined);
   const ref = useRef<HTMLTextAreaElement>(null);
   const reduced = useReducedMotion();
+  const touch = useIsTouch();
+  const hintId = useId();
   /** Set once a key action has handled saving, so the blur that follows is ignored. */
   const handled = useRef(false);
   /** The first measurement sets the height without a spring: the block's own spring opens it. */
@@ -67,11 +71,9 @@ function NoteEditor({
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      handled.current = true;
-      onMode('closed');
-    } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    // Esc closes like a click elsewhere does: it saves. preventDefault also keeps the global Esc
+    // (which clears the row selection) out of it.
+    if (e.key === 'Escape' || (e.key === 'Enter' && (e.metaKey || e.ctrlKey))) {
       e.preventDefault();
       handled.current = true;
       save();
@@ -79,31 +81,40 @@ function NoteEditor({
   };
 
   return (
-    <motion.textarea
-      ref={ref}
-      className={styles.editor}
-      value={draft}
-      rows={1}
-      maxLength={MAX_NOTES_LENGTH}
-      aria-label="Note"
-      placeholder="Add a note…"
-      initial={false}
-      animate={height === undefined ? undefined : { height }}
-      transition={reduced || !measured.current ? { duration: 0 } : spring.layout}
-      onChange={(e) => setDraft(e.target.value)}
-      onKeyDown={onKeyDown}
-      onBlur={() => {
-        if (handled.current) return;
-        handled.current = true;
-        save();
-      }}
-    />
+    <>
+      <motion.textarea
+        ref={ref}
+        className={styles.editor}
+        value={draft}
+        rows={1}
+        maxLength={MAX_NOTES_LENGTH}
+        aria-label="Note"
+        aria-describedby={touch ? undefined : hintId}
+        placeholder="Add a note…"
+        initial={false}
+        animate={height === undefined ? undefined : { height }}
+        transition={reduced || !measured.current ? { duration: 0 } : spring.layout}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={onKeyDown}
+        onBlur={() => {
+          if (handled.current) return;
+          handled.current = true;
+          save();
+        }}
+      />
+      {/* Keyboard hint; a touch keyboard has neither key, and a tap elsewhere saves. */}
+      {!touch && (
+        <p id={hintId} className={styles.hint}>
+          {isMac() ? '⌘↵' : 'Ctrl+Enter'} to save · Esc to close
+        </p>
+      )}
+    </>
   );
 }
 
 /**
  * A task's note, under its title: read-only (links as the usual chips, a click edits it) or an
- * auto-growing editor that saves on blur and on ⌘/Ctrl+Enter, and drops its draft on Esc.
+ * auto-growing editor that saves on blur, on ⌘/Ctrl+Enter and on Esc.
  * Opens and closes with a height spring.
  */
 export function TaskNote({ id, notes, mode, onMode }: Props) {
@@ -123,7 +134,9 @@ export function TaskNote({ id, notes, mode, onMode }: Props) {
           className={styles.text}
           role="group"
           aria-label="Note"
-          tabIndex={0}
+          // Inside a task row: reached with → like the row's buttons, not with Tab.
+          tabIndex={-1}
+          data-row-control
           title="Edit note"
           data-swipe-through
           onClick={(e) => {
@@ -141,7 +154,7 @@ export function TaskNote({ id, notes, mode, onMode }: Props) {
             <p key={i} className={styles.line}>
               {text === '' && links.length === 0 ? ' ' : text}
               {links.map((href) => (
-                <LinkChip key={href} href={href} />
+                <LinkChip key={href} href={href} tabIndex={-1} />
               ))}
             </p>
           ))}

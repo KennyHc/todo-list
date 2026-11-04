@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { AlertCircle } from 'lucide-react';
 import { useOverdueIds, useTaskStore } from '../store/tasks';
 import styles from './OverdueNudge.module.css';
@@ -10,6 +10,9 @@ import { spring } from '../styles/motion';
  */
 export function OverdueNudge({ tag }: { tag: string | null }) {
   const count = useOverdueIds(tag).length;
+  // Reduced motion: the line appears at full height. While it grows, its wrapper clips the
+  // button, so a tap (or the hit-area check) can miss it (#65).
+  const reduced = useReducedMotion();
   return (
     <AnimatePresence initial={false}>
       {count > 0 && (
@@ -18,7 +21,7 @@ export function OverdueNudge({ tag }: { tag: string | null }) {
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
-          transition={spring.layout}
+          transition={reduced ? { duration: 0 } : spring.layout}
           style={{ overflow: 'hidden' }}
         >
           <div className={styles.line} role="status">

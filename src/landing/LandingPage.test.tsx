@@ -1,4 +1,4 @@
-import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DemoCard } from './DemoCard';
 import { LandingPage } from './LandingPage';
@@ -33,10 +33,14 @@ describe('LandingPage', () => {
   it('calls onSignIn from every call to action', () => {
     const onSignIn = vi.fn();
     render(<LandingPage onSignIn={onSignIn} />);
-    const google = screen.getAllByRole('button', { name: /continue with google/i });
+    const main = screen.getByRole('main');
+    const google = within(main).getAllByRole('button', { name: /continue with google/i });
     expect(google).toHaveLength(2);
     google.forEach((b) => fireEvent.click(b));
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(onSignIn).toHaveBeenCalledTimes(2);
+    // The header button uses the same label as the hero.
+    const header = document.querySelector('header')!;
+    fireEvent.click(within(header).getByRole('button', { name: 'Continue with Google' }));
     expect(onSignIn).toHaveBeenCalledTimes(3);
   });
 
@@ -48,20 +52,35 @@ describe('LandingPage', () => {
   it('disables the buttons while signing in', () => {
     const onSignIn = vi.fn();
     render(<LandingPage onSignIn={onSignIn} signingIn />);
-    for (const b of screen.getAllByRole('button', { name: /continue with google/i })) {
-      expect(b).toBeDisabled();
-    }
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled();
+    const buttons = screen.getAllByRole('button', { name: /continue with google/i });
+    expect(buttons).toHaveLength(3);
+    for (const b of buttons) expect(b).toBeDisabled();
   });
 
-  it('has a labelled interactive demo whose checkboxes are real buttons', () => {
+  it('shows the demo as an inert preview, out of the Tab order', () => {
     vi.useFakeTimers();
     render(<LandingPage onSignIn={() => {}} />);
-    expect(screen.getByRole('group', { name: 'Interactive demo' })).toBeInTheDocument();
+    const preview = screen.getByRole('img', { name: 'Preview' });
     act(() => {
       vi.advanceTimersByTime(4000);
     });
-    expect(screen.getAllByRole('checkbox').length).toBe(4);
+    const card = preview.querySelector('[inert]');
+    expect(card).not.toBeNull();
+    // The rows are still drawn, just not reachable.
+    expect(card!.querySelectorAll('button[role="checkbox"]').length).toBe(4);
+  });
+
+  it('renders the feature cards and closing call to action visible without scrolling', () => {
+    render(<LandingPage onSignIn={() => {}} />);
+    const below = [
+      screen.getByRole('heading', { name: 'Break it down' }),
+      screen.getByRole('heading', { name: /one click away/i }),
+    ];
+    for (const el of below) {
+      for (let node: HTMLElement | null = el; node; node = node.parentElement) {
+        expect(node.style.opacity).not.toBe('0');
+      }
+    }
   });
 });
 

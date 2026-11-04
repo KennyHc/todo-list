@@ -1,4 +1,5 @@
 .button {
+  position: relative;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -25,6 +26,42 @@
 .button:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+
+/* Sync badge on the avatar: hidden while synced, shown off <main data-sync>. */
+.syncBadge {
+  display: none;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--bg);
+  background: var(--muted);
+}
+
+:global(main[data-sync='offline']) .syncBadge {
+  display: block;
+}
+
+:global(main[data-sync='ready'][data-saving]) .syncBadge {
+  display: block;
+  background: var(--accent);
+}
+
+:global(main[data-sync='error']) .syncBadge {
+  display: block;
+  background: var(--danger);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .menu {
@@ -140,6 +177,22 @@
 
 .sync[data-status='offline'] .dot {
   background: var(--muted);
+}
+
+.sync[data-status='saving'] .dot {
+  animation: savingPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes savingPulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sync[data-status='saving'] .dot {
+    animation: none;
+  }
 }
 
 .sync[data-status='error'] {

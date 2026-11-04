@@ -11,19 +11,22 @@
 
   --text: #0f172a;
   --text-2: #475569;
-  /* 4.5:1 on white cards (AA for small text), still clearly lighter than --text-2. */
-  --muted: #6b778a;
+  /* 4.9:1 or better on the page, cards and surface-2 (AA for small text), still lighter than --text-2. */
+  --muted: #5f6b7d;
 
   --accent: #7c9cf0;
   --accent-soft: rgba(124, 156, 240, 0.14);
   --ring: rgba(124, 156, 240, 0.45);
-  /* Text-weight accent for small links: --accent itself is too light on white. */
-  --accent-ink: #4466c9;
+  /* Text-weight accent for small links: --accent itself is too light on white. 4.8:1 or better
+     on accent-soft too (avatar initial, today's Week header). */
+  --accent-ink: #3d5fc2;
 
   --check-ink: #0f172a;
 
   --danger: #e5484d;
   --danger-soft: rgba(229, 72, 77, 0.1);
+  /* Danger as text (overdue): 4.5:1 or better on every surface and on danger-soft. */
+  --danger-text: #c0333a;
 
   --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.08);
   --shadow-lift: 0 2px 4px rgba(15, 23, 42, 0.05), 0 14px 28px -12px rgba(15, 23, 42, 0.16);
@@ -58,6 +61,14 @@
   --space-7: 32px;
   --space-8: 40px;
 
+  /*
+   * Touch targets, for (pointer: coarse) blocks: the smallest hit area for a finger. Inset a
+   * control's ::after by --tap-inset to grow its hit area to at least --tap on both axes, centred,
+   * without changing its size (the control needs position: relative). Bigger controls get 0.
+   */
+  --tap: 44px;
+  --tap-inset: min(0px, calc((100% - var(--tap)) / 2));
+
   --font: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
@@ -90,6 +101,8 @@
 
   --danger: #f2555a;
   --danger-soft: rgba(242, 85, 90, 0.14);
+  /* A step lighter than --danger so the overdue pill passes on a hovered row too. */
+  --danger-text: #f46468;
 
   --shadow-card:
     inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.4),
@@ -194,6 +207,12 @@ input {
 }
 
 @media (max-width: 480px) {
+  /* The docked composer's height, safe area included. TaskInput sets the measured value on <html>;
+     this is the idle bar until then. */
+  :root {
+    --dock-h: calc(86px + env(safe-area-inset-bottom, 0px));
+  }
+
   .app {
     /* Phone chrome: a 44px compact bar and a 44px view row stick to the top while scrolling;
        the composer docks to the bottom. Sticky section headers sit below the first two. */
@@ -203,7 +222,7 @@ input {
     --bar-h: 44px;
     --sticky-1: calc(var(--top-safe) + var(--bar-h));
     --sticky-2: calc(var(--sticky-1) + 44px);
-    --dock-clear: calc(104px + env(safe-area-inset-bottom, 0px));
+    --dock-clear: calc(var(--dock-h) + var(--space-4));
     padding-top: calc(var(--top-safe) + var(--space-3));
     padding-right: var(--gutter-r);
     padding-bottom: var(--dock-clear);
@@ -262,6 +281,30 @@ input {
 [data-row-color][data-done]::after {
   opacity: 0.4;
   box-shadow: none;
+}
+
+/*
+ * A plan for the day (Week view) has a hollow marker in place of the solid bar: the same strip,
+ * outlined. Rows without a colour get a neutral one, so every plan reads the same way.
+ */
+[data-quiet]::after,
+:root[data-theme='dark'] [data-row-color][data-quiet]::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 5px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 3px;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+[data-row-color][data-quiet]::after,
+:root[data-theme='dark'] [data-row-color][data-quiet]::after {
+  border-color: color-mix(in srgb, var(--row-color) 70%, var(--text));
 }
 
 /* The keyboard-focus bar takes the same spot while a row is focused. */

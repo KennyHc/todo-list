@@ -26,3 +26,25 @@ test('a task added on one device shows up on another, and survives a reload', as
     await b.close();
   }
 });
+
+test('going offline shows a badge on the avatar, and it clears back online', async ({
+  page,
+  context,
+}, info) => {
+  await signIn(page, uniqueSub(info));
+  const badge = page.locator('main [data-sync-badge]');
+  await expect(page.getByRole('button', { name: 'Account', exact: true })).toBeVisible();
+  await expect(badge).toBeHidden();
+
+  await context.setOffline(true);
+  await expect(page.locator('main[data-sync="offline"]')).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Account, Offline — changes will sync' }),
+  ).toBeVisible();
+  await expect(badge).toBeVisible();
+
+  await context.setOffline(false);
+  await ready(page);
+  await expect(page.getByRole('button', { name: 'Account', exact: true })).toBeVisible();
+  await expect(badge).toBeHidden();
+});

@@ -65,3 +65,36 @@
   opacity: 0;
   cursor: pointer;
 }
+
+/*
+ * Touch: bigger swatches spaced a fingertip apart, each with a fingertip hit area (they wrap to
+ * a second line in a sheet). The custom swatch's colour input is the hit area there, so it can't
+ * be clipped to the circle.
+ */
+@media (pointer: coarse) {
+  .swatches {
+    gap: var(--space-4);
+    padding: var(--space-2);
+  }
+
+  .swatch {
+    width: 28px;
+    height: 28px;
+  }
+
+  .swatch:not(.custom)::after {
+    content: '';
+    position: absolute;
+    inset: var(--tap-inset);
+  }
+
+  .custom {
+    overflow: visible;
+  }
+
+  .native {
+    inset: calc((100% - var(--tap)) / 2);
+    width: var(--tap);
+    height: var(--tap);
+  }
+}

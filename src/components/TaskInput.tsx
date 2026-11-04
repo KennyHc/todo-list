@@ -11,7 +11,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Calendar, Hourglass, Plus, Repeat as RepeatIcon, Tag, X } from 'lucide-react';
+import { Calendar, CircleHelp, Hourglass, Plus, Repeat as RepeatIcon, Tag, X } from 'lucide-react';
 import { useIsTouch } from '../hooks/useIsTouch';
 import { useKeyboardInset } from '../hooks/useKeyboardInset';
 import { useIsPhone } from '../hooks/useMediaQuery';
@@ -28,12 +28,13 @@ import { DifficultyGlyph } from './DifficultyGlyph';
 import { consumeLaunchParams } from '../pwa/newTaskShortcut';
 import { Popover } from './Popover';
 import { QuickChip } from './QuickChip';
+import { SyntaxHint } from './SyntaxHint';
 import { TagChip } from './TagChip';
 import { TagEditor } from './TagEditor';
 import styles from './TaskInput.module.css';
 import { dur, ease, spring } from '../styles/motion';
 
-type Panel = 'tag' | 'date' | null;
+type Panel = 'tag' | 'date' | 'syntax' | null;
 
 /** A `#prefix` being typed right before the caret. */
 const OPEN_TOKEN = /(^|\s)#([\p{L}\p{N}_-]+)$/u;
@@ -62,6 +63,8 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const [caret, setCaret] = useState(0);
   const [tags, setTags] = useState<string[]>([]);
   const [due, setDue] = useState<string | null>(null);
+  /** The day a Week "+" opened the composer for: the due date unless the text or toolbar says. */
+  const [dayDue, setDayDue] = useState<string | null>(null);
   /** A repeat picked from the toolbar; it wins over one typed in the text. */
   const [pickedRepeat, setPickedRepeat] = useState<Repeat | null>(null);
   const [focused, setFocused] = useState(false);
@@ -77,6 +80,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const tagBtnRef = useRef<HTMLButtonElement>(null);
   const dateBtnRef = useRef<HTMLButtonElement>(null);
+  const syntaxBtnRef = useRef<HTMLButtonElement>(null);
   const pendingCaret = useRef<number | null>(null);
   const listId = useId();
   const closePanel = useCallback(() => setPanel(null), []);
@@ -85,6 +89,22 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const phone = useIsPhone();
   // The phone's composer docks to the bottom edge; lift it above the keyboard while it has focus.
   const keyboard = useKeyboardInset(phone && focused);
+  // The docked composer's measured height, as --dock-h on the root: the list's bottom padding
+  // and the undo toast clear it however tall it grows (chips, tools, hints).
+  const dockRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const dock = dockRef.current;
+    if (!phone || !dock || typeof ResizeObserver === 'undefined') return;
+    const root = document.documentElement.style;
+    const observer = new ResizeObserver(() =>
+      root.setProperty('--dock-h', `${Math.ceil(dock.getBoundingClientRect().height)}px`),
+    );
+    observer.observe(dock, { box: 'border-box' });
+    return () => {
+      observer.disconnect();
+      root.removeProperty('--dock-h');
+    };
+  }, [phone]);
   // First run after sign-in: ready to type. Skipped on touch so the keyboard doesn't pop up.
   useEffect(() => {
     if (autoFocus && !isTouch) inputRef.current?.focus();
@@ -101,6 +121,15 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
     }
     if (newTask || text !== null) inputRef.current?.focus();
   }, []);
+
+  // A Week day's "+": focus the composer, set to that day.
+  const composerDay = useUIStore((s) => s.composerDay);
+  useEffect(() => {
+    if (composerDay === null) return;
+    setDayDue(composerDay);
+    useUIStore.getState().setComposerDay(null);
+    inputRef.current?.focus();
+  }, [composerDay]);
 
   const parsed = useMemo(
     () => parseQuickAdd(value, { ignore: ignored, repeats: SUPPORTS_REPEAT }),
@@ -139,14 +168,16 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const repeatToken = parsed.tokens.find((t) => t.kind === 'repeat');
   /**
    * The due date the task gets: the picked date, then a date typed in the text, then (for a
-   * repeat) its first occurrence. A repeat from the text already got that from the parser; one
-   * picked from the toolbar overrides it, so the first occurrence is worked out again.
+   * repeat) its first occurrence, then the Week day it was opened for. A repeat from the text
+   * already got that from the parser; one picked from the toolbar overrides it, so the first
+   * occurrence is worked out again.
    */
   const dueDate =
     due ??
     (pickedRepeat === null || dateToken !== undefined
       ? parsed.dueDate
-      : firstOccurrence(pickedRepeat, todayISO()));
+      : firstOccurrence(pickedRepeat, todayISO())) ??
+    dayDue;
   const tagTokens = parsed.tokens.filter((t) => t.kind === 'tag');
 
   const before = value.slice(0, caret);
@@ -214,6 +245,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
     setCaret(0);
     setTags([]);
     setDue(null);
+    setDayDue(null);
     setPickedRepeat(null);
     setPanel(null);
   };
@@ -245,7 +277,10 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   };
 
   const onBlur = (e: FocusEvent<HTMLDivElement>) => {
-    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false);
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    setFocused(false);
+    // A Week day's "+" left without typing anything: forget the day.
+    if (value === '' && panel === null) setDayDue(null);
   };
 
   const showToolbar =
@@ -253,12 +288,15 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
     value !== '' ||
     tags.length > 0 ||
     due !== null ||
+    dayDue !== null ||
     pickedRepeat !== null ||
     panel !== null;
-  const toolbarDue = due ?? (pickedRepeat !== null ? dueDate : null);
+  const toolbarDue =
+    due ?? (pickedRepeat !== null ? dueDate : null) ?? (parsed.dueDate === null ? dayDue : null);
 
   return (
     <div
+      ref={dockRef}
       className={styles.dock}
       data-intro="2"
       data-keyboard={keyboard > 0 || undefined}
@@ -482,6 +520,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
                       aria-label="Clear due date"
                       onClick={() => {
                         setDue(null);
+                        setDayDue(null);
                         setPickedRepeat(null);
                       }}
                     >
@@ -489,6 +528,19 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
                     </button>
                   )}
                 </span>
+
+                <button
+                  ref={syntaxBtnRef}
+                  type="button"
+                  className={`${styles.tool} ${styles.syntaxBtn}`}
+                  aria-label="Typing shortcuts"
+                  title="Typing shortcuts"
+                  aria-haspopup="dialog"
+                  aria-expanded={panel === 'syntax'}
+                  onClick={() => setPanel(panel === 'syntax' ? null : 'syntax')}
+                >
+                  <CircleHelp size={14} strokeWidth={1.75} aria-hidden="true" />
+                </button>
               </div>
             </motion.div>
           )}
@@ -516,12 +568,26 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
             value={toolbarDue}
             onChange={(date) => {
               setDue(date);
-              if (date === null) setPickedRepeat(null);
+              if (date === null) {
+                setPickedRepeat(null);
+                setDayDue(null);
+              }
             }}
             onPicked={closePanel}
             repeat={pickedRepeat}
             onRepeatChange={setPickedRepeat}
           />
+        </Popover>
+        <Popover
+          open={panel === 'syntax'}
+          onClose={closePanel}
+          anchorRef={syntaxBtnRef}
+          label="Typing shortcuts"
+          align="end"
+          width={288}
+          sheetOnMobile={false}
+        >
+          <SyntaxHint />
         </Popover>
       </div>
     </div>

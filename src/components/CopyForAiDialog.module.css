@@ -82,3 +82,16 @@
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
+
+/* Touch: suggestion chips a fingertip tall, with room between them. */
+@media (pointer: coarse) {
+  .chips {
+    gap: var(--space-2);
+  }
+
+  .chip {
+    min-height: var(--tap);
+    padding-inline: 14px;
+    font-size: 13px;
+  }
+}

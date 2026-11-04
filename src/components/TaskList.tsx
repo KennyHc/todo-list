@@ -4,7 +4,6 @@ import {
   DragOverlay,
   KeyboardSensor,
   MeasuringStrategy,
-  PointerSensor,
   TouchSensor,
   closestCenter,
   useSensor,
@@ -14,7 +13,6 @@ import {
   type DragOverEvent,
   type DragStartEvent,
   type KeyboardCoordinateGetter,
-  type PointerSensorOptions,
   type ScreenReaderInstructions,
 } from '@dnd-kit/core';
 import {
@@ -24,6 +22,7 @@ import {
 } from '@dnd-kit/sortable';
 import { AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
+import { MOUSE_ACTIVATION, MousePenSensor, TOUCH_ACTIVATION } from '../hooks/dragSensors';
 import { useCompletionHold } from '../hooks/useCompletionHold';
 import { useSettledOrder } from '../hooks/useSettledOrder';
 import {
@@ -48,23 +47,6 @@ import { useSessionStore } from '../store/session';
 import { SortableTaskItem } from './TaskItem';
 import { UpcomingFooter } from './UpcomingFooter';
 import styles from './TaskList.module.css';
-
-/** Mouse and pen drag after 4px; touch has its own sensor (press and hold) so scrolling works. */
-class MousePenSensor extends PointerSensor {
-  static activators = [
-    {
-      eventName: 'onPointerDown' as const,
-      handler: (
-        { nativeEvent: event }: { nativeEvent: PointerEvent },
-        { onActivation }: PointerSensorOptions,
-      ) => {
-        if (!event.isPrimary || event.button !== 0 || event.pointerType === 'touch') return false;
-        onActivation?.({ event });
-        return true;
-      },
-    },
-  ];
-}
 
 const EXPAND_DELAY = 600;
 const RELEASE_LAYOUT_MS = 320;
@@ -135,8 +117,8 @@ export function TaskList() {
   session.current.projection = projection;
 
   const sensors = useSensors(
-    useSensor(MousePenSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 350, tolerance: 5 } }),
+    useSensor(MousePenSensor, { activationConstraint: MOUSE_ACTIVATION }),
+    useSensor(TouchSensor, { activationConstraint: TOUCH_ACTIVATION }),
     useSensor(KeyboardSensor, {
       coordinateGetter: useCallback<KeyboardCoordinateGetter>((event, args) => {
         // Left and right change the nesting by one level, within what the slot allows.
@@ -313,7 +295,7 @@ export function TaskList() {
           items={dragItems.map((item) => item.id)}
           strategy={verticalListSortingStrategy}
         >
-          <ul ref={listRef} className={styles.list}>
+          <ul ref={listRef} className={styles.list} role="tree" aria-label="Tasks">
             <AnimatePresence initial={false}>
               {items.map((item, i) => (
                 <SortableTaskItem

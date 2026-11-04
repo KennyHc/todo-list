@@ -231,6 +231,19 @@ describe('visibleOrder', () => {
     return { b, a, a1, a2, c, d };
   }
 
+  it('lists the Week view day by day, for the current or the chosen week', () => {
+    const tree = mkState([
+      mkTask('fri', { dueDate: '2026-10-23' }),
+      mkTask('mon', { dueDate: '2026-10-19' }),
+      mkTask('next', { dueDate: '2026-10-27' }),
+    ]);
+    const today = '2026-10-21';
+    expect(visibleOrder(tree, { view: 'week', tag: null }, today)).toEqual(['mon', 'fri']);
+    expect(
+      visibleOrder(tree, { view: 'week', tag: null, weekAnchor: '2026-10-26' }, today),
+    ).toEqual(['next']);
+  });
+
   it('walks the tree depth first', () => {
     const { b, a, a1, a2, c, d } = sample();
     expect(visibleOrder(b.tree, { view: 'tree', tag: null })).toEqual([a, a1, a2, c, d]);

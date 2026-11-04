@@ -272,6 +272,71 @@ describe('keyboard workflow', () => {
     expect(useUIStore.getState().focusedId).toBeNull();
   });
 
+  it('makes each row one Tab stop (roving tabindex) that follows the focused row', () => {
+    const { a, b } = seed();
+    render(<App />);
+    const tree = screen.getByRole('tree', { name: 'Tasks' });
+    const rows = within(tree).getAllByRole('treeitem');
+    const stops = () =>
+      [...tree.querySelectorAll<HTMLElement>('*')].filter((el) => el.tabIndex >= 0);
+    // Nothing focused yet: the first row is the list's only Tab stop; its buttons are not.
+    expect(stops()).toEqual([rows[0]]);
+    expect(within(rows[0]).getByRole('checkbox').tabIndex).toBe(-1);
+    press('j');
+    press('j');
+    expect(useUIStore.getState().focusedId).toBe(b);
+    expect(stops()).toEqual([rows[1]]);
+    expect(rows[1]).toHaveFocus();
+    expect(rows[1]).toHaveAttribute('aria-selected', 'true');
+    press('Home');
+    expect(useUIStore.getState().focusedId).toBe(a);
+    press('End');
+    expect(rows[2]).toHaveFocus();
+  });
+
+  it("←/→ collapse, expand, go to the parent and step through the row's buttons", () => {
+    const s = useTaskStore.getState();
+    const p = s.add({ title: 'Parent' });
+    const kid = s.add({ title: 'Kid', parentId: p });
+    render(<App />);
+    const key = (el: Element, k: string) => act(() => void fireEvent.keyDown(el, { key: k }));
+    press('j');
+    const parentRow = screen.getByRole('treeitem', { name: 'Parent' });
+    expect(parentRow).toHaveAttribute('aria-expanded', 'true');
+    press('ArrowLeft');
+    expect(useTaskStore.getState().tasks[p].collapsed).toBe(true);
+    press('ArrowRight');
+    expect(useTaskStore.getState().tasks[p].collapsed).toBe(false);
+    press('j');
+    const kidRow = screen.getByRole('treeitem', { name: 'Kid' });
+    expect(useUIStore.getState().focusedId).toBe(kid);
+    expect(kidRow).toHaveAttribute('aria-level', '2');
+    // ← on a leaf goes to its parent.
+    key(kidRow, 'ArrowLeft');
+    expect(useUIStore.getState().focusedId).toBe(p);
+    expect(parentRow).toHaveFocus();
+    // → on an open row steps into its buttons; ←/→ walk them, ← from the first goes back.
+    key(parentRow, 'ArrowRight');
+    const first = document.activeElement as HTMLElement;
+    expect(parentRow.contains(first) && first !== parentRow).toBe(true);
+    key(first, 'ArrowRight');
+    const second = document.activeElement as HTMLElement;
+    expect(second).not.toBe(first);
+    key(second, 'ArrowLeft');
+    expect(first).toHaveFocus();
+    key(first, 'ArrowLeft');
+    expect(parentRow).toHaveFocus();
+    // Esc from a button goes back to the row and keeps it selected; ↓ from a button moves on.
+    key(parentRow, 'ArrowRight');
+    key(document.activeElement!, 'Escape');
+    expect(parentRow).toHaveFocus();
+    expect(useUIStore.getState().focusedId).toBe(p);
+    key(parentRow, 'ArrowRight');
+    key(document.activeElement!, 'ArrowDown');
+    expect(useUIStore.getState().focusedId).toBe(kid);
+    expect(kidRow).toHaveFocus();
+  });
+
   it('toggles the focused task with x and Space, moving focus on when it leaves the list', () => {
     const { a, b } = seed();
     render(<App />);
@@ -403,6 +468,74 @@ describe('keyboard workflow', () => {
       fireEvent.keyDown(input, { key: 'Enter' });
       await waitFor(() => expect(useUIStore.getState().view).toBe('history'));
       expect(useUIStore.getState().paletteOpen).toBe(false);
+    });
+  });
+
+  describe('checking a subtask with its parent selected (#74)', () => {
+    function family(dueDate: string | null = null) {
+      const s = useTaskStore.getState();
+      const parent = s.add({ title: 'Parent', dueDate });
+      const one = s.add({ title: 'One', parentId: parent, dueDate });
+      const two = s.add({ title: 'Two', parentId: parent, dueDate });
+      const three = s.add({ title: 'Three', parentId: parent, dueDate });
+      return { parent, one, two, three };
+    }
+    const done = (id: string) => useTaskStore.getState().tasks[id].done;
+    // fireEvent.click does not focus the button, like a click in Safari or a tap.
+    const clickCheck = (title: string) =>
+      act(() => {
+        fireEvent.click(screen.getByRole('checkbox', { name: `Done: ${title}` }));
+      });
+
+    it('Tree: x after the click acts on the row that took its place, not on the parent', () => {
+      const { parent, one, two, three } = family();
+      render(<App />);
+      act(() => useUIStore.getState().setFocusedId(parent));
+      clickCheck('One');
+      expect(done(one)).toBe(true);
+      expect(done(parent)).toBe(false);
+      expect(useUIStore.getState().focusedId).toBe(two);
+      press('x');
+      expect(done(two)).toBe(true);
+      expect(done(three)).toBe(false);
+      expect(done(parent)).toBe(false);
+    });
+
+    it('Tree: Space after the click does not complete the parent either', () => {
+      const { parent, one, two, three } = family();
+      render(<App />);
+      act(() => useUIStore.getState().setFocusedId(parent));
+      clickCheck('One');
+      press(' ');
+      expect(done(one)).toBe(true);
+      expect(done(two)).toBe(true);
+      expect(done(three)).toBe(false);
+      expect(done(parent)).toBe(false);
+    });
+
+    it('Week: the checked row stays, so x reopens it instead of completing the parent', () => {
+      const { parent, one } = family(todayISO());
+      useUIStore.setState({ view: 'week', weekAnchor: null });
+      render(<App />);
+      act(() => useUIStore.getState().setFocusedId(parent));
+      clickCheck('One');
+      expect(done(one)).toBe(true);
+      expect(useUIStore.getState().focusedId).toBe(one);
+      press('x');
+      expect(done(one)).toBe(false);
+      expect(done(parent)).toBe(false);
+    });
+
+    it('still auto-completes the parent once every subtask is checked', () => {
+      const { parent, one, two, three } = family();
+      render(<App />);
+      act(() => useUIStore.getState().setFocusedId(parent));
+      clickCheck('One');
+      clickCheck('Two');
+      expect(done(parent)).toBe(false);
+      clickCheck('Three');
+      expect([one, two, three].map(done)).toEqual([true, true, true]);
+      expect(done(parent)).toBe(true);
     });
   });
 });
@@ -722,8 +855,8 @@ describe('the Completed section of the deadline view', () => {
       'aria-checked',
       'true',
     );
-    // Its old section (This week) went away with its last row.
-    await waitFor(() => expect(screen.queryByText('This week')).toBeNull());
+    // Its old section (Next 7 days) went away with its last row.
+    await waitFor(() => expect(screen.queryByText('Next 7 days')).toBeNull());
   });
 
   it('reopening from Completed returns the row to its date section', async () => {

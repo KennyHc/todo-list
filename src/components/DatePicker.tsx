@@ -40,7 +40,7 @@ export function DatePicker({
               onPicked?.();
             }}
           >
-            {label.replace(/^(This|Next) weekend$/, 'Weekend')}
+            {label}
           </button>
         ))}
       </div>
@@ -66,7 +66,7 @@ export function DatePicker({
             onPicked?.();
           }}
         >
-          Clear date
+          Remove date
         </button>
       )}
     </div>
