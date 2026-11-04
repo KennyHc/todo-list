@@ -74,19 +74,30 @@ describe('migrateTasksState', () => {
 });
 
 describe('task store history', () => {
-  it('logs completions, cascades and removes on uncheck', () => {
+  it('logs completions, cascades down and removes on uncheck', () => {
     const p = get().add({ title: 'P', tags: ['#X'] });
     const c1 = get().add({ title: 'C1', parentId: p });
     const c2 = get().add({ title: 'C2', parentId: p });
     expect(get().tasks[p].tags).toEqual(['x']);
     get().toggle(c1);
     get().toggle(c2);
+    // Every subtask done: the parent stays open and out of History (#74).
+    expect(get().tasks[p].done).toBe(false);
     expect(get().history.map((e) => [e.title, e.auto])).toEqual([
       ['C1', false],
       ['C2', false],
-      ['P', true],
     ]);
     get().toggle(c1);
+    expect(get().history.map((e) => e.title)).toEqual(['C2']);
+    // Checking the parent completes the open subtask with it, marked auto.
+    get().toggle(p);
+    expect(get().history.map((e) => [e.title, e.auto])).toEqual([
+      ['C2', false],
+      ['C1', true],
+      ['P', false],
+    ]);
+    get().toggle(c1);
+    expect(get().tasks[p].done).toBe(false);
     expect(get().history.map((e) => e.title)).toEqual(['C2']);
   });
 
@@ -144,6 +155,11 @@ describe('undo', () => {
     const c2 = get().add({ title: 'C2', parentId: p });
     get().toggle(c1);
     get().toggle(c2);
+    // The last subtask completes only itself (#74).
+    expect(get().undo?.label).toBe('Completed \u201cC2\u201d');
+    expect(get().tasks[p].done).toBe(false);
+    get().toggle(c2);
+    get().toggle(p);
     expect(get().undo?.label).toBe('Completed 2 tasks');
     expect(get().tasks[p].done).toBe(true);
     expect(get().history).toHaveLength(3);
@@ -757,9 +773,9 @@ describe('recurring tasks', () => {
     expect(Object.keys(get().tasks)).toHaveLength(count);
     expect(get().tasks[parent]).toMatchObject({ done: false, repeat: sunday });
 
-    // Done through the cascade, reopened by unchecking one subtask.
+    // Done by its own check, reopened by unchecking one subtask.
     get().toggle(a);
-    get().toggle(b);
+    get().toggle(parent);
     expect(copiesOf(parent)).toHaveLength(1);
     get().toggle(b);
     expect(copiesOf(parent)).toHaveLength(0);
@@ -786,20 +802,21 @@ describe('recurring tasks', () => {
     expect(Object.keys(get().tasks)).toHaveLength(2);
   });
 
-  it('a parent that auto-completes through a cascade spawns', () => {
+  it('a repeating parent whose subtasks are all checked stays open and spawns nothing (#74)', () => {
     const parent = get().add({ title: 'Weekly review', dueDate: '2026-10-20', repeat: sunday });
     const a = get().add({ title: 'A', parentId: parent });
     const b = get().add({ title: 'B', parentId: parent });
     get().toggle(a);
-    expect(copiesOf(parent)).toHaveLength(0);
     get().toggle(b);
-    expect(get().tasks[parent].done).toBe(true);
+    expect(get().tasks[parent].done).toBe(false);
+    expect(copiesOf(parent)).toHaveLength(0);
+    expect(get().history.map((e) => e.title)).toEqual(['A', 'B']);
+    // Checking the parent itself spawns the next occurrence, with its own undone subtasks.
+    get().toggle(parent);
     const [copy] = copiesOf(parent);
     expect(copy).toMatchObject({ title: 'Weekly review', done: false, dueDate: '2026-10-25' });
-    // The copy brings its own, undone subtasks.
     expect(copy.childIds).toHaveLength(2);
     expect(copy.childIds.every((c) => get().tasks[c].done === false)).toBe(true);
-    // History: A, B and the cascaded parent, once each.
     expect(get().history.map((e) => e.title)).toEqual(['A', 'B', 'Weekly review']);
   });
 
@@ -971,14 +988,10 @@ describe('completed tasks: delete, restore, repair', () => {
     expect(get().undo).toBeNull();
   });
 
-  it('files a parent in History when deleting its last open subtask completes it', () => {
+  it('deleting the last open subtask leaves the parent open and out of History (#74)', () => {
     const { p, c1, c2 } = project();
     get().toggle(c1);
     get().remove(c2);
-    expect(get().tasks[p].done).toBe(true);
-    expect(get().history.map((e) => e.taskId)).toEqual([c1, p]);
-    expect(entryFor(p).auto).toBe(true);
-    get().undoLast();
     expect(get().tasks[p].done).toBe(false);
     expect(get().history.map((e) => e.taskId)).toEqual([c1]);
   });

@@ -29,7 +29,7 @@ import { splitTitleLinks } from '../lib/links';
 import { ignoreTextEntry } from '../lib/textEntry';
 import { primeKeyboard } from '../lib/focusProxy';
 import { rowControls, TEXT_ENTRY, toggleKeepingFocus } from '../hooks/useHotkeys';
-import { getAncestors, getDescendants, hiddenUntilStart } from '../lib/tree';
+import { getDescendants, hiddenUntilStart } from '../lib/tree';
 import {
   isContextOnly,
   neighborAfterRemoval,
@@ -259,10 +259,8 @@ function TaskItemInner({
   const closeConfirm = useCallback(() => setConfirm((c) => ({ ...c, open: false })), []);
   const deleting = useRef(false);
   const pulse = useAnimationControls();
-  const flash = useAnimationControls();
   const tint = useAnimationControls();
   const rowRef = useRef<HTMLDivElement>(null);
-  const prevDone = useRef(liveTask?.done ?? false);
   const liRef = useRef<HTMLLIElement>(null);
   const present = useIsPresent();
   const [burst, setBurst] = useState<{ x: number; y: number } | null>(null);
@@ -281,8 +279,6 @@ function TaskItemInner({
   if (liveTask) lastView.current = view;
   const { task, leaf, sum, color, done, total } = liveTask ? view : lastView.current;
 
-  const done_ = task?.done ?? false;
-
   // The sparks burst from the checkbox centre, measured as the exit starts.
   useLayoutEffect(() => {
     if (!completing || reduced) return;
@@ -296,24 +292,6 @@ function TaskItemInner({
       });
     }
   }, [completing, reduced]);
-
-  // Auto-complete pulse: an ancestor of the toggled task that became done as a result.
-  useEffect(() => {
-    const wasDone = prevDone.current;
-    prevDone.current = done_;
-    if (wasDone || !done_ || reduced) return;
-    const state = useTaskStore.getState();
-    const toggled = state.lastToggle;
-    if (!toggled || toggled.id === id || !getAncestors(state, toggled.id).includes(id)) return;
-    void pulse.start({
-      scale: [1, 1.02, 1],
-      transition: { duration: 0.5, delay, ease: 'easeInOut' },
-    });
-    void flash.start({
-      opacity: [0, 0.18, 0],
-      transition: { duration: 0.8, delay, times: [0, 0.25, 1], ease: 'easeOut' },
-    });
-  }, [done_, id, delay, reduced, pulse, flash]);
 
   /** Shake the row, then remove it so the list's exit animation runs. */
   const runDelete = useCallback(
@@ -623,13 +601,6 @@ function TaskItemInner({
                     }
                   />
                 )}
-                <motion.span
-                  className={styles.flash}
-                  style={{ background: color ?? 'var(--accent)' }}
-                  initial={{ opacity: 0 }}
-                  animate={flash}
-                  aria-hidden="true"
-                />
                 <motion.span
                   className={styles.tint}
                   initial={{ opacity: 0 }}

@@ -291,9 +291,9 @@ const stepBack = (s: TaskState): Partial<TaskState> | null => {
 };
 
 /**
- * History for a structural edit (add, delete, move, indent) that can flip a parent's done flag
- * (its last open subtask went away, or a subtask was added to a done parent): the parent files
- * itself in History, or leaves it, exactly as if it had been toggled.
+ * History for a structural edit (add, move, indent) that reopens a done parent (it gained an
+ * open subtask): the parent leaves History, exactly as if it had been unchecked. A structural
+ * edit never completes a parent (#74), so nothing is filed here.
  */
 const historyAfter = (state: TaskState, after: TaskTree, now = Date.now()): HistoryEntry[] =>
   after.tasks === state.tasks
@@ -431,13 +431,13 @@ export const createTaskStore = () =>
       const toggled = toggleDone(before, id, now);
       if (toggled === before) return;
 
-      // Repeating tasks that just became done (the one toggled, its subtasks, or a parent that
-      // auto-completed) leave their next occurrence behind, inside this same update and undo.
+      // Repeating tasks that just became done (the one toggled or its subtasks; a parent never
+      // completes with them, #74) leave their next occurrence behind, in this update and undo.
       let after = toggled;
       const spawned = new Map<string, string>();
       let madeOneOff = false;
       if (toggled.tasks[id]?.done) {
-        const affected = [id, ...getDescendants(before, id), ...getAncestors(before, id)];
+        const affected = [id, ...getDescendants(before, id)];
         const becameDone = (taskId: string) =>
           before.tasks[taskId] !== undefined &&
           !before.tasks[taskId].done &&
@@ -463,7 +463,7 @@ export const createTaskStore = () =>
           let kept = false;
           for (const copy of Object.values(before.tasks)) {
             if (copy.spawnedFrom !== taskId || !after.tasks[copy.id]) continue;
-            if (isUntouchedCopy(before, copy.id)) after = deleteTask(after, copy.id, now);
+            if (isUntouchedCopy(before, copy.id)) after = deleteTask(after, copy.id);
             else kept = true;
           }
           if (kept) {

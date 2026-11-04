@@ -1,7 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { addTask, check, openMenu, row, signIn, titleBtn, uniqueSub } from './helpers';
 
-test('checking every subtask completes the parent, and Undo reverts it', async ({ page }, info) => {
+// #74: checking subtasks never completes their parent; only the parent's own check does.
+test('every subtask checked leaves the parent open; its own check and Undo', async ({
+  page,
+}, info) => {
   await signIn(page, uniqueSub(info));
   await addTask(page, 'Launch');
   await expect(row(page, 'Launch')).toBeVisible();
@@ -26,18 +29,25 @@ test('checking every subtask completes the parent, and Undo reverts it', async (
   await expect(check(page, 'Launch')).toHaveAttribute('aria-checked', 'false');
   await expect(row(page, 'Launch')).toContainText('1/2');
 
-  // The last subtask completes the project: the whole thing leaves the Tree.
+  // The last subtask leaves too, but the project stays open with all its subtasks done.
   await check(page, 'Ship it').click();
   await expect(check(page, 'Ship it')).toHaveCount(0);
+  await expect(page.getByText(/Completed “Ship it”/)).toBeVisible();
+  await expect(check(page, 'Launch')).toHaveAttribute('aria-checked', 'false');
+  await expect(row(page, 'Launch')).toContainText('2/2');
+
+  // Checking the project itself completes it: the whole thing leaves the Tree.
+  await check(page, 'Launch').click();
   await expect(check(page, 'Launch')).toHaveCount(0);
   await expect(page.locator('li[data-row-id]')).toHaveCount(0);
 
-  // Earlier toasts (one per completed subtask) are still fading out; wait for the latest alone.
+  // Earlier toasts (one per completed task) are still fading out; wait for the latest alone.
   const undo = page.getByRole('button', { name: 'Undo' });
   await expect(undo).toHaveCount(1);
   await undo.click();
-  // Undo brings the parent back with its open subtask; the first one stays done (in History).
-  await expect(check(page, 'Ship it')).toHaveAttribute('aria-checked', 'false');
+  // Undo brings the project back, open; its subtasks stay done (in History).
   await expect(check(page, 'Launch')).toHaveAttribute('aria-checked', 'false');
+  await expect(row(page, 'Launch')).toContainText('2/2');
   await expect(check(page, 'Write copy')).toHaveCount(0);
+  await expect(check(page, 'Ship it')).toHaveCount(0);
 });

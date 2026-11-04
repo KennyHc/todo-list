@@ -85,19 +85,27 @@ describe('LandingPage', () => {
 });
 
 describe('useDemo', () => {
-  it('plays the script and auto-completes the parent', () => {
+  it('plays the script: the subtasks, then the parent, which never completes by itself', () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useDemo({ enabled: true, active: true }));
     act(() => {
       vi.advanceTimersByTime(1000);
     });
     expect(result.current.typed.length).toBeGreaterThan(0);
+    // Subtasks are checked at about 4.1 s, 5.0 s and 5.9 s, the parent at about 6.8 s.
     act(() => {
-      vi.advanceTimersByTime(7500);
+      vi.advanceTimersByTime(5000);
     });
-    const tasks = Object.values(result.current.tree.tasks);
-    expect(tasks).toHaveLength(4);
-    expect(tasks.every((t) => t.done)).toBe(true);
+    const tasks = () => Object.values(result.current.tree.tasks);
+    const parent = () => tasks().find((t) => t.parentId === null)!;
+    expect(tasks()).toHaveLength(4);
+    expect(tasks().filter((t) => t.parentId !== null && t.done)).toHaveLength(3);
+    expect(parent().done).toBe(false);
+    act(() => {
+      vi.advanceTimersByTime(900);
+    });
+    expect(tasks().every((t) => t.done)).toBe(true);
+    expect(result.current.toggled).toBe(parent().id);
   });
 
   it('does nothing when disabled or inactive', () => {

@@ -384,7 +384,7 @@ describe('appendAiTasks', () => {
     expect(out.ids.every((id) => out.tree.tasks[id].color === '#123456')).toBe(true);
   });
 
-  it('marks done leaves and derives parent done state', () => {
+  it('marks done tasks; a parent completes only when marked done itself (#74)', () => {
     const done: AiImportTask[] = [
       {
         title: 'P',
@@ -404,13 +404,26 @@ describe('appendAiTasks', () => {
           { title: 'd2', difficulty: 1, tags: [], subtasks: [] },
         ],
       },
+      {
+        title: 'R',
+        difficulty: 1,
+        tags: [],
+        done: true,
+        subtasks: [
+          { title: 'e1', difficulty: 1, tags: [], subtasks: [] },
+          { title: 'e2', difficulty: 1, tags: [], done: true, subtasks: [] },
+        ],
+      },
     ];
     const out = appendAiTasks(emptyTree(), done, { now: 50 });
-    const [p, q] = out.ids.map((id) => out.tree.tasks[id]);
-    expect(p.done).toBe(true);
-    expect(p.completedAt).toBe(50);
+    const [p, q, r] = out.ids.map((id) => out.tree.tasks[id]);
+    expect(p.done).toBe(false);
+    expect(progress(out.tree, p.id)).toEqual({ done: 2, total: 2 });
     expect(q.done).toBe(false);
     expect(progress(out.tree, q.id)).toEqual({ done: 1, total: 2 });
+    expect(r.done).toBe(true);
+    expect(r.completedAt).toBe(50);
+    expect(progress(out.tree, r.id)).toEqual({ done: 2, total: 2 });
   });
 });
 

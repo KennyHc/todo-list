@@ -129,7 +129,7 @@ function Entry({
             <div className={styles.titleLine}>
               <span className={styles.title}>{entry.title}</span>
               {entry.auto && (
-                <span className={styles.auto} title="Completed automatically with its subtasks">
+                <span className={styles.auto} title="Completed along with its parent task">
                   auto
                 </span>
               )}

@@ -61,7 +61,7 @@ describe('App', () => {
     expect(screen.getByLabelText('New task')).toHaveValue('');
   });
 
-  it('checks a box and auto-completes the parent when its only child is done', () => {
+  it('checks a box; the parent stays open when its only child is done (#74)', () => {
     render(<App />);
     addViaInput('Parent');
     fireEvent.click(screen.getByRole('button', { name: 'Add subtask' }));
@@ -80,7 +80,7 @@ describe('App', () => {
     );
     expect(screen.getByRole('checkbox', { name: 'Done: Parent' })).toHaveAttribute(
       'aria-checked',
-      'true',
+      'false',
     );
   });
 
@@ -526,15 +526,17 @@ describe('keyboard workflow', () => {
       expect(done(parent)).toBe(false);
     });
 
-    it('still auto-completes the parent once every subtask is checked', () => {
+    it('leaves the parent open once every subtask is checked', () => {
       const { parent, one, two, three } = family();
       render(<App />);
       act(() => useUIStore.getState().setFocusedId(parent));
       clickCheck('One');
       clickCheck('Two');
-      expect(done(parent)).toBe(false);
       clickCheck('Three');
       expect([one, two, three].map(done)).toEqual([true, true, true]);
+      expect(done(parent)).toBe(false);
+      // Only the parent's own check completes it.
+      clickCheck('Parent');
       expect(done(parent)).toBe(true);
     });
   });
@@ -688,13 +690,19 @@ describe('completing tasks', () => {
     expect(useTaskStore.getState().tasks[kid].done).toBe(true);
   });
 
-  it('removes a whole project when its last subtask completes it', async () => {
+  it('keeps a project when its last subtask is checked, and removes it once checked (#74)', async () => {
     render(<App />);
     act(() => {
       const p = useTaskStore.getState().add({ title: 'Project' });
       useTaskStore.getState().add({ title: 'Only step', parentId: p });
     });
     fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Only step' }));
+    await gone('Only step');
+    expect(screen.getByRole('checkbox', { name: 'Done: Project' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Done: Project' }));
     await gone('Project');
     expect(rowIds()).toHaveLength(0);
     expect(await screen.findByText('All clear. Nice work.')).toBeInTheDocument();

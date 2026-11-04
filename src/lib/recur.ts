@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid';
 import type { Repeat, Task, TaskTree } from '../types';
 import { addDays, daysBetween, parseISO } from './dates';
-import { createDraft, reevaluateFrom, sameRepeat } from './tree';
+import { createDraft, reopenFrom, sameRepeat } from './tree';
 import { todayISO } from './views';
 
 /**
@@ -221,7 +221,7 @@ export function spawnNextOccurrence(
   const siblings = draft.siblings(task.parentId);
   siblings.splice(siblings.indexOf(id) + 1, 0, newId);
   // New open work: a done parent (and done ancestors) reopen.
-  reevaluateFrom(draft, task.parentId, now);
+  reopenFrom(draft, task.parentId, now);
   return { tree: draft.finish(), newId };
 }
 
