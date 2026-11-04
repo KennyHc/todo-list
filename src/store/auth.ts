@@ -154,6 +154,10 @@ export function initAuth(): () => void {
   return watchAuthState();
 }
 
+export const DELETE_NOT_CONFIRMED = "Your account wasn't deleted: couldn't confirm it's you.";
+export const DELETE_WRONG_ACCOUNT =
+  "Your account wasn't deleted: choose the same Google account you're signed in with.";
+
 function handleRedirectResult(): void {
   void getRedirectResult(auth, popupRedirect)
     .then((result) => {
@@ -168,12 +172,20 @@ function handleRedirectResult(): void {
             }
           });
       } else if (result?.user) useAuthStore.setState({ freshSignIn: true });
-      else clearDeletePending();
+      else if (isDeletePending()) {
+        // Came back without confirming (e.g. backed out of Google): say so, never drop it silently.
+        clearDeletePending();
+        useUIStore.getState().showNotice(DELETE_NOT_CONFIRMED);
+      }
     })
     .catch((error) => {
+      const deleting = isDeletePending();
       clearDeletePending();
       write(() => sessionStorage, REDIRECT_KEY, null);
-      useAuthStore.setState({ error: messageFor(error) });
+      if (!deleting) useAuthStore.setState({ error: messageFor(error) });
+      else if ((error as { code?: string } | null)?.code === 'auth/user-mismatch') {
+        useUIStore.getState().showNotice(DELETE_WRONG_ACCOUNT);
+      } else useUIStore.getState().showNotice(DELETE_NOT_CONFIRMED);
     });
 }
 
