@@ -470,6 +470,74 @@ describe('keyboard workflow', () => {
       expect(useUIStore.getState().paletteOpen).toBe(false);
     });
   });
+
+  describe('checking a subtask with its parent selected (#74)', () => {
+    function family(dueDate: string | null = null) {
+      const s = useTaskStore.getState();
+      const parent = s.add({ title: 'Parent', dueDate });
+      const one = s.add({ title: 'One', parentId: parent, dueDate });
+      const two = s.add({ title: 'Two', parentId: parent, dueDate });
+      const three = s.add({ title: 'Three', parentId: parent, dueDate });
+      return { parent, one, two, three };
+    }
+    const done = (id: string) => useTaskStore.getState().tasks[id].done;
+    // fireEvent.click does not focus the button, like a click in Safari or a tap.
+    const clickCheck = (title: string) =>
+      act(() => {
+        fireEvent.click(screen.getByRole('checkbox', { name: `Done: ${title}` }));
+      });
+
+    it('Tree: x after the click acts on the row that took its place, not on the parent', () => {
+      const { parent, one, two, three } = family();
+      render(<App />);
+      act(() => useUIStore.getState().setFocusedId(parent));
+      clickCheck('One');
+      expect(done(one)).toBe(true);
+      expect(done(parent)).toBe(false);
+      expect(useUIStore.getState().focusedId).toBe(two);
+      press('x');
+      expect(done(two)).toBe(true);
+      expect(done(three)).toBe(false);
+      expect(done(parent)).toBe(false);
+    });
+
+    it('Tree: Space after the click does not complete the parent either', () => {
+      const { parent, one, two, three } = family();
+      render(<App />);
+      act(() => useUIStore.getState().setFocusedId(parent));
+      clickCheck('One');
+      press(' ');
+      expect(done(one)).toBe(true);
+      expect(done(two)).toBe(true);
+      expect(done(three)).toBe(false);
+      expect(done(parent)).toBe(false);
+    });
+
+    it('Week: the checked row stays, so x reopens it instead of completing the parent', () => {
+      const { parent, one } = family(todayISO());
+      useUIStore.setState({ view: 'week', weekAnchor: null });
+      render(<App />);
+      act(() => useUIStore.getState().setFocusedId(parent));
+      clickCheck('One');
+      expect(done(one)).toBe(true);
+      expect(useUIStore.getState().focusedId).toBe(one);
+      press('x');
+      expect(done(one)).toBe(false);
+      expect(done(parent)).toBe(false);
+    });
+
+    it('still auto-completes the parent once every subtask is checked', () => {
+      const { parent, one, two, three } = family();
+      render(<App />);
+      act(() => useUIStore.getState().setFocusedId(parent));
+      clickCheck('One');
+      clickCheck('Two');
+      expect(done(parent)).toBe(false);
+      clickCheck('Three');
+      expect([one, two, three].map(done)).toEqual([true, true, true]);
+      expect(done(parent)).toBe(true);
+    });
+  });
 });
 
 describe('drag and drop', () => {
