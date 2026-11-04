@@ -4,7 +4,9 @@ const PORT = 5176;
 
 export default defineConfig({
   testDir: 'e2e',
-  timeout: 15_000,
+  // On CI sign-in alone takes ~9s (first sync against a cold emulator), so 15s left too little
+  // for the longer specs (#72).
+  timeout: process.env.CI ? 30_000 : 15_000,
   expect: { timeout: 5_000 },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

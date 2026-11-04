@@ -62,3 +62,20 @@
   font-size: 12.5px;
   line-height: 18px;
 }
+
+/* Touch: a fingertip hit area around each step. */
+@media (pointer: coarse) {
+  .steps {
+    gap: var(--space-2);
+  }
+
+  .step {
+    position: relative;
+  }
+
+  .step::after {
+    content: '';
+    position: absolute;
+    inset: var(--tap-inset);
+  }
+}

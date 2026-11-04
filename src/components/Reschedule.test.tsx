@@ -232,7 +232,7 @@ describe('date picker quick picks', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'More options' }));
     const dialog = await screen.findByRole('dialog', { name: 'Task options' });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Weekend' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /^(This|Next) weekend$/ }));
     expect(task(id).dueDate).toBe(addDays(todayISO(), 4));
   });
 });

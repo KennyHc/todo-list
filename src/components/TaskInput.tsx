@@ -11,7 +11,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Calendar, Hourglass, Plus, Repeat as RepeatIcon, Tag, X } from 'lucide-react';
+import { Calendar, CircleHelp, Hourglass, Plus, Repeat as RepeatIcon, Tag, X } from 'lucide-react';
 import { useIsTouch } from '../hooks/useIsTouch';
 import { useKeyboardInset } from '../hooks/useKeyboardInset';
 import { useIsPhone } from '../hooks/useMediaQuery';
@@ -28,12 +28,13 @@ import { DifficultyGlyph } from './DifficultyGlyph';
 import { consumeLaunchParams } from '../pwa/newTaskShortcut';
 import { Popover } from './Popover';
 import { QuickChip } from './QuickChip';
+import { SyntaxHint } from './SyntaxHint';
 import { TagChip } from './TagChip';
 import { TagEditor } from './TagEditor';
 import styles from './TaskInput.module.css';
 import { dur, ease, spring } from '../styles/motion';
 
-type Panel = 'tag' | 'date' | null;
+type Panel = 'tag' | 'date' | 'syntax' | null;
 
 /** A `#prefix` being typed right before the caret. */
 const OPEN_TOKEN = /(^|\s)#([\p{L}\p{N}_-]+)$/u;
@@ -79,6 +80,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const tagBtnRef = useRef<HTMLButtonElement>(null);
   const dateBtnRef = useRef<HTMLButtonElement>(null);
+  const syntaxBtnRef = useRef<HTMLButtonElement>(null);
   const pendingCaret = useRef<number | null>(null);
   const listId = useId();
   const closePanel = useCallback(() => setPanel(null), []);
@@ -87,6 +89,22 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
   const phone = useIsPhone();
   // The phone's composer docks to the bottom edge; lift it above the keyboard while it has focus.
   const keyboard = useKeyboardInset(phone && focused);
+  // The docked composer's measured height, as --dock-h on the root: the list's bottom padding
+  // and the undo toast clear it however tall it grows (chips, tools, hints).
+  const dockRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const dock = dockRef.current;
+    if (!phone || !dock || typeof ResizeObserver === 'undefined') return;
+    const root = document.documentElement.style;
+    const observer = new ResizeObserver(() =>
+      root.setProperty('--dock-h', `${Math.ceil(dock.getBoundingClientRect().height)}px`),
+    );
+    observer.observe(dock, { box: 'border-box' });
+    return () => {
+      observer.disconnect();
+      root.removeProperty('--dock-h');
+    };
+  }, [phone]);
   // First run after sign-in: ready to type. Skipped on touch so the keyboard doesn't pop up.
   useEffect(() => {
     if (autoFocus && !isTouch) inputRef.current?.focus();
@@ -278,6 +296,7 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
 
   return (
     <div
+      ref={dockRef}
       className={styles.dock}
       data-intro="2"
       data-keyboard={keyboard > 0 || undefined}
@@ -509,6 +528,19 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
                     </button>
                   )}
                 </span>
+
+                <button
+                  ref={syntaxBtnRef}
+                  type="button"
+                  className={`${styles.tool} ${styles.syntaxBtn}`}
+                  aria-label="Typing shortcuts"
+                  title="Typing shortcuts"
+                  aria-haspopup="dialog"
+                  aria-expanded={panel === 'syntax'}
+                  onClick={() => setPanel(panel === 'syntax' ? null : 'syntax')}
+                >
+                  <CircleHelp size={14} strokeWidth={1.75} aria-hidden="true" />
+                </button>
               </div>
             </motion.div>
           )}
@@ -545,6 +577,17 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
             repeat={pickedRepeat}
             onRepeatChange={setPickedRepeat}
           />
+        </Popover>
+        <Popover
+          open={panel === 'syntax'}
+          onClose={closePanel}
+          anchorRef={syntaxBtnRef}
+          label="Typing shortcuts"
+          align="end"
+          width={288}
+          sheetOnMobile={false}
+        >
+          <SyntaxHint />
         </Popover>
       </div>
     </div>

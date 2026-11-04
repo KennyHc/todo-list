@@ -177,3 +177,26 @@
   flex: none;
   color: var(--accent-ink);
 }
+
+/* Touch: fingertip hit areas; the line under the field is tall enough to hold them. */
+@media (pointer: coarse) {
+  .under {
+    min-height: var(--tap);
+    margin-top: 0;
+    gap: var(--space-5);
+  }
+
+  .link,
+  .fileLink,
+  .hintBtn {
+    position: relative;
+  }
+
+  .link::after,
+  .fileLink::after,
+  .hintBtn::after {
+    content: '';
+    position: absolute;
+    inset: var(--tap-inset);
+  }
+}

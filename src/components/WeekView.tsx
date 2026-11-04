@@ -57,6 +57,12 @@ function WeekBar({ start, current }: { start: string; current: string }) {
         {weekRange(start, todayISO())}
       </h2>
       <div className={styles.nav} role="group" aria-label="Week">
+        {/* Only off the current week; first, so the arrows don't move when it comes and goes. */}
+        {!here && (
+          <button type="button" className={styles.todayBtn} onClick={() => go(current)}>
+            Today
+          </button>
+        )}
         <button
           type="button"
           className={styles.navBtn}
@@ -64,14 +70,6 @@ function WeekBar({ start, current }: { start: string; current: string }) {
           onClick={() => go(addDays(start, -7))}
         >
           <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className={styles.todayBtn}
-          disabled={here}
-          onClick={() => go(current)}
-        >
-          Today
         </button>
         <button
           type="button"
@@ -95,6 +93,8 @@ function DayRow({ item, date, today }: { item: WeekItem; date: string; today: st
   // A plan that rolled over from an earlier day says so ("From Mon"), as in Today.
   const reason = task && item.carried ? todayReason(task, today) : null;
   const enabled = task !== undefined && !task.done;
+  // An overdue row shows its red due pill, as in Tree, rather than relying on its past day.
+  const overdue = enabled && task.dueDate !== null && task.dueDate < today;
   const draggable = useDraggable({
     id: `${item.kind}:${item.id}`,
     data: { id: item.id, kind: item.kind, date } satisfies RowData,
@@ -117,7 +117,7 @@ function DayRow({ item, date, today }: { item: WeekItem; date: string; today: st
         verb: 'Move',
       }}
       // A due row sits under its date already; a plan keeps its due pill to say when it is due.
-      section={item.kind === 'due' ? 'today' : undefined}
+      section={item.kind === 'due' && !overdue ? 'today' : undefined}
       quiet={item.kind === 'planned'}
       compact
       reason={reason?.label}
@@ -199,10 +199,13 @@ const announcements: Announcements = {
     over
       ? `“${titleOf(active.data.current)}” is over ${weekdayDate(String(over.id))}.`
       : `“${titleOf(active.data.current)}” is not over a day.`,
-  onDragEnd: ({ active, over }) =>
-    over
-      ? `Dropped “${titleOf(active.data.current)}” on ${weekdayDate(String(over.id))}.`
-      : `“${titleOf(active.data.current)}” was dropped without moving.`,
+  // A move is said by the undo toast ("Moved … · Undo"), so this region empties rather than
+  // keep a "Dropped … on Tue" that an Undo would make wrong.
+  onDragEnd: ({ active, over }) => {
+    const row = active.data.current as RowData;
+    if (over && weekDropMove(row.kind, row.date, String(over.id), todayISO())) return '';
+    return `“${titleOf(row)}” was dropped without moving.`;
+  },
   onDragCancel: ({ active }) => `Cancelled. “${titleOf(active.data.current)}” did not move.`,
 };
 
@@ -223,6 +226,21 @@ export function WeekView() {
   const reduced = useReducedMotion();
   const activeId = useDragStore((s) => s.activeId);
   const releaseTimer = useRef<number>();
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  // Stacked days (below 1024px): opening the current week starts at today, not at a Monday
+  // that may be screens above it. Instant, never smooth. Other weeks open at Monday as before.
+  useEffect(() => {
+    if (anchor !== null || !window.matchMedia?.('(max-width: 1023px)').matches) return;
+    const section = gridRef.current?.querySelector<HTMLElement>('section[data-today]');
+    const head = section?.querySelector('header');
+    if (!section?.previousElementSibling || !head) return;
+    // Onto the header's sticky line on a phone (under the bars), 16px from the top otherwise.
+    const pinned = parseFloat(getComputedStyle(head).top);
+    const line = Number.isFinite(pinned) ? pinned : 16;
+    window.scrollBy({ top: head.getBoundingClientRect().top - line, behavior: 'instant' });
+    // Only when the view opens: later edits must not pull the page back to today.
+  }, []);
 
   const sensors = useSensors(
     useSensor(MousePenSensor, { activationConstraint: MOUSE_ACTIVATION }),
@@ -279,6 +297,7 @@ export function WeekView() {
       >
         <motion.div
           key={start}
+          ref={gridRef}
           className={styles.grid}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

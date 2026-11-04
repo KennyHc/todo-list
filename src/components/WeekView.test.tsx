@@ -122,3 +122,24 @@ describe('[ and ] in Week', () => {
     expect(useUIStore.getState().weekAnchor).toBeNull();
   });
 });
+
+describe('Week polish', () => {
+  it('shows Today only off the current week', () => {
+    render(<WeekView />);
+    expect(screen.queryByRole('button', { name: 'Today' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Next week' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Today' }));
+    expect(useUIStore.getState().weekAnchor).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Today' })).toBeNull();
+  });
+
+  it('marks past days, and gives an overdue row its due pill', () => {
+    useTaskStore.getState().add({ title: 'Brakes', dueDate: '2026-10-19' });
+    useTaskStore.getState().add({ title: 'Report', dueDate: '2026-10-22' });
+    render(<WeekView />);
+    expect(dayOf('2026-10-19')).toHaveAttribute('data-past');
+    expect(dayOf('2026-10-20')).not.toHaveAttribute('data-past');
+    expect(within(dayOf('2026-10-19')).getByTitle('Due 2026-10-19')).toBeInTheDocument();
+    expect(within(dayOf('2026-10-22')).queryByTitle('Due 2026-10-22')).toBeNull();
+  });
+});

@@ -4,6 +4,7 @@ import {
   migrateTasksState,
   readLegacyLocalTasks,
   resetTaskStore,
+  UNDO_DEPTH,
   useTaskStore,
 } from './tasks';
 import { mkTask } from '../test/factories';
@@ -196,20 +197,26 @@ describe('undo', () => {
     expect(get().undo).toBeNull();
   });
 
-  it('only undoes the latest action, and non-undoable actions keep the entry', () => {
+  it('keeps the toast entry through quiet edits, and the toast undoes back to its action', () => {
     const a = get().add({ title: 'A' });
     const b = get().add({ title: 'B' });
     get().remove(a);
     get().remove(b);
     const entry = get().undo;
-    get().add({ title: 'C' });
-    get().update(b, {});
+    const c = get().add({ title: 'C' });
+    get().update(c, { title: 'C2' });
     expect(get().undo).toBe(entry);
-    get().undoLast();
+    get().undoToast();
     expect(get().tasks[b]).toBeDefined();
     expect(get().tasks[a]).toBeUndefined();
-    get().undoLast();
-    expect(get().tasks[a]).toBeUndefined();
+    expect(get().tasks[c]).toBeUndefined();
+    expect(get().undo).toBeNull();
+    // Redo walks forward again, the toast's action first.
+    get().redoLast();
+    expect(get().tasks[b]).toBeUndefined();
+    get().redoLast();
+    get().redoLast();
+    expect(get().tasks[c]?.title).toBe('C2');
   });
 
   it('undoes history clearing and replaceAll', () => {
@@ -226,6 +233,132 @@ describe('undo', () => {
     expect(get().rootIds).toEqual([]);
     get().undoLast();
     expect(get().tasks[a]).toBeDefined();
+  });
+});
+
+describe('undo history', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-02T12:00:00'));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('undoes one step at a time after the toast is dismissed', () => {
+    const a = get().add({ title: 'A' });
+    get().add({ title: 'B' });
+    get().update(a, { title: 'A2' });
+    get().remove(a);
+    get().dismissUndo();
+    expect(get().undo).toBeNull();
+    get().undoLast();
+    expect(get().tasks[a]?.title).toBe('A2');
+    get().undoLast();
+    expect(get().tasks[a]?.title).toBe('A');
+    get().undoLast();
+    get().undoLast();
+    expect(get().tasks).toEqual({});
+    // Nothing left: a further undo is a no-op.
+    const tasks = get().tasks;
+    get().undoLast();
+    expect(get().tasks).toBe(tasks);
+  });
+
+  it('keeps at most UNDO_DEPTH steps, dropping the oldest', () => {
+    for (let i = 0; i < UNDO_DEPTH + 5; i++) get().add({ title: `T${i}` });
+    expect(get().past).toHaveLength(UNDO_DEPTH);
+    for (let i = 0; i < UNDO_DEPTH + 5; i++) get().undoLast();
+    // The first five adds are out of reach.
+    expect(get().rootIds.map((id) => get().tasks[id].title)).toEqual([
+      'T0',
+      'T1',
+      'T2',
+      'T3',
+      'T4',
+    ]);
+  });
+
+  it('redoes undone steps, and a new action empties the redo list', () => {
+    const a = get().add({ title: 'A' });
+    get().setTagColor('work', '#c0333a');
+    get().undoLast();
+    get().undoLast();
+    expect(get().tasks[a]).toBeUndefined();
+    get().redoLast();
+    expect(get().tasks[a]).toBeDefined();
+    get().add({ title: 'B' });
+    expect(get().future).toEqual([]);
+    get().redoLast();
+    expect(get().tagColors).toEqual({});
+  });
+
+  it('does not record expanding or collapsing, or no-op edits', () => {
+    const p = get().add({ title: 'P' });
+    get().add({ title: 'C', parentId: p });
+    const steps = get().past.length;
+    get().update(p, { collapsed: true });
+    get().update(p, { title: 'P' });
+    expect(get().past).toHaveLength(steps);
+  });
+
+  it('folds the first title of a just-added row into its add', () => {
+    const draft = get().add({ title: '' });
+    get().update(draft, { title: 'Named' });
+    expect(get().past).toHaveLength(1);
+    get().undoLast();
+    expect(get().tasks[draft]).toBeUndefined();
+  });
+
+  it('records indent and outdent', () => {
+    get().add({ title: 'A' });
+    const b = get().add({ title: 'B' });
+    get().indent(b);
+    expect(get().tasks[b].parentId).not.toBeNull();
+    get().undoLast();
+    expect(get().tasks[b].parentId).toBeNull();
+  });
+
+  it('forgets an abandoned draft entirely', () => {
+    const a = get().add({ title: 'A' });
+    get().remove(a);
+    const draft = get().add({ title: '', parentId: null });
+    get().remove(draft);
+    get().undoLast();
+    // The step back is the deletion of A, not the draft's add.
+    expect(get().tasks[a]).toBeDefined();
+  });
+
+  it('is emptied by a reset (sign-out or account switch)', () => {
+    const a = get().add({ title: 'A' });
+    get().remove(a);
+    get().undoLast();
+    expect(get().past.length).toBeGreaterThan(0);
+    expect(get().future.length).toBeGreaterThan(0);
+    resetTaskStore();
+    expect(get().past).toEqual([]);
+    expect(get().future).toEqual([]);
+    get().undoLast();
+    get().redoLast();
+    expect(get().tasks).toEqual({});
+  });
+
+  it('drops steps older than remote content, keeping only the toast entry', () => {
+    const a = get().add({ title: 'A' });
+    get().setTagColor('work', '#c0333a');
+    const entry = get().undo;
+    get().hydrate({ tasks: { ...get().tasks, [a]: { ...get().tasks[a], title: 'Remote' } } });
+    expect(get().past).toEqual([entry]);
+    expect(get().future).toEqual([]);
+    get().undoLast();
+    expect(get().tagColors).toEqual({});
+    // The add of A predates the remote edit, so it is out of reach.
+    get().undoLast();
+    expect(get().tasks[a]).toBeDefined();
+  });
+
+  it('keeps the history when only settings arrive', () => {
+    get().add({ title: 'A' });
+    get().hydrate({ settings: { ...DEFAULT_SETTINGS, hints: {} } });
+    expect(get().past).toHaveLength(1);
   });
 });
 
@@ -548,10 +681,99 @@ describe('recurring tasks', () => {
     const rep = get().add({ title: 'Rep', dueDate: '2026-10-18', repeat: sunday });
     get().toggle(rep); // done: one copy
     expect(Object.keys(get().tasks)).toHaveLength(4);
-    get().toggle(rep); // reopen: no new copy, the existing one stays
-    expect(Object.keys(get().tasks)).toHaveLength(4);
+    get().toggle(rep); // reopen: no new copy, and the untouched one goes away
+    expect(Object.keys(get().tasks)).toHaveLength(3);
     expect(get().tasks[rep].done).toBe(false);
-    expect(copiesOf(rep)).toHaveLength(1);
+    expect(copiesOf(rep)).toHaveLength(0);
+  });
+
+  it('reopening removes the untouched copy in the same update, with History and undo intact', () => {
+    const id = get().add({ title: 'Water plants', dueDate: '2026-10-18', repeat: sunday });
+    get().toggle(id);
+    const completed = get().tasks;
+    get().toggle(id);
+    expect(Object.keys(get().tasks)).toEqual([id]);
+    expect(get().rootIds).toEqual([id]);
+    expect(get().tasks[id]).toMatchObject({ done: false, repeat: sunday });
+    expect(get().history).toEqual([]);
+    expect(get().undo?.label).toBe('Reopened “Water plants”');
+    // Undo brings back the completed task and its copy together.
+    get().undoLast();
+    expect(get().tasks).toBe(completed);
+    expect(get().history).toHaveLength(1);
+  });
+
+  it('complete, reopen, complete leaves exactly one copy', () => {
+    const id = get().add({ title: 'Water plants', dueDate: '2026-10-18', repeat: sunday });
+    for (let i = 0; i < 5; i++) get().toggle(id);
+    expect(get().tasks[id].done).toBe(true);
+    expect(copiesOf(id)).toHaveLength(1);
+    expect(copiesOf(id)[0]).toMatchObject({ done: false, dueDate: '2026-10-25' });
+    expect(Object.keys(get().tasks)).toHaveLength(2);
+    expect(get().history).toHaveLength(1);
+  });
+
+  it('reopening keeps an edited copy and turns the original into a one-off', () => {
+    const id = get().add({ title: 'Water plants', dueDate: '2026-10-18', repeat: sunday });
+    get().toggle(id);
+    const [copy] = copiesOf(id);
+    get().setNotes(copy.id, 'Use the rain water');
+    get().toggle(id);
+    expect(get().tasks[copy.id]).toMatchObject({ notes: 'Use the rain water', repeat: sunday });
+    expect(get().tasks[id]).toMatchObject({ done: false, repeat: null });
+    expect(get().undo?.label).toBe('Reopened “Water plants” · no longer repeats');
+    // Undo of the reopen restores the repeat on the original.
+    get().undoLast();
+    expect(get().tasks[id]).toMatchObject({ done: true, repeat: sunday });
+    // Reopened again and completed again, the one-off spawns nothing.
+    get().toggle(id);
+    get().toggle(id);
+    expect(copiesOf(id)).toHaveLength(1);
+    expect(Object.keys(get().tasks)).toHaveLength(2);
+  });
+
+  it('reopening keeps a copy whose subtask was completed', () => {
+    const parent = get().add({ title: 'Weekly review', dueDate: '2026-10-20', repeat: sunday });
+    get().add({ title: 'Inbox', parentId: parent });
+    get().add({ title: 'Calendar', parentId: parent });
+    get().toggle(parent);
+    const [copy] = copiesOf(parent);
+    get().toggle(copy.childIds[0]);
+    get().toggle(parent);
+    expect(get().tasks[copy.id]).toBeDefined();
+    expect(get().tasks[copy.childIds[0]].done).toBe(true);
+    expect(get().tasks[parent]).toMatchObject({ done: false, repeat: null });
+  });
+
+  it('reopening a repeating parent, or one of its subtasks, removes the untouched copy subtree', () => {
+    const parent = get().add({ title: 'Weekly review', dueDate: '2026-10-20', repeat: sunday });
+    const a = get().add({ title: 'Inbox', parentId: parent });
+    const b = get().add({ title: 'Calendar', parentId: parent });
+    const count = Object.keys(get().tasks).length;
+
+    get().toggle(parent);
+    expect(Object.keys(get().tasks)).toHaveLength(count * 2);
+    get().toggle(parent);
+    expect(Object.keys(get().tasks)).toHaveLength(count);
+    expect(get().tasks[parent]).toMatchObject({ done: false, repeat: sunday });
+
+    // Done through the cascade, reopened by unchecking one subtask.
+    get().toggle(a);
+    get().toggle(b);
+    expect(copiesOf(parent)).toHaveLength(1);
+    get().toggle(b);
+    expect(copiesOf(parent)).toHaveLength(0);
+    expect(Object.keys(get().tasks)).toHaveLength(count);
+    expect(get().tasks[parent].done).toBe(false);
+    expect(get().history.map((e) => e.title)).toEqual(['Inbox']);
+  });
+
+  it('restoring from History removes the untouched copy too', () => {
+    const id = get().add({ title: 'Water plants', dueDate: '2026-10-18', repeat: sunday });
+    get().toggle(id);
+    get().restoreFromHistory(get().history[0].id);
+    expect(Object.keys(get().tasks)).toEqual([id]);
+    expect(get().undo?.label).toBe('Restored “Water plants”');
   });
 
   it('a double toggle (done, undone, done) does not create a second copy for the same date', () => {

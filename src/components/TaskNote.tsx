@@ -134,7 +134,9 @@ export function TaskNote({ id, notes, mode, onMode }: Props) {
           className={styles.text}
           role="group"
           aria-label="Note"
-          tabIndex={0}
+          // Inside a task row: reached with → like the row's buttons, not with Tab.
+          tabIndex={-1}
+          data-row-control
           title="Edit note"
           data-swipe-through
           onClick={(e) => {
@@ -152,7 +154,7 @@ export function TaskNote({ id, notes, mode, onMode }: Props) {
             <p key={i} className={styles.line}>
               {text === '' && links.length === 0 ? ' ' : text}
               {links.map((href) => (
-                <LinkChip key={href} href={href} />
+                <LinkChip key={href} href={href} tabIndex={-1} />
               ))}
             </p>
           ))}

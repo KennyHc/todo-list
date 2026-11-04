@@ -273,3 +273,19 @@
     inset: -12px -8px;
   }
 }
+
+/* Touch: Filter matches Search (36px), with a full fingertip hit area. */
+@media (pointer: coarse) and (max-width: 480px) {
+  .button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .button::after {
+    inset: var(--tap-inset);
+  }
+
+  .clear::after {
+    inset: var(--tap-inset);
+  }
+}

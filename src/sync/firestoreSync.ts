@@ -60,6 +60,7 @@ export type SyncStatusSink = {
   getState: () => {
     setSyncStatus: (status: 'loading' | 'ready' | 'offline' | 'error') => void;
     setMigratedCount: (count: number | null) => void;
+    setPendingWrites?: (count: number) => void;
   };
 };
 
@@ -72,6 +73,8 @@ export type SyncOptions = {
   maxWaitMs?: number;
   /** How long the initial load waits for the server before settling for the local cache. */
   initialTimeoutMs?: number;
+  /** How long writes must stay unconfirmed before the UI is told (see SyncState.pendingWrites). */
+  pendingNoticeMs?: number;
 };
 
 const BATCH_LIMIT = 450;
@@ -118,6 +121,7 @@ export function startSync(uid: string, options: SyncOptions): () => void {
   const debounceMs = options.debounceMs ?? 250;
   const maxWaitMs = options.maxWaitMs ?? 1000;
   const initialTimeoutMs = options.initialTimeoutMs ?? 8000;
+  const pendingNoticeMs = options.pendingNoticeMs ?? 1000;
   const setStatus = (s: 'loading' | 'ready' | 'offline' | 'error') =>
     statusSink.getState().setSyncStatus(s);
 
@@ -264,6 +268,34 @@ export function startSync(uid: string, options: SyncOptions): () => void {
 
   // --- local -> remote ----------------------------------------------------------------------
 
+  // Writes the server has not confirmed yet. A reload or a closed tab can drop them (a large
+  // change is split into many batches, and the ones not yet in the local queue are lost), so
+  // the UI says "Saving" and `beforeunload` asks the user to stay while any are in flight.
+  let inFlight = 0;
+  let announced = false;
+  let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+  const publishPending = (count: number) => {
+    // A stopped engine (sign-out, account switch) no longer speaks for the store.
+    if (!stopped) statusSink.getState().setPendingWrites?.(count);
+  };
+  const trackPending = (delta: number) => {
+    inFlight = Math.max(0, inFlight + delta);
+    if (inFlight === 0) {
+      clearTimeout(noticeTimer);
+      noticeTimer = undefined;
+      if (announced) publishPending(0);
+      announced = false;
+    } else if (announced) {
+      publishPending(inFlight);
+    } else {
+      noticeTimer ??= setTimeout(() => {
+        noticeTimer = undefined;
+        announced = true;
+        publishPending(inFlight);
+      }, pendingNoticeMs);
+    }
+  };
+
   let flushTimer: ReturnType<typeof setTimeout> | undefined;
   let firstDirtyAt: number | null = null;
 
@@ -325,8 +357,12 @@ export function startSync(uid: string, options: SyncOptions): () => void {
     const commits: Promise<void>[] = [];
     for (let i = 0; i < ops.length; i += BATCH_LIMIT) {
       const batch = writeBatch(db);
-      ops.slice(i, i + BATCH_LIMIT).forEach((op) => op(batch));
-      commits.push(batch.commit());
+      const slice = ops.slice(i, i + BATCH_LIMIT);
+      slice.forEach((op) => op(batch));
+      trackPending(slice.length);
+      // Settles on the server's answer (or never while offline: the count stays, and so does
+      // the "Offline — changes will sync" status).
+      commits.push(batch.commit().finally(() => trackPending(-slice.length)));
     }
     // Writes resolve against the offline queue; the UI never waits on them.
     return Promise.all(commits).then(
@@ -365,8 +401,17 @@ export function startSync(uid: string, options: SyncOptions): () => void {
     if (typeof document === 'undefined' || document.visibilityState === 'hidden') void flush();
   };
   const onConnectivity = () => updateStatus();
+  // Only while writes are in flight, so an ordinary reload is never nagged. Edits still in the
+  // debounce window are flushed first, which puts them in flight too.
+  const onBeforeUnload = (e: BeforeUnloadEvent) => {
+    if (flushTimer !== undefined) void flush();
+    if (inFlight === 0) return;
+    e.preventDefault();
+    e.returnValue = ''; // older browsers
+  };
   if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onHidden);
   if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', onBeforeUnload);
     window.addEventListener('pagehide', onHidden);
     window.addEventListener('online', onConnectivity);
     window.addEventListener('offline', onConnectivity);
@@ -489,14 +534,17 @@ export function startSync(uid: string, options: SyncOptions): () => void {
     unsubStore?.();
     clearTimeout(flushTimer);
     clearTimeout(applyTimer);
+    clearTimeout(noticeTimer);
     waiters.clear();
     if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onHidden);
     if (typeof window !== 'undefined') {
+      window.removeEventListener('beforeunload', onBeforeUnload);
       window.removeEventListener('pagehide', onHidden);
       window.removeEventListener('online', onConnectivity);
       window.removeEventListener('offline', onConnectivity);
     }
     setStatus('loading');
+    statusSink.getState().setPendingWrites?.(0);
   };
   const handle: Active = { flush, db, stop };
   active = handle;

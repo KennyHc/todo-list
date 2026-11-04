@@ -219,7 +219,7 @@ function Panel({ onClose, onAskClear }: { onClose: () => void; onAskClear: () =>
         label: 'Undo',
         Icon: Undo2,
         detail: undo.label,
-        run: () => useTaskStore.getState().undoLast(),
+        run: () => useTaskStore.getState().undoToast(),
       });
     }
     list.push({

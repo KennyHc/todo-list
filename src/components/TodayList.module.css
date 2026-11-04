@@ -397,3 +397,10 @@
     font-size: 15px;
   }
 }
+
+@media (pointer: coarse) {
+  .emptyAction {
+    min-height: var(--tap);
+    font-size: 14px;
+  }
+}

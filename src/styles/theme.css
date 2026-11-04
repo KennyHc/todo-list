@@ -61,6 +61,14 @@
   --space-7: 32px;
   --space-8: 40px;
 
+  /*
+   * Touch targets, for (pointer: coarse) blocks: the smallest hit area for a finger. Inset a
+   * control's ::after by --tap-inset to grow its hit area to at least --tap on both axes, centred,
+   * without changing its size (the control needs position: relative). Bigger controls get 0.
+   */
+  --tap: 44px;
+  --tap-inset: min(0px, calc((100% - var(--tap)) / 2));
+
   --font: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
@@ -199,6 +207,12 @@ input {
 }
 
 @media (max-width: 480px) {
+  /* The docked composer's height, safe area included. TaskInput sets the measured value on <html>;
+     this is the idle bar until then. */
+  :root {
+    --dock-h: calc(86px + env(safe-area-inset-bottom, 0px));
+  }
+
   .app {
     /* Phone chrome: a 44px compact bar and a 44px view row stick to the top while scrolling;
        the composer docks to the bottom. Sticky section headers sit below the first two. */
@@ -208,7 +222,7 @@ input {
     --bar-h: 44px;
     --sticky-1: calc(var(--top-safe) + var(--bar-h));
     --sticky-2: calc(var(--sticky-1) + 44px);
-    --dock-clear: calc(104px + env(safe-area-inset-bottom, 0px));
+    --dock-clear: calc(var(--dock-h) + var(--space-4));
     padding-top: calc(var(--top-safe) + var(--space-3));
     padding-right: var(--gutter-r);
     padding-bottom: var(--dock-clear);

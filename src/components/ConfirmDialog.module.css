@@ -85,3 +85,19 @@
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
+
+/* Touch: fingertip-tall buttons, sharing the width on a phone. */
+@media (pointer: coarse) {
+  .cancel,
+  .confirm {
+    height: var(--tap);
+    font-size: 14px;
+  }
+}
+
+@media (pointer: coarse) and (max-width: 480px) {
+  .cancel,
+  .confirm {
+    flex: 1 1 0;
+  }
+}

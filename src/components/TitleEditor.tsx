@@ -1,8 +1,14 @@
 import { MoreHorizontal } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useIsTouch } from '../hooks/useIsTouch';
 import { useIsPhone } from '../hooks/useMediaQuery';
+import { weekdayDate } from '../lib/dates';
+import { parseQuickAdd, SUPPORTS_REPEAT, tokenKey, type QuickToken } from '../lib/quickAdd';
+import { quickPatch } from '../lib/quickEdit';
+import { todayISO } from '../lib/views';
 import { useTaskStore } from '../store/tasks';
+import { useUIStore } from '../store/ui';
+import { QuickChips } from './QuickChips';
 import styles from './TaskItem.module.css';
 
 type Props = {
@@ -24,6 +30,17 @@ export function TitleEditor({ id, initial, parentId, onMenu }: Props) {
   const phone = useIsPhone();
   /** Set once a key action has handled saving, so the blur that follows is ignored. */
   const handled = useRef(false);
+  // The draft is parsed like the composer's. Phrases already in the saved title start out
+  // dismissed, so an old "Meeting on friday" isn't turned into a date by editing it.
+  const [ignored, setIgnored] = useState<ReadonlySet<string>>(
+    () => new Set(parseQuickAdd(initial, { repeats: SUPPORTS_REPEAT }).tokens.map(tokenKey)),
+  );
+  const parsed = useMemo(
+    () => parseQuickAdd(draft, { ignore: ignored, repeats: SUPPORTS_REPEAT }),
+    [draft, ignored],
+  );
+  const ignore = (...tokens: QuickToken[]) =>
+    setIgnored((prev) => new Set([...prev, ...tokens.map(tokenKey)]));
 
   // Focus synchronously on mount (before paint). On iOS this takes focus over from the proxy
   // input primed in the tap, which keeps the keyboard open.
@@ -46,31 +63,34 @@ export function TitleEditor({ id, initial, parentId, onMenu }: Props) {
   }, [phone, initial]);
 
   const store = useTaskStore;
+  /** Saves the draft, or removes the task when it has no title. Returns false if removed. */
   const save = () => {
-    const title = draft.trim();
-    if (title === '') store.getState().remove(id);
-    else store.getState().update(id, { title });
+    const { tasks, update, remove } = store.getState();
+    const task = tasks[id];
+    const patch = draft.trim() === '' || !task ? { title: '' } : quickPatch(task, parsed);
+    if (patch.title === '') {
+      remove(id);
+      return false;
+    }
+    update(id, patch);
+    // A task that starts later leaves the lists; say so, like the composer.
+    if (patch.startDate && patch.startDate > todayISO()) {
+      useUIStore.getState().showNotice(`Hidden until ${weekdayDate(patch.startDate)}`);
+    }
+    return true;
   };
   const finish = () => store.getState().setEditingId(null);
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing) return;
-    const { add, update, indent, outdent, remove, setEditingId } = store.getState();
+    const { add, indent, outdent, remove, setEditingId } = store.getState();
     const title = draft.trim();
     if (e.key === 'Enter') {
       e.preventDefault();
       handled.current = true;
-      if (title === '') {
-        remove(id);
-        finish();
-      } else if (touch) {
-        // Phones: Enter means "done". Save and stop: no new sibling.
-        update(id, { title });
-        finish();
-      } else {
-        update(id, { title });
-        setEditingId(add({ title: '', parentId, afterId: id }));
-      }
+      // Phones: Enter means "done". Save and stop: no new sibling.
+      if (!save() || touch) finish();
+      else setEditingId(add({ title: '', parentId, afterId: id }));
       // Closes the on-screen keyboard.
       if (touch) ref.current?.blur();
     } else if (e.key === 'Escape') {
@@ -83,7 +103,7 @@ export function TitleEditor({ id, initial, parentId, onMenu }: Props) {
       if (title === '') return;
       // The row remounts under its new parent; editingId stays, so focus follows the task.
       handled.current = true;
-      update(id, { title });
+      if (!save()) return finish();
       if (e.shiftKey) outdent(id);
       else indent(id);
     }
@@ -107,28 +127,37 @@ export function TitleEditor({ id, initial, parentId, onMenu }: Props) {
       }}
     />
   );
-  if (!onMenu) return input;
+  const chips = <QuickChips parsed={parsed} onIgnore={ignore} />;
+  if (!onMenu)
+    return (
+      <>
+        {input}
+        {chips}
+      </>
+    );
 
   return (
-    <div className={styles.editorLine}>
-      {input}
-      <button
-        type="button"
-        className={styles.editorMenu}
-        aria-label="More options"
-        aria-haspopup="dialog"
-        // Keep focus in the input until the click, so the blur does not end the edit first.
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => {
-          handled.current = true;
-          const empty = draft.trim() === '';
-          save();
-          finish();
-          if (!empty) onMenu();
-        }}
-      >
-        <MoreHorizontal size={18} strokeWidth={1.75} aria-hidden="true" />
-      </button>
-    </div>
+    <>
+      <div className={styles.editorLine}>
+        {input}
+        <button
+          type="button"
+          className={styles.editorMenu}
+          aria-label="More options"
+          aria-haspopup="dialog"
+          // Keep focus in the input until the click, so the blur does not end the edit first.
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            handled.current = true;
+            const saved = save();
+            finish();
+            if (saved) onMenu();
+          }}
+        >
+          <MoreHorizontal size={18} strokeWidth={1.75} aria-hidden="true" />
+        </button>
+      </div>
+      {chips}
+    </>
   );
 }

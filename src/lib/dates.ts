@@ -96,7 +96,7 @@ export const BUCKET_LABELS: Record<DeadlineBucket, string> = {
   overdue: 'Overdue',
   today: 'Today',
   tomorrow: 'Tomorrow',
-  week: 'This week',
+  week: 'Next 7 days',
   later: 'Later',
   none: 'No deadline',
   done: 'Completed',

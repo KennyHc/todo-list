@@ -109,8 +109,28 @@ describe('matchHotkey', () => {
     expect(matchHotkey(ev('j'), onButton)).toEqual({ type: 'move', step: 1 });
   });
 
-  it('only expands and collapses in the tree view, and has no rows in history', () => {
-    expect(matchHotkey(ev('ArrowRight'), ctx({ view: 'deadline' }))).toBeNull();
+  it("↑/↓ still move between rows from a row's own buttons, but not from other controls", () => {
+    const inRow = ctx({ interactive: true, inRow: true });
+    expect(matchHotkey(ev('ArrowDown'), inRow)).toEqual({ type: 'move', step: 1 });
+    expect(matchHotkey(ev('ArrowUp'), inRow)).toEqual({ type: 'move', step: -1 });
+    expect(matchHotkey(ev('Enter'), inRow)).toBeNull();
+    expect(matchHotkey(ev(' '), inRow)).toBeNull();
+    expect(matchHotkey(ev('ArrowRight'), inRow)).toBeNull();
+  });
+
+  it('Home and End go to the first and last row', () => {
+    expect(matchHotkey(ev('Home'), ctx())).toEqual({ type: 'edge', last: false });
+    expect(matchHotkey(ev('End'), ctx({ hasFocus: false }))).toEqual({ type: 'edge', last: true });
+    expect(matchHotkey(ev('End'), ctx({ interactive: true }))).toBeNull();
+    expect(matchHotkey(ev('Home'), ctx({ view: 'history' }))).toBeNull();
+  });
+
+  it('←/→ work on rows in every row view, and history has no rows', () => {
+    expect(matchHotkey(ev('ArrowRight'), ctx({ view: 'deadline' }))).toEqual({
+      type: 'collapse',
+      collapsed: false,
+    });
+    expect(matchHotkey(ev('ArrowRight'), ctx({ view: 'history' }))).toBeNull();
     expect(matchHotkey(ev('j'), ctx({ view: 'history' }))).toBeNull();
     expect(matchHotkey(ev('1'), ctx({ view: 'history' }))).toEqual({ type: 'view', view: 'tree' });
   });

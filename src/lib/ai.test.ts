@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mkEntry, mkState, mkTask } from '../test/factories';
+import { MAX_NOTES_LENGTH, MAX_TAGS, MAX_TITLE_LENGTH } from '../types';
 import {
   appendAiTasks,
   buildExportPrompt,
@@ -229,6 +230,23 @@ describe('parseAiImport', () => {
       ['work', 'home'],
       ['errands', 'quick'],
     ]);
+  });
+
+  it('keeps imports inside the server limits: title, notes and tag count (#63)', () => {
+    const out = parseAiImport(
+      reply([
+        {
+          title: 't'.repeat(643),
+          notes: 'n'.repeat(30_000),
+          tags: Array.from({ length: 50 }, (_, i) => `tag${i}`),
+        },
+      ]),
+    );
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.tasks[0].title).toHaveLength(MAX_TITLE_LENGTH);
+    expect(out.tasks[0].notes).toHaveLength(MAX_NOTES_LENGTH);
+    expect(out.tasks[0].tags).toHaveLength(MAX_TAGS);
   });
 
   it('drops invalid dates with a warning and keeps done flags', () => {
