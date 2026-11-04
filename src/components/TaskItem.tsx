@@ -364,6 +364,20 @@ function TaskItemInner({
     else void runDelete();
   }, [id, runDelete]);
 
+  /**
+   * The row's checkbox and swipe-to-complete. With a row selected, this row becomes the selected
+   * one, so a following x or Space acts on it (or on the row that takes its place), never on the
+   * row selected before, such as its parent (#74). From the keyboard (or a click, which focuses
+   * the button), the focus must not fall to <body> when the completed row leaves the list.
+   */
+  const toggleHere = useCallback(() => {
+    const ui = useUIStore.getState();
+    const selected = ui.focusedId !== null;
+    if (selected && ui.focusedId !== id) ui.setFocusedId(id);
+    if (selected || rowRef.current?.contains(document.activeElement)) toggleKeepingFocus(id);
+    else useTaskStore.getState().toggle(id);
+  }, [id]);
+
   /** Swipe-to-delete: the gesture is the confirmation for a leaf, so no shake; parents still ask. */
   const swipeDelete = useCallback(() => {
     const count = getDescendants(useTaskStore.getState(), id).length;
@@ -529,7 +543,7 @@ function TaskItemInner({
                       setRescheduleOpen(true);
                     }
               }
-              onComplete={() => useTaskStore.getState().toggle(id)}
+              onComplete={toggleHere}
               onDelete={swipeDelete}
             >
               <motion.div
@@ -639,12 +653,7 @@ function TaskItemInner({
                   checked={task.done}
                   label={`Done: ${task.title}`}
                   delay={delay}
-                  onToggle={() => {
-                    // From the keyboard (or a click, which focuses the button), the focus must not
-                    // fall to <body> when the completed row leaves the list.
-                    if (rowRef.current?.contains(document.activeElement)) toggleKeepingFocus(id);
-                    else store.toggle(id);
-                  }}
+                  onToggle={toggleHere}
                   tabIndex={-1}
                 />
                 <div className={styles.title}>
