@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addTask, signIn, uniqueSub } from './helpers';
+import { signIn, uniqueSub } from './helpers';
 
 /** ISO dates by the browser's clock: today and this week's Monday. */
 const dates = (page: Page) =>
@@ -11,6 +11,18 @@ const dates = (page: Page) =>
     mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
     return { today: iso(now), mon: iso(mon) };
   });
+
+/** Adds `count` tasks due on `date` in one go, through the app's store (Vite serves it). */
+const seed = (page: Page, prefix: string, count: number, date: string) =>
+  page.evaluate(
+    async ([p, n, d]) => {
+      const { useTaskStore } = (await import(
+        /* @vite-ignore */ `${location.origin}/src/store/tasks.ts`
+      )) as { useTaskStore: { getState: () => { add: (t: object) => string } } };
+      for (let i = 0; i < n; i++) useTaskStore.getState().add({ title: `${p} ${i}`, dueDate: d });
+    },
+    [prefix, count, date] as const,
+  );
 
 const headOf = (page: Page, date: string) => page.locator(`section[data-date="${date}"] header`);
 const topOf = async (page: Page, date: string) => (await headOf(page, date).boundingBox())!.y;
@@ -36,11 +48,8 @@ test('phone Week opens at today with its header pinned under the bars (#67)', as
   test.skip(today === mon, 'on a Monday the week already opens at today');
 
   // Enough on Monday to push today well below the first screen, and a few rows today.
-  for (let i = 0; i < 14; i++) await addTask(page, `Early ${i}`);
-  for (let i = 0; i < 14; i++) {
-    await page.evaluate(([t, d]) => window.__e2e!.setDueDate(t, d), [`Early ${i}`, mon] as const);
-  }
-  for (let i = 0; i < 8; i++) await addTask(page, `Today ${i} today`);
+  await seed(page, 'Early', 14, mon);
+  await seed(page, 'Today', 8, today);
 
   await page.getByRole('radio', { name: 'Week' }).click();
   await expect(page.locator('section[data-date]')).toHaveCount(7);
@@ -71,11 +80,8 @@ test('stacked days on a tablet open at today too; seven columns stay put (#67)',
   await signIn(page, uniqueSub(info));
   const { today, mon } = await dates(page);
   test.skip(today === mon, 'on a Monday the week already opens at today');
-  for (let i = 0; i < 20; i++) await addTask(page, `Early ${i}`);
-  for (let i = 0; i < 20; i++) {
-    await page.evaluate(([t, d]) => window.__e2e!.setDueDate(t, d), [`Early ${i}`, mon] as const);
-  }
-  for (let i = 0; i < 12; i++) await addTask(page, `Today ${i} today`);
+  await seed(page, 'Early', 20, mon);
+  await seed(page, 'Today', 12, today);
   await page.getByRole('radio', { name: 'Week' }).click();
   await expect(page.locator('section[data-date]')).toHaveCount(7);
   // Near the top (16px, give or take the day card's own padding settling in).
