@@ -46,3 +46,39 @@ test('rows are one Tab stop each, with arrow keys between and into them', async 
   await expect(row(page, 'Alpha')).toHaveCount(0);
   await expect(bravo).toBeFocused();
 });
+
+for (const key of ['Enter', 'Space'] as const) {
+  test(`completing with the checkbox (${key}) keeps focus in the list, and undo brings it back (#66)`, async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name === 'mobile-chromium', 'keyboard flow');
+    await signIn(page, uniqueSub(info));
+    await addTask(page, 'Alpha');
+    await addTask(page, 'Bravo');
+    await addTask(page, 'Charlie');
+    await expect(row(page, 'Charlie')).toBeVisible();
+
+    const tree = page.getByRole('tree', { name: 'Tasks' });
+    const item = (name: string) => tree.getByRole('treeitem', { name });
+    await item('Bravo').focus();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    const checkbox = page.getByRole('checkbox', { name: 'Done: Bravo' });
+    await expect(checkbox).toBeFocused();
+
+    await page.keyboard.press(key);
+    await expect(row(page, 'Bravo')).toHaveCount(0);
+    await expect(item('Charlie')).toBeFocused();
+
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect(item('Bravo')).toBeFocused();
+
+    // The last row hands focus back to the one before it.
+    await item('Charlie').focus();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press(key);
+    await expect(row(page, 'Charlie')).toHaveCount(0);
+    await expect(item('Bravo')).toBeFocused();
+  });
+}

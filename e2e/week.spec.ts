@@ -122,8 +122,11 @@ async function dragTo(page: Page, source: Locator, target: Locator, touch: boole
       touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
     });
   await send('touchStart', start.x, start.y);
-  // Hold past the long-press delay (350ms) without moving, so it lifts instead of scrolling.
-  await page.waitForTimeout(500);
+  // Hold still until the long press (350ms) has lifted the row: onDragStart sets the grabbing
+  // cursor. A fixed wait raced the activation timer on a busy runner (#72).
+  await page.waitForFunction(() => document.body.style.cursor === 'grabbing', undefined, {
+    timeout: 5_000,
+  });
   for (let i = 1; i <= 10; i += 1) {
     await send(
       'touchMove',
