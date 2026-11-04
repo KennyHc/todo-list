@@ -178,6 +178,57 @@ const orderOf = (ui: ReturnType<typeof useUIStore.getState>) => ({
   weekAnchor: ui.weekAnchor,
 });
 
+/** Completions that handed the keyboard focus on: undo entry id -> the completed task. */
+const handedOn = new Map<string, string>();
+const HANDED_ON_MAX = 20;
+
+/** Focuses a shown row: through the store, or directly when the store already points at it. */
+function focusRow(id: string | null): void {
+  const ui = useUIStore.getState();
+  if (ui.focusedId !== id) {
+    ui.setFocusedId(id); // TaskItem moves the DOM focus (only out of a row or from nowhere)
+    return;
+  }
+  if (id === null) return;
+  const row = document.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(id)}"] [data-row]`);
+  const active = document.activeElement;
+  if (row && (active === null || active === document.body || active.closest('[data-row-id]'))) {
+    row.focus({ preventScroll: true });
+  }
+}
+
+/**
+ * Toggles a task the keyboard is on (`x`, Space, or its checkbox). A completed row leaves the
+ * list (with its subtree, and maybe its parent), so focus moves on to the next row that stays,
+ * and undoing the completion brings it back (see useHotkeys).
+ */
+export function toggleKeepingFocus(id: string): void {
+  const ui = useUIStore.getState();
+  const order = visibleOrder(useTaskStore.getState(), orderOf(ui));
+  useTaskStore.getState().toggle(id);
+  const after = useTaskStore.getState();
+  const stays = new Set(visibleOrder(after, orderOf(ui)));
+  if (stays.has(id)) return;
+  const entry = after.past.at(-1);
+  if (entry) {
+    handedOn.set(entry.id, id);
+    if (handedOn.size > HANDED_ON_MAX) handedOn.delete(handedOn.keys().next().value!);
+  }
+  const gone = new Set(order.filter((other) => !stays.has(other)));
+  focusRow(neighborAfterRemoval(order, id, gone));
+}
+
+/** After an undo: the task whose completion was just taken back, if it had handed focus on. */
+function restoredByUndo(prevFuture: { id: string }[], future: { id: string }[]): string | null {
+  if (future.length <= prevFuture.length) return null;
+  const before = new Set(prevFuture.map((e) => e.id));
+  for (const entry of future) {
+    const id = !before.has(entry.id) ? handedOn.get(entry.id) : undefined;
+    if (id !== undefined) return id;
+  }
+  return null;
+}
+
 const asElement = (target: EventTarget | null) => (target instanceof Element ? target : null);
 
 /** Global keyboard workflow: row focus, task shortcuts, views and the palette. Use once, in App. */
@@ -240,18 +291,9 @@ export function useHotkeys(): void {
         case 'edge':
           if (order.length > 0) ui.setFocusedId(order[action.last ? order.length - 1 : 0]);
           break;
-        case 'toggle': {
-          if (!focusedId) break;
-          tasks.toggle(focusedId);
-          // A completed row leaves the list (with its subtree, and maybe its parent), so focus
-          // moves on to the next row that stays, and j/k keep working.
-          const stays = new Set(visibleOrder(useTaskStore.getState(), orderOf(ui)));
-          if (!stays.has(focusedId)) {
-            const gone = new Set(order.filter((other) => !stays.has(other)));
-            ui.setFocusedId(neighborAfterRemoval(order, focusedId, gone));
-          }
+        case 'toggle':
+          if (focusedId) toggleKeepingFocus(focusedId);
           break;
-        }
         case 'edit':
           if (focusedId) tasks.setEditingId(focusedId);
           break;
@@ -343,7 +385,20 @@ export function useHotkeys(): void {
       }
     };
     document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    // Undoing a completion (⌘Z or the toast) that had moved focus on puts it back on the row,
+    // when the keyboard is still in the list.
+    const unsubscribe = useTaskStore.subscribe((s, p) => {
+      if (s.future === p.future) return;
+      const id = restoredByUndo(p.future, s.future);
+      if (id === null) return;
+      const active = document.activeElement;
+      const inList = useUIStore.getState().focusedId !== null || !!active?.closest('[data-row-id]');
+      if (inList) focusRow(id);
+    });
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      unsubscribe();
+    };
   }, []);
 
   // Roving tabindex: keep tabStopId on the focused row, or the first row while none is focused.

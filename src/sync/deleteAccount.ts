@@ -19,6 +19,7 @@ import {
 import { auth as defaultAuth, googleProvider, popupRedirect } from '../lib/firebase';
 import { db as defaultDb } from '../lib/firestore';
 import { useAiDraft } from '../store/aiDraft';
+import { isStandalone } from '../store/auth';
 import { useImportDraft } from '../store/importDraft';
 import { resetTaskStore } from '../store/tasks';
 import {
@@ -72,8 +73,8 @@ export type DeleteAccountOptions = {
   db?: Firestore;
   auth?: Auth;
   /**
-   * Re-authenticates the signed-in user. The default opens the Google popup (falling back to a
-   * redirect that resumes the deletion afterwards). Tests and the redirect resume replace it.
+   * Re-authenticates the signed-in user. The default opens the Google popup (a redirect that
+   * resumes the deletion afterwards when installed or when the popup is blocked). Tests and the redirect resume replace it.
    */
   reauthenticate?: (user: User) => Promise<void>;
   /** Runs once everything is gone. Defaults to a full page reload. */
@@ -88,19 +89,27 @@ const CANCEL_CODES = new Set([
   'auth/user-cancelled',
 ]);
 
-/** Must be called synchronously from the click so the browser allows the popup. */
+/**
+ * Must be called synchronously from the click so the browser allows the popup. Installed apps
+ * redirect straight away, like sign-in (#37): their popup opens a separate browser context that
+ * cannot hand the result back. The redirect sets DELETE_PENDING_KEY so `initAuth` resumes the
+ * deletion when the page comes back.
+ */
 async function reauthenticateWithGoogle(user: User): Promise<void> {
-  try {
-    await reauthenticateWithPopup(user, googleProvider, popupRedirect);
-  } catch (error) {
-    if (codeOf(error) !== 'auth/popup-blocked') throw error;
-    session.set(DELETE_PENDING_KEY, '1');
+  if (!isStandalone()) {
     try {
-      await reauthenticateWithRedirect(user, googleProvider, popupRedirect); // navigates away
-    } catch (redirectError) {
-      clearDeletePending();
-      throw redirectError;
+      await reauthenticateWithPopup(user, googleProvider, popupRedirect);
+      return;
+    } catch (error) {
+      if (codeOf(error) !== 'auth/popup-blocked') throw error;
     }
+  }
+  session.set(DELETE_PENDING_KEY, '1');
+  try {
+    await reauthenticateWithRedirect(user, googleProvider, popupRedirect); // navigates away
+  } catch (redirectError) {
+    clearDeletePending();
+    throw redirectError;
   }
 }
 
