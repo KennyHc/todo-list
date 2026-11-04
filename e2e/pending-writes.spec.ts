@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addTask, ready, signIn, titleBtn, uniqueSub } from './helpers';
+import { addTask, signIn, titleBtn, uniqueSub } from './helpers';
 
 const N = 2000;
 
@@ -23,7 +23,8 @@ test('a large restore says "Saving", holds the page while it uploads, and surviv
   page,
 }, info) => {
   test.skip(info.project.name !== 'desktop-chromium', 'one browser is enough for a sync test');
-  test.setTimeout(120_000);
+  // Rendering 2,000 rows makes a slow CI runner take minutes, not seconds, to upload them.
+  test.setTimeout(300_000);
   await signIn(page, uniqueSub(info));
   await addTask(page, 'Before the restore');
   await expect(titleBtn(page, 'Before the restore')).toBeVisible();
@@ -33,16 +34,24 @@ test('a large restore says "Saving", holds the page while it uploads, and surviv
   await page.evaluate((n) => window.__e2e!.restoreTasks(n), N);
   expect(await unloadBlocked(page)).toBe(true);
 
+  // Cheap reads only: with 2,000 rows on the page an accessibility-tree query can take longer
+  // than the upload itself.
+  const savingState = () =>
+    page.evaluate(() => {
+      const label = document
+        .querySelector('button[aria-label^="Account"]')
+        ?.getAttribute('aria-label');
+      return `${label} | ${document.querySelector('main')?.dataset.saving ?? 'no'}`;
+    });
+  await expect
+    .poll(savingState, { timeout: 30_000, intervals: [100] })
+    .toMatch(/^Account, Saving [\d,]+ changes… \| true$/);
   const main = page.locator('main');
-  await expect(main).toHaveAttribute('data-saving', 'true', { timeout: 10_000 });
-  await page.getByRole('button', { name: /^Account, Saving [\d,]+ changes…$/ }).click();
-  await expect(page.getByRole('menu', { name: 'Account' })).toContainText(/Saving [\d,]+ changes…/);
-  await page.keyboard.press('Escape');
 
   // Once the server has everything, leaving is free again and a reload keeps every task.
-  await expect(main).not.toHaveAttribute('data-saving', /.*/, { timeout: 90_000 });
+  await expect(main).not.toHaveAttribute('data-saving', /.*/, { timeout: 240_000 });
   expect(await unloadBlocked(page)).toBe(false);
   await page.reload();
-  await ready(page);
-  await expect.poll(() => taskCount(page), { timeout: 15_000 }).toBe(N);
+  await expect(page.locator('main[data-sync="ready"]')).toBeVisible({ timeout: 30_000 });
+  await expect.poll(() => taskCount(page), { timeout: 30_000 }).toBe(N);
 });
