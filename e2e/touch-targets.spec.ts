@@ -29,12 +29,32 @@ const hitArea = (target: Locator) =>
     };
   });
 
-/** At least 44×44, give or take the 0.5px sampling step. Soft, so one run lists every gap. */
+/**
+ * At least 44×44, give or take the 0.5px sampling step. Measured again for up to 3s, since a
+ * line that animates its height in (framer still animates height under reduced motion) clips
+ * its controls until it settles. Soft, so one run lists every gap.
+ */
 async function expectFingerSized(name: string, target: Locator) {
   await expect(target, name).toBeVisible();
-  const { width, height } = await hitArea(target);
-  expect.soft(width, `${name}: hit area width`).toBeGreaterThanOrEqual(43.5);
-  expect.soft(height, `${name}: hit area height`).toBeGreaterThanOrEqual(43.5);
+  let size = await hitArea(target);
+  for (let i = 0; i < 30 && (size.width < 43.5 || size.height < 43.5); i++) {
+    await target.page().waitForTimeout(100);
+    size = await hitArea(target);
+  }
+  // What covers the centre, if it isn't the control: names the culprit in a failure.
+  const at = await target.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return hit && (hit === el || el.contains(hit))
+      ? 'itself'
+      : (hit?.outerHTML.slice(0, 120) ?? 'nothing');
+  });
+  expect
+    .soft(size.width, `${name}: hit area width (centre hits ${at})`)
+    .toBeGreaterThanOrEqual(43.5);
+  expect
+    .soft(size.height, `${name}: hit area height (centre hits ${at})`)
+    .toBeGreaterThanOrEqual(43.5);
 }
 
 const yesterday = (page: Page) =>
