@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resetTaskStore, useTaskStore } from '../store/tasks';
 import { backupFilename, parseBackup, serializeBackup } from './backup';
 import type { PersistedTasks } from '../store/tasks';
-import { DEFAULT_SETTINGS, MAX_NOTES_LENGTH } from '../types';
+import { DEFAULT_SETTINGS, MAX_NOTES_LENGTH, MAX_TAGS, MAX_TITLE_LENGTH } from '../types';
 
 describe('backup', () => {
   const sampleData: PersistedTasks = {
@@ -408,5 +408,62 @@ describe('backup: notes and start dates', () => {
       expect('notes' in result.data.tasks[id]).toBe(false);
     }
     expect(result.data.tasks['3'].notes).toHaveLength(MAX_NOTES_LENGTH);
+  });
+});
+
+describe('backup: limits the server enforces (#63)', () => {
+  const task = (id: string, over: Record<string, unknown> = {}) => ({
+    id,
+    title: `Task ${id}`,
+    done: false,
+    collapsed: false,
+    childIds: [],
+    parentId: null,
+    tags: [],
+    dueDate: null,
+    repeat: null,
+    plannedFor: null,
+    difficulty: 1,
+    color: null,
+    createdAt: 1000,
+    ...over,
+  });
+  const parse = (tasks: Record<string, unknown>) => {
+    const result = parseBackup(
+      JSON.stringify({ app: 'tasks', version: 3, tasks, rootIds: Object.keys(tasks), history: [] }),
+    );
+    if (!result.ok) throw new Error(result.error);
+    return result.data.tasks;
+  };
+
+  it('clamps an over-long title to MAX_TITLE_LENGTH', () => {
+    const tasks = parse({ '1': task('1', { title: 'x'.repeat(643) }) });
+    expect(tasks['1'].title).toHaveLength(MAX_TITLE_LENGTH);
+  });
+
+  it('clamps over-long notes to MAX_NOTES_LENGTH', () => {
+    const tasks = parse({ '1': task('1', { notes: 'n'.repeat(30_000) }) });
+    expect(tasks['1'].notes).toHaveLength(MAX_NOTES_LENGTH);
+  });
+
+  it('keeps at most MAX_TAGS tags, normalized and deduplicated first', () => {
+    const many = ['#Work', 'work', ...Array.from({ length: 50 }, (_, i) => `t${i}`)];
+    const tasks = parse({ '1': task('1', { tags: many }) });
+    expect(tasks['1'].tags).toHaveLength(MAX_TAGS);
+    expect(tasks['1'].tags.slice(0, 2)).toEqual(['work', 't0']);
+  });
+
+  it('drops non-string tags and treats a missing title as empty', () => {
+    const tasks = parse({ '1': task('1', { title: 42, tags: ['ok', 7, null] }) });
+    expect(tasks['1'].title).toBe('');
+    expect(tasks['1'].tags).toEqual(['ok']);
+  });
+
+  it('leaves ordinary tasks next to the bad ones untouched', () => {
+    const tasks = parse({
+      a: task('a', { title: 'y'.repeat(600) }),
+      b: task('b', { tags: ['home'], notes: 'short' }),
+    });
+    expect(tasks.b).toMatchObject({ title: 'Task b', tags: ['home'], notes: 'short' });
   });
 });
