@@ -182,20 +182,16 @@ function setDone(draft: Draft, id: string, done: boolean, now: number): void {
 }
 
 /**
- * Walks up from `startId`, setting each task's done flag from its children.
- * A task without children keeps its current flag.
+ * Walks up from `startId` and reopens each done task that has an open child, so a done task
+ * never holds open work. It never completes anything: a task is done only when the user
+ * completes it or one of its ancestors (#74), never because its subtasks are all done.
  */
-export function reevaluateFrom(draft: Draft, startId: string | null, now: number): void {
+export function reopenFrom(draft: Draft, startId: string | null, now: number): void {
   let id = startId;
   while (id !== null) {
     const task = draft.tasks[id];
-    if (task.childIds.length > 0) {
-      setDone(
-        draft,
-        id,
-        task.childIds.every((childId) => draft.tasks[childId].done),
-        now,
-      );
+    if (task.done && task.childIds.some((childId) => !draft.tasks[childId].done)) {
+      setDone(draft, id, false, now);
     }
     id = task.parentId;
   }
@@ -254,7 +250,7 @@ export function addTask(
   siblings.splice(afterIndex === -1 ? siblings.length : afterIndex + 1, 0, id);
 
   // New open work: a done parent (and done ancestors) reopen.
-  reevaluateFrom(draft, parentId, now);
+  reopenFrom(draft, parentId, now);
   return { tree: draft.finish(), id };
 }
 
@@ -307,14 +303,14 @@ export function updateTask(tree: TaskTree, id: string, rawPatch: TaskPatch): Tas
   return draft.finish();
 }
 
-export function deleteTask(tree: TaskTree, id: string, now = Date.now()): TaskTree {
+export function deleteTask(tree: TaskTree, id: string): TaskTree {
   const task = tree.tasks[id];
   if (!task) return tree;
 
   const draft = createDraft(tree);
   for (const removedId of [id, ...getDescendants(tree, id)]) delete draft.tasks[removedId];
   detach(draft, task);
-  reevaluateFrom(draft, task.parentId, now);
+  // Losing its last open subtask never completes the parent (#74).
   return draft.finish();
 }
 
@@ -328,9 +324,9 @@ export function toggleDone(tree: TaskTree, id: string, now = Date.now()): TaskTr
     setDone(draft, affectedId, done, now);
   }
 
-  if (done) {
-    reevaluateFrom(draft, task.parentId, now);
-  } else {
+  // Completing cascades down only, never up to the parent (#74). Reopening reopens the
+  // ancestors, since a done task can't hold an open one.
+  if (!done) {
     for (const ancestorId of getAncestors(tree, id)) setDone(draft, ancestorId, false, now);
   }
   return draft.finish();
@@ -351,13 +347,13 @@ export function indentTask(tree: TaskTree, id: string, now = Date.now()): TaskTr
   draft.edit(newParentId).childIds.push(id);
   draft.edit(id).parentId = newParentId;
 
-  reevaluateFrom(draft, task.parentId, now);
-  reevaluateFrom(draft, newParentId, now);
+  // The new parent may have gained open work; the old one is never completed (#74).
+  reopenFrom(draft, newParentId, now);
   return draft.finish();
 }
 
 /** Moves the task to sit directly after its parent. */
-export function outdentTask(tree: TaskTree, id: string, now = Date.now()): TaskTree {
+export function outdentTask(tree: TaskTree, id: string): TaskTree {
   const task = tree.tasks[id];
   if (!task || task.parentId === null) return tree;
 
@@ -370,8 +366,8 @@ export function outdentTask(tree: TaskTree, id: string, now = Date.now()): TaskT
   siblings.splice(siblings.indexOf(oldParentId) + 1, 0, id);
   draft.edit(id).parentId = grandparentId;
 
-  // The old parent lost a child; the grandparent gained one (possibly an undone one).
-  reevaluateFrom(draft, oldParentId, now);
+  // The old parent lost a child, which never completes it (#74). The grandparent gained one,
+  // but it already held this task's subtree, so its done flag still fits.
   return draft.finish();
 }
 
@@ -409,17 +405,13 @@ export function moveTask(
   if (sameParent && index === siblingIds(tree, task).indexOf(id)) return tree;
 
   const draft = createDraft(tree);
-  const oldParentId = task.parentId;
   detach(draft, task);
   draft.siblings(parentId).splice(index, 0, id);
   if (!sameParent) draft.edit(id).parentId = parentId;
 
-  // Both ends changed their children: the old parent may now be complete, the new one may
-  // have gained open work (or, as a former leaf, a done child).
-  if (!sameParent) {
-    reevaluateFrom(draft, oldParentId, now);
-    reevaluateFrom(draft, parentId, now);
-  }
+  // The new parent may have gained open work. The old one lost a child, which never
+  // completes it (#74).
+  if (!sameParent) reopenFrom(draft, parentId, now);
   return draft.finish();
 }
 

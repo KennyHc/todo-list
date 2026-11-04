@@ -487,8 +487,9 @@ export function importStats(tasks: AiImportTask[]): { count: number; difficulty:
 
 /**
  * Appends the imported tasks (in order, recursively) at the root or under `parentId`. Each new
- * root is left on automatic colour (tags with a colour apply by themselves). Done leaves are marked afterwards via
- * toggleDone, so parents derive their done state like they do everywhere else.
+ * root is left on automatic colour (tags with a colour apply by themselves). Tasks marked done
+ * are completed afterwards via toggleDone, like a check: a done parent completes its subtree,
+ * and a parent whose subtasks are all done stays open unless it is marked done itself (#74).
  */
 export function appendAiTasks(
   tree: TaskTree,
@@ -503,7 +504,7 @@ export function appendAiTasks(
   let current = tree;
   let count = 0;
   const ids: string[] = [];
-  const doneLeaves: string[] = [];
+  const doneIds: string[] = [];
 
   const add = (task: AiImportTask, parent: string | null, color: string | null): string => {
     const result = addTask(
@@ -524,16 +525,16 @@ export function appendAiTasks(
     );
     current = result.tree;
     count += 1;
-    if (task.subtasks.length === 0) {
-      if (task.done) doneLeaves.push(result.id);
-    } else {
-      for (const sub of task.subtasks) add(sub, result.id, null);
-    }
+    if (task.done) doneIds.push(result.id);
+    for (const sub of task.subtasks) add(sub, result.id, null);
     return result.id;
   };
 
   for (const task of tasks) ids.push(add(task, parentId, opts.color ?? null));
 
-  for (const id of doneLeaves) current = toggleDone(current, id, now);
+  // Parents come first, so a subtask a done parent already completed is skipped, not reopened.
+  for (const id of doneIds) {
+    if (!current.tasks[id].done) current = toggleDone(current, id, now);
+  }
   return { tree: current, ids, count };
 }

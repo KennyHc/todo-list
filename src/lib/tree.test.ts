@@ -180,17 +180,19 @@ describe('effectiveDifficulty', () => {
 });
 
 describe('toggleDone', () => {
-  it('checking the last undone child completes the parent and grandparent', () => {
+  it('checking every subtask never completes the parent or grandparent (#74)', () => {
     const s = sample();
     let tree = toggleDone(s.tree, s.d, 100);
-    expect(done(tree, s.b)).toBe(false);
     tree = toggleDone(tree, s.e, 200);
-    expect(done(tree, s.b)).toBe(true);
-    expect(done(tree, s.a)).toBe(false); // C still open
     tree = toggleDone(tree, s.c, 300);
-    expect(done(tree, s.a)).toBe(true);
-    expect(tree.tasks[s.b].completedAt).toBe(200);
-    expect(tree.tasks[s.a].completedAt).toBe(300);
+    for (const id of [s.c, s.d, s.e]) expect(done(tree, id)).toBe(true);
+    expect(done(tree, s.b)).toBe(false);
+    expect(done(tree, s.a)).toBe(false);
+    expect(tree.tasks[s.b].completedAt).toBeUndefined();
+    expect(tree.tasks[s.a].completedAt).toBeUndefined();
+    // Only the parent's own check completes it, and its whole subtree with it.
+    tree = toggleDone(tree, s.a, 400);
+    for (const id of [s.a, s.b]) expect(tree.tasks[id].completedAt).toBe(400);
   });
 
   it('checking a parent checks all descendants and keeps earlier completedAt', () => {
@@ -202,7 +204,7 @@ describe('toggleDone', () => {
     expect(tree.tasks[s.e].completedAt).toBe(500);
   });
 
-  it('unchecking a grandchild unchecks parent and grandparent but not siblings', () => {
+  it('unchecking a grandchild reopens parent and grandparent but not siblings (#74, decided)', () => {
     const s = sample();
     let tree = toggleDone(s.tree, s.a);
     tree = toggleDone(tree, s.d);
@@ -249,23 +251,13 @@ describe('deleteTask', () => {
     expect(tree).toEqual(emptyTree());
   });
 
-  it('completes the parent when the only undone child is deleted', () => {
+  it('deleting the last open subtask leaves the parent and grandparent open (#74)', () => {
     const s = sample();
     let tree = toggleDone(s.tree, s.d);
+    tree = toggleDone(tree, s.c);
     tree = deleteTask(tree, s.e);
-    expect(done(tree, s.b)).toBe(true);
+    expect(done(tree, s.b)).toBe(false);
     expect(done(tree, s.a)).toBe(false);
-    tree = toggleDone(tree, s.c);
-    expect(done(tree, s.a)).toBe(true);
-  });
-
-  it('propagates completion to the grandparent', () => {
-    const s = sample();
-    let tree = toggleDone(s.tree, s.d);
-    tree = toggleDone(tree, s.c);
-    tree = deleteTask(tree, s.e);
-    expect(done(tree, s.b)).toBe(true);
-    expect(done(tree, s.a)).toBe(true);
   });
 
   it('leaves the parent done flag alone when it has no children left', () => {
@@ -328,15 +320,24 @@ describe('indentTask', () => {
     expect(done(tree, a.id)).toBe(true);
   });
 
-  it('completes the old parent if its remaining children are all done', () => {
+  it('leaves the old parent open when its remaining children are all done (#74)', () => {
     const s = sample();
-    // B has D, E. Check D, leave E undone, then outdent... instead indent E under D.
+    // B has D, E. Check D, then indent E under D: D reopens, B has only D.
     let tree = toggleDone(s.tree, s.d);
-    tree = indentTask(tree, s.e); // E becomes child of D; D reopens, B has only D
+    tree = indentTask(tree, s.e);
     expect(done(tree, s.d)).toBe(false);
+    expect(done(tree, s.b)).toBe(false);
     tree = toggleDone(tree, s.e);
-    expect(done(tree, s.d)).toBe(true);
-    expect(done(tree, s.b)).toBe(true);
+    expect(done(tree, s.d)).toBe(false);
+    expect(done(tree, s.b)).toBe(false);
+  });
+
+  it('never completes an open leaf that receives a done task (#74)', () => {
+    const a = add(emptyTree(), 'a');
+    const b = add(a.tree, 'b');
+    const tree = indentTask(toggleDone(b.tree, b.id), b.id);
+    expect(tree.tasks[a.id].childIds).toEqual([b.id]);
+    expect(done(tree, a.id)).toBe(false);
   });
 
   it('re-evaluates the old parent when the moved task was the only undone sibling', () => {
@@ -376,22 +377,13 @@ describe('outdentTask', () => {
     expect(outdentTask(s.tree, 'nope')).toBe(s.tree);
   });
 
-  it('completes the old parent when its remaining children are all done', () => {
+  it('leaves the old parent open when its remaining children are all done (#74)', () => {
     const s = sample();
-    let tree = toggleDone(s.tree, s.d);
-    expect(done(tree, s.b)).toBe(false);
-    tree = outdentTask(tree, s.e);
-    expect(done(tree, s.b)).toBe(true);
-    expect(done(tree, s.a)).toBe(false); // E (undone) now lives under A
-  });
-
-  it('reopens the grandparent when an undone task is moved up into a done one', () => {
-    const s = sample();
-    // Done: everything except E; outdent D (done) leaves B with only E undone.
     let tree = toggleDone(s.tree, s.d);
     tree = toggleDone(tree, s.c);
     tree = outdentTask(tree, s.e);
-    expect(done(tree, s.b)).toBe(true);
+    expect(tree.tasks[s.b].childIds).toEqual([s.d]);
+    expect(done(tree, s.b)).toBe(false);
     expect(done(tree, s.a)).toBe(false);
   });
 });
@@ -506,25 +498,24 @@ describe('structural sharing', () => {
     const s = branches();
     let tree = toggleDone(s.tree, s.a2);
     const before = tree;
-    tree = toggleDone(tree, s.a1); // completes A; R still open because of B
+    tree = toggleDone(tree, s.a1); // A stays open: only a1 changes
     expect(tree.tasks[s.b]).toBe(before.tasks[s.b]);
     expect(tree.tasks[s.b1]).toBe(before.tasks[s.b1]);
-    expect(tree.tasks[s.r]).toBe(before.tasks[s.r]); // R's value did not change
-    for (const id of [s.a1, s.a]) expect(tree.tasks[id]).not.toBe(before.tasks[id]);
+    expect(tree.tasks[s.r]).toBe(before.tasks[s.r]);
+    expect(tree.tasks[s.a]).toBe(before.tasks[s.a]);
+    expect(tree.tasks[s.a1]).not.toBe(before.tasks[s.a1]);
     expect(tree.tasks[s.a2]).toBe(before.tasks[s.a2]);
     expect(tree.tasks).not.toBe(before.tasks);
     expect(tree.rootIds).toBe(before.rootIds);
   });
 
-  it('toggleDone replaces every task in the changed ancestor chain', () => {
+  it('reopening replaces every task in the reopened ancestor chain', () => {
     const s = branches();
-    let tree = toggleDone(s.tree, s.a1);
-    tree = toggleDone(tree, s.a2);
-    tree = toggleDone(tree, s.b1);
-    const before = toggleDone(tree, s.b1); // b1 open again, everything above reopened
-    const after = toggleDone(before, s.b1);
+    const before = toggleDone(s.tree, s.r); // everything done
+    const after = toggleDone(before, s.b1); // b1 reopens, and B and R with it
     for (const id of [s.b1, s.b, s.r]) expect(after.tasks[id]).not.toBe(before.tasks[id]);
     expect(after.tasks[s.a]).toBe(before.tasks[s.a]);
+    expect(done(after, s.a)).toBe(true);
   });
 
   it('updateTask only replaces the edited task', () => {
@@ -677,10 +668,10 @@ describe('moveTask', () => {
     expect(isLeaf(tree, s.R)).toBe(false);
     expect(tree.tasks[s.R].childIds).toEqual([s.Q]);
     expect(done(tree, s.R)).toBe(false); // gained an undone child
-    // A done child under an open leaf completes it.
+    // A done child under an open leaf leaves it open (#74).
     let t2 = toggleDone(s.tree, s.Q);
     t2 = moveTask(t2, s.Q, { parentId: s.R, index: 0 });
-    expect(done(t2, s.R)).toBe(true);
+    expect(done(t2, s.R)).toBe(false);
   });
 
   it('refuses to move into its own subtree', () => {
@@ -700,26 +691,25 @@ describe('moveTask', () => {
     expect(done(tree, s.p1)).toBe(true);
   });
 
-  it('completes the old parent when its remaining children are all done', () => {
+  it('leaves the old parent open when its remaining children are all done (#74)', () => {
     const s = flat();
     let tree = toggleDone(s.tree, s.p1);
     tree = toggleDone(tree, s.p2);
-    expect(done(tree, s.P)).toBe(false);
     tree = moveTask(tree, s.p3, { parentId: null, index: 3 });
-    expect(done(tree, s.P)).toBe(true);
-    expect(tree.tasks[s.P].completedAt).toBeDefined();
+    expect(done(tree, s.P)).toBe(false);
+    expect(tree.tasks[s.P].completedAt).toBeUndefined();
   });
 
-  it('re-evaluates when the new parent is a descendant of the old one', () => {
+  it('never completes ancestors when the new parent is a descendant of the old one', () => {
     const s = sample();
-    // Complete D; B is open because of E. Move E to C: B is done, A has the open C and E.
+    // Complete D, move E to C: B has only the done D, A has the open C and E.
     let tree = toggleDone(s.tree, s.d);
     tree = moveTask(tree, s.e, { parentId: s.c, index: 0 });
-    expect(done(tree, s.b)).toBe(true);
+    expect(done(tree, s.b)).toBe(false);
     expect(done(tree, s.a)).toBe(false);
     tree = toggleDone(tree, s.e);
-    expect(done(tree, s.c)).toBe(true);
-    expect(done(tree, s.a)).toBe(true);
+    expect(done(tree, s.c)).toBe(false);
+    expect(done(tree, s.a)).toBe(false);
   });
 
   it('clamps the index to the valid range', () => {

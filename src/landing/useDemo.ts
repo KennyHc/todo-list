@@ -110,13 +110,19 @@ export function useDemo({
     });
     t += 500 + DEMO_SUBTASKS.length * 420 + 600;
 
+    // Each subtask, then the parent: checking the subtasks never completes it (#74).
     DEMO_SUBTASKS.forEach((_, i) => {
       at(t + i * 900, () => {
         setToggled(childIds[i]);
         setTree(toggleDone(treeRef.current, childIds[i]));
       });
     });
-    t += (DEMO_SUBTASKS.length - 1) * 900 + 2400;
+    t += DEMO_SUBTASKS.length * 900;
+    at(t, () => {
+      setToggled(parentId);
+      setTree(toggleDone(treeRef.current, parentId));
+    });
+    t += 2400;
 
     at(t, () => setFading(true));
     at(t + FADE_MS, () => setLoop((n) => n + 1));

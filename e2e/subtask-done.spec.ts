@@ -1,8 +1,8 @@
 import { expect, type Page, test } from '@playwright/test';
 import { addTask, check, openMenu, row, signIn, swipe, titleBtn, uniqueSub } from './helpers';
 
-// #74: checking one subtask must leave its parent open while other subtasks are open, whatever
-// the input, also when the parent row was selected first and a key follows the check.
+// #74: checking subtasks never completes their parent, whatever the input, also when the
+// parent row was selected first and a key follows the check. Only the parent's own check does.
 
 async function addSubtask(page: Page, parent: string, title: string, typed = title) {
   const menu = await openMenu(page, parent);
@@ -106,9 +106,11 @@ test.describe('desktop', () => {
     await expect(row(page, 'Charger')).toHaveCount(0);
     await selected(page, 'Snacks');
     await page.keyboard.press('x');
-    // x completed Snacks, the last open subtask, so the parent completes by the intended rule.
-    await expect(row(page, 'Pack for trip')).toHaveCount(0);
-    await expect(page.getByText(/Completed 3 tasks/)).toHaveCount(0);
+    // x completed Snacks, the last open subtask; the parent stays open with all three done.
+    await expect(row(page, 'Snacks')).toHaveCount(0);
+    await isOpen(page, 'Pack for trip');
+    await expect(row(page, 'Pack for trip')).toContainText('3/3');
+    await expect(page.getByText(/Completed \d+ tasks/)).toHaveCount(0);
   });
 
   test('Week: the checked subtask stays, and x then reopens it', async ({ page }, info) => {
@@ -123,13 +125,21 @@ test.describe('desktop', () => {
     await isOpen(page, 'Parent');
   });
 
-  test('checking every subtask still completes the parent', async ({ page }, info) => {
+  test('checking every subtask leaves the parent open; its own check completes it', async ({
+    page,
+  }, info) => {
     await signIn(page, uniqueSub(info));
     await seed(page);
-    await check(page, 'One').click();
-    await check(page, 'Two').click();
+    for (const child of ['One', 'Two', 'Three']) {
+      await check(page, child).click();
+      await expect(row(page, child)).toHaveCount(0);
+    }
     await isOpen(page, 'Parent');
-    await check(page, 'Three').click();
+    await expect(row(page, 'Parent')).toContainText('3/3');
+    // Still open after a reload, so the synced copy agrees.
+    await page.reload();
+    await isOpen(page, 'Parent');
+    await check(page, 'Parent').click();
     await expect(row(page, 'Parent')).toHaveCount(0);
     await expect(page.locator('li[data-row-id]')).toHaveCount(0);
   });

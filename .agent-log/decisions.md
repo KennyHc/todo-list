@@ -18,3 +18,6 @@ that made it.
   `hydrate`; undo and redo are plain store `set`s so sync diffs them. (#50)
 - Task rows use a roving tabindex: the row is the only Tab stop (`ui.tabStopId`), its controls
   are `tabIndex={-1}` and reached with → then ←/→; new row controls must follow this. (#51)
+- Completing a task never completes its parent: completion cascades down to its subtasks only,
+  for checks and structural edits alike (`reopenFrom` only ever reopens). Reopening a subtask,
+  or adding one, under a done parent reopens that parent and its done ancestors (user-confirmed). (#74)

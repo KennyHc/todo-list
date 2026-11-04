@@ -106,15 +106,6 @@
   background: var(--accent-soft);
 }
 
-.flash {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: var(--r-md);
-  opacity: 0;
-  pointer-events: none;
-}
-
 .reveal {
   position: absolute;
   inset: 0;
@@ -569,7 +560,6 @@
     --band: calc(var(--pad-y) * 2 + var(--lh));
   }
 
-  .flash,
   .reveal,
   .tint {
     border-radius: 0;

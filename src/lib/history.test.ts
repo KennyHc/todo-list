@@ -39,16 +39,20 @@ describe('diffCompletions', () => {
     expect(typeof diff.completed[0].id).toBe('string');
   });
 
-  it('logs a cascaded parent with auto=true, after its subtasks', () => {
+  it('checking the last open subtask logs only that subtask, never the parent (#74)', () => {
     const s = sample();
     const one = run(s.tree, s.b, 100);
     const two = run(one.after, s.c, 200);
-    expect(two.diff.completed.map((e) => [e.taskId, e.auto])).toEqual([
-      [s.c, false],
-      [s.a, true],
-    ]);
-    const parent = two.diff.completed[1];
+    expect(two.diff.completed.map((e) => [e.taskId, e.auto])).toEqual([[s.c, false]]);
+  });
+
+  it('logs a toggled parent with a full snapshot, after its subtasks', () => {
+    const s = sample();
+    const { diff } = run(s.tree, s.a, 200);
+    const parent = diff.completed[2];
     expect(parent).toMatchObject({
+      taskId: s.a,
+      auto: false,
       title: 'A',
       color: '#111111',
       tags: ['t'],
@@ -99,7 +103,7 @@ describe('applyHistory', () => {
   it('appends newest last', () => {
     const s = sample();
     const first = run(s.tree, s.b, 1);
-    const second = run(first.after, s.c, 2);
+    const second = run(first.after, s.a, 2);
     const h = applyHistory(applyHistory([], first.diff), second.diff);
     expect(h.map((e) => e.taskId)).toEqual([s.b, s.c, s.a]);
   });
@@ -128,10 +132,10 @@ describe('applyHistory', () => {
     expect(out.map((e) => e.id)).toEqual(['old']);
   });
 
-  it('unchecking a cascade-completed child removes the parent entry too', () => {
+  it('unchecking a child of a completed parent removes the parent entry too', () => {
     const s = sample();
     const one = run(s.tree, s.b, 1);
-    const two = run(one.after, s.c, 2);
+    const two = run(one.after, s.a, 2);
     let h = applyHistory(applyHistory([], one.diff), two.diff);
     expect(h).toHaveLength(3);
     const un = run(two.after, s.b, 3);
@@ -149,7 +153,7 @@ describe('applyHistory', () => {
     const s = sample();
     const one = run(s.tree, s.b, 1);
     const h = applyHistory([], one.diff);
-    const afterDelete = deleteTask(one.after, s.b, 5);
+    const afterDelete = deleteTask(one.after, s.b);
     expect(afterDelete.tasks[s.b]).toBeUndefined();
     expect(h).toHaveLength(1);
   });
