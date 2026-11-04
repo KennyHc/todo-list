@@ -28,7 +28,18 @@ vi.mock('../sync/syncControl', () => ({
   }),
 }));
 
-import { hasAuthHint, initAuth, isInAppBrowser, useAuthStore } from './auth';
+const resumeDeleteAccount = vi.hoisted(() => vi.fn(async () => null as unknown));
+vi.mock('../sync/deleteAccount', () => ({ resumeDeleteAccount }));
+
+import {
+  DELETE_NOT_CONFIRMED,
+  DELETE_WRONG_ACCOUNT,
+  hasAuthHint,
+  initAuth,
+  isInAppBrowser,
+  useAuthStore,
+} from './auth';
+import { useUIStore } from './ui';
 import { resetTaskStore, useTaskStore } from './tasks';
 
 const reset = () =>
@@ -188,6 +199,37 @@ describe('signInWithGoogle', () => {
     fb.signInWithPopup.mockResolvedValue({});
     await useAuthStore.getState().signInWithGoogle();
     expect(fb.signInWithPopup.mock.calls[0]).toHaveLength(3);
+  });
+});
+
+describe('delete-account redirect return', () => {
+  beforeEach(() => {
+    sessionStorage.setItem('delete-pending', '1');
+    useUIStore.getState().clearNotice();
+  });
+
+  it('resumes the deletion once the re-authentication succeeded', async () => {
+    fb.getRedirectResult.mockResolvedValue({ user: fakeUser });
+    initAuth();
+    await vi.waitFor(() => expect(resumeDeleteAccount).toHaveBeenCalledTimes(1));
+    expect(useAuthStore.getState().freshSignIn).toBe(false);
+  });
+
+  it('says the account was not deleted when the user came back without confirming', async () => {
+    fb.getRedirectResult.mockResolvedValue(null);
+    initAuth();
+    await vi.waitFor(() => expect(useUIStore.getState().notice?.text).toBe(DELETE_NOT_CONFIRMED));
+    expect(resumeDeleteAccount).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('delete-pending')).toBeNull();
+  });
+
+  it('explains a different Google account and deletes nothing', async () => {
+    fb.getRedirectResult.mockRejectedValue({ code: 'auth/user-mismatch' });
+    initAuth();
+    await vi.waitFor(() => expect(useUIStore.getState().notice?.text).toBe(DELETE_WRONG_ACCOUNT));
+    expect(resumeDeleteAccount).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('delete-pending')).toBeNull();
+    expect(useAuthStore.getState().error).toBeNull();
   });
 });
 
