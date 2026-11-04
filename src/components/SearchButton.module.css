@@ -40,11 +40,11 @@
     background: none;
   }
 
-  /* A 44px target around the 36px button. */
+  /* A 44px target around the 36px button (--tap-inset measures from inside the border). */
   .button::after {
     content: '';
     position: absolute;
-    inset: -4px;
+    inset: var(--tap-inset);
   }
 
   .keys {

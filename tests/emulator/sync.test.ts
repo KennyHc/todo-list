@@ -10,11 +10,13 @@ import {
   connectFirestoreEmulator,
   doc,
   getDocs,
+  getDocsFromServer,
   getDoc,
   initializeFirestore,
   memoryLocalCache,
   setDoc,
   terminate,
+  waitForPendingWrites,
   type Firestore,
 } from 'firebase/firestore';
 import { createStore } from 'zustand/vanilla';
@@ -22,6 +24,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { startSync, type SyncStore } from '../../src/sync/firestoreSync';
 import { createTaskStore } from '../../src/store/tasks';
 import { toTaskDoc } from '../../src/sync/schema';
+import { parseBackup } from '../../src/lib/backup';
 import type { Task } from '../../src/types';
 
 type Client = {
@@ -500,5 +503,36 @@ describe('pending writes (#61)', () => {
 
     const server = await getDocs(collection(first.db, 'users', uid, 'tasks'));
     expect(server.size).toBe(N);
+  }, 30000);
+});
+
+describe('restoring a backup that breaks the rules limits (#63)', () => {
+  it('keeps all 77 tasks in the app and on the server', async () => {
+    const first = await signedInDb(true);
+    uid = first.uid;
+    const a = await client(first.app, first.db);
+
+    const tasks: Record<string, Task & { notes?: string }> = {};
+    for (let i = 0; i < 77; i++) tasks[`b${i}`] = mkOld(`b${i}`);
+    tasks.b0 = { ...tasks.b0, title: 'x'.repeat(643) };
+    tasks.b1 = { ...tasks.b1, tags: Array.from({ length: 50 }, (_, i) => `tag${i}`) };
+    tasks.b2 = { ...tasks.b2, notes: 'n'.repeat(30_000) };
+    const parsed = parseBackup(
+      JSON.stringify({ app: 'tasks', version: 3, tasks, rootIds: Object.keys(tasks), history: [] }),
+    );
+    if (!parsed.ok) throw new Error(parsed.error);
+    a.store.getState().replaceAll(parsed.data, 'Restored backup (77 tasks)');
+
+    // Once the server has answered every write (a rejection rolls the batch back), count
+    // what it holds, then give the rollback time to reach the store.
+    const col = collection(first.db, 'users', uid, 'tasks');
+    // The debounced flush has run once the writes show in the client's own view.
+    await vi.waitFor(async () => expect((await getDocs(col)).size).toBe(77), { timeout: 8000 });
+    await waitForPendingWrites(first.db);
+    const server = await getDocsFromServer(col);
+    expect(server.size).toBe(77);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(Object.keys(a.store.getState().tasks)).toHaveLength(77);
+    expect(a.sink.getState().status).not.toBe('error');
   }, 30000);
 });

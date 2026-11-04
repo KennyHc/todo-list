@@ -54,3 +54,11 @@
     padding: var(--space-3) 0 var(--space-1);
   }
 }
+
+/* The wrapper clips (height animation), so the line keeps 12px under the button for the
+   bottom of its 44px hit area (#65). */
+@media (pointer: coarse) and (max-width: 480px) {
+  .line {
+    padding-bottom: var(--space-3);
+  }
+}

@@ -226,6 +226,21 @@ export function WeekView() {
   const reduced = useReducedMotion();
   const activeId = useDragStore((s) => s.activeId);
   const releaseTimer = useRef<number>();
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  // Stacked days (below 1024px): opening the current week starts at today, not at a Monday
+  // that may be screens above it. Instant, never smooth. Other weeks open at Monday as before.
+  useEffect(() => {
+    if (anchor !== null || !window.matchMedia?.('(max-width: 1023px)').matches) return;
+    const section = gridRef.current?.querySelector<HTMLElement>('section[data-today]');
+    const head = section?.querySelector('header');
+    if (!section?.previousElementSibling || !head) return;
+    // Onto the header's sticky line on a phone (under the bars), 16px from the top otherwise.
+    const pinned = parseFloat(getComputedStyle(head).top);
+    const line = Number.isFinite(pinned) ? pinned : 16;
+    window.scrollBy({ top: head.getBoundingClientRect().top - line, behavior: 'instant' });
+    // Only when the view opens: later edits must not pull the page back to today.
+  }, []);
 
   const sensors = useSensors(
     useSensor(MousePenSensor, { activationConstraint: MOUSE_ACTIVATION }),
@@ -282,6 +297,7 @@ export function WeekView() {
       >
         <motion.div
           key={start}
+          ref={gridRef}
           className={styles.grid}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
