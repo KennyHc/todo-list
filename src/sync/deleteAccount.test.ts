@@ -56,7 +56,7 @@ vi.mock('./firestoreSync', () => ({
 
 vi.mock('../store/tasks', () => ({ resetTaskStore: vi.fn(() => log('resetStore')) }));
 
-import { deleteUser } from 'firebase/auth';
+import { deleteUser, reauthenticateWithPopup, reauthenticateWithRedirect } from 'firebase/auth';
 import { startSync } from './firestoreSync';
 import { deleteAccount, DeleteAccountError } from './deleteAccount';
 
@@ -86,6 +86,9 @@ beforeEach(() => {
   reload.mockClear();
   localStorage.clear();
   sessionStorage.clear();
+  vi.mocked(reauthenticateWithPopup).mockReset();
+  vi.mocked(reauthenticateWithRedirect).mockReset();
+  window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as never;
 });
 
 describe('deleteAccount', () => {
@@ -221,5 +224,65 @@ describe('deleteAccount', () => {
     await expect(run({ auth: { currentUser: null } as never })).rejects.toMatchObject({
       code: 'not-signed-in',
     });
+  });
+});
+
+describe('default re-authentication', () => {
+  // Uses the real reauthenticateWithGoogle (no `reauthenticate` override).
+  const runDefault = () => deleteAccount({ auth, db, reload });
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+
+  it('uses the popup in a browser tab, then deletes', async () => {
+    vi.mocked(reauthenticateWithPopup).mockResolvedValue({} as never);
+    await runDefault();
+    expect(reauthenticateWithPopup).toHaveBeenCalled();
+    expect(reauthenticateWithRedirect).not.toHaveBeenCalled();
+    expect(calls).toContain('deleteUser');
+    expect(sessionStorage.getItem('delete-pending')).toBeNull();
+  });
+
+  it('falls back to the redirect in a browser tab when the popup is blocked', async () => {
+    vi.mocked(reauthenticateWithPopup).mockRejectedValue({ code: 'auth/popup-blocked' });
+    vi.mocked(reauthenticateWithRedirect).mockReturnValue(new Promise<never>(() => {}));
+    void runDefault();
+    await tick();
+    expect(reauthenticateWithRedirect).toHaveBeenCalled();
+    expect(sessionStorage.getItem('delete-pending')).toBe('1');
+    expect(calls).toEqual([]);
+  });
+
+  it.each([
+    [
+      'display-mode: standalone',
+      () => void (window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as never),
+    ],
+    [
+      'iOS navigator.standalone',
+      () =>
+        void Object.defineProperty(navigator, 'standalone', { value: true, configurable: true }),
+    ],
+  ])(
+    'redirects straight away when installed (%s), deleting nothing yet',
+    async (_name, install) => {
+      install();
+      vi.mocked(reauthenticateWithRedirect).mockReturnValue(new Promise<never>(() => {})); // navigates away
+      void runDefault();
+      await tick();
+      expect(reauthenticateWithPopup).not.toHaveBeenCalled();
+      expect(reauthenticateWithRedirect).toHaveBeenCalled();
+      expect(sessionStorage.getItem('delete-pending')).toBe('1');
+      expect(calls).toEqual([]);
+      Reflect.deleteProperty(navigator, 'standalone');
+    },
+  );
+
+  it('clears the pending flag and reports a failure when the installed redirect fails', async () => {
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as never;
+    vi.mocked(reauthenticateWithRedirect).mockRejectedValue({
+      code: 'auth/network-request-failed',
+    });
+    await expect(runDefault()).rejects.toMatchObject({ code: 'reauth-failed' });
+    expect(sessionStorage.getItem('delete-pending')).toBeNull();
+    expect(calls).toEqual([]);
   });
 });
