@@ -37,6 +37,8 @@ type Props = {
   onOpenChange?: (open: boolean) => void;
   /** Render the sheet only; something else opens it. */
   hideTrigger?: boolean;
+  /** The trigger's tabindex: -1 inside a task row, which is the Tab stop (roving tabindex). */
+  tabIndex?: number;
 };
 
 /**
@@ -82,6 +84,7 @@ export function TaskMenu({
   open: controlledOpen,
   onOpenChange,
   hideTrigger = false,
+  tabIndex,
 }: Props) {
   const task = useTask(id);
   const leaf = useIsLeaf(id);
@@ -120,6 +123,7 @@ export function TaskMenu({
           aria-label="More options"
           aria-haspopup="dialog"
           aria-expanded={open}
+          tabIndex={tabIndex}
           onClick={() => setOpen(!open)}
         >
           <MoreHorizontal size={16} strokeWidth={1.75} aria-hidden="true" />

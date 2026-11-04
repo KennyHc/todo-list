@@ -16,3 +16,5 @@ that made it.
 - Undo history: 20 steps (`UNDO_DEPTH`), every content change is a step (toast or quiet), emptied
   by `resetTaskStore` (sign-out, account switch) and trimmed to the toast's entry by a content
   `hydrate`; undo and redo are plain store `set`s so sync diffs them. (#50)
+- Task rows use a roving tabindex: the row is the only Tab stop (`ui.tabStopId`), its controls
+  are `tabIndex={-1}` and reached with → then ←/→; new row controls must follow this. (#51)

@@ -8,11 +8,13 @@ type Props = {
   label?: string;
   /** Seconds to wait before animating a done-state change (cascade timing). */
   delay?: number;
+  /** -1 inside a task row, which is the Tab stop for its controls (roving tabindex). */
+  tabIndex?: number;
 };
 
 const EASE = [0.65, 0, 0.35, 1] as const;
 
-export function Checkbox({ checked, onToggle, label = 'Done', delay = 0 }: Props) {
+export function Checkbox({ checked, onToggle, label = 'Done', delay = 0, tabIndex }: Props) {
   // Bumped on every transition to checked so the ring burst remounts and replays.
   const [prevChecked, setPrevChecked] = useState(checked);
   const [burst, setBurst] = useState(0);
@@ -29,6 +31,7 @@ export function Checkbox({ checked, onToggle, label = 'Done', delay = 0 }: Props
       aria-label={label}
       data-press="off"
       className={styles.hit}
+      tabIndex={tabIndex}
       onClick={onToggle}
     >
       {burst > 0 && (

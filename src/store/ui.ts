@@ -32,6 +32,11 @@ type UIState = {
   composerDay: string | null;
   /** The row the keyboard acts on. Not persisted. */
   focusedId: string | null;
+  /**
+   * The one row in the Tab order: the focused row while it is shown, else the first row (roving
+   * tabindex). Derived by useHotkeys. Not persisted.
+   */
+  tabStopId: string | null;
   /** Whether the tag filter popover is open, so a hotkey can open it. Not persisted. */
   filterOpen: boolean;
   paletteOpen: boolean;
@@ -84,6 +89,7 @@ export const useUIStore = create<UIState>()(
       weekAnchor: null,
       composerDay: null,
       focusedId: null,
+      tabStopId: null,
       filterOpen: false,
       paletteOpen: false,
       sheetOpen: false,

@@ -272,6 +272,71 @@ describe('keyboard workflow', () => {
     expect(useUIStore.getState().focusedId).toBeNull();
   });
 
+  it('makes each row one Tab stop (roving tabindex) that follows the focused row', () => {
+    const { a, b } = seed();
+    render(<App />);
+    const tree = screen.getByRole('tree', { name: 'Tasks' });
+    const rows = within(tree).getAllByRole('treeitem');
+    const stops = () =>
+      [...tree.querySelectorAll<HTMLElement>('*')].filter((el) => el.tabIndex >= 0);
+    // Nothing focused yet: the first row is the list's only Tab stop; its buttons are not.
+    expect(stops()).toEqual([rows[0]]);
+    expect(within(rows[0]).getByRole('checkbox').tabIndex).toBe(-1);
+    press('j');
+    press('j');
+    expect(useUIStore.getState().focusedId).toBe(b);
+    expect(stops()).toEqual([rows[1]]);
+    expect(rows[1]).toHaveFocus();
+    expect(rows[1]).toHaveAttribute('aria-selected', 'true');
+    press('Home');
+    expect(useUIStore.getState().focusedId).toBe(a);
+    press('End');
+    expect(rows[2]).toHaveFocus();
+  });
+
+  it("←/→ collapse, expand, go to the parent and step through the row's buttons", () => {
+    const s = useTaskStore.getState();
+    const p = s.add({ title: 'Parent' });
+    const kid = s.add({ title: 'Kid', parentId: p });
+    render(<App />);
+    const key = (el: Element, k: string) => act(() => void fireEvent.keyDown(el, { key: k }));
+    press('j');
+    const parentRow = screen.getByRole('treeitem', { name: 'Parent' });
+    expect(parentRow).toHaveAttribute('aria-expanded', 'true');
+    press('ArrowLeft');
+    expect(useTaskStore.getState().tasks[p].collapsed).toBe(true);
+    press('ArrowRight');
+    expect(useTaskStore.getState().tasks[p].collapsed).toBe(false);
+    press('j');
+    const kidRow = screen.getByRole('treeitem', { name: 'Kid' });
+    expect(useUIStore.getState().focusedId).toBe(kid);
+    expect(kidRow).toHaveAttribute('aria-level', '2');
+    // ← on a leaf goes to its parent.
+    key(kidRow, 'ArrowLeft');
+    expect(useUIStore.getState().focusedId).toBe(p);
+    expect(parentRow).toHaveFocus();
+    // → on an open row steps into its buttons; ←/→ walk them, ← from the first goes back.
+    key(parentRow, 'ArrowRight');
+    const first = document.activeElement as HTMLElement;
+    expect(parentRow.contains(first) && first !== parentRow).toBe(true);
+    key(first, 'ArrowRight');
+    const second = document.activeElement as HTMLElement;
+    expect(second).not.toBe(first);
+    key(second, 'ArrowLeft');
+    expect(first).toHaveFocus();
+    key(first, 'ArrowLeft');
+    expect(parentRow).toHaveFocus();
+    // Esc from a button goes back to the row and keeps it selected; ↓ from a button moves on.
+    key(parentRow, 'ArrowRight');
+    key(document.activeElement!, 'Escape');
+    expect(parentRow).toHaveFocus();
+    expect(useUIStore.getState().focusedId).toBe(p);
+    key(parentRow, 'ArrowRight');
+    key(document.activeElement!, 'ArrowDown');
+    expect(useUIStore.getState().focusedId).toBe(kid);
+    expect(kidRow).toHaveFocus();
+  });
+
   it('toggles the focused task with x and Space, moving focus on when it leaves the list', () => {
     const { a, b } = seed();
     render(<App />);

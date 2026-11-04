@@ -71,9 +71,15 @@
 }
 
 .row:hover,
+.row:focus-visible,
 .row:has(:focus-visible) {
   --row-bg: var(--surface-2);
   background: var(--surface-2);
+}
+
+/* The row itself is the Tab stop (roving tabindex); keep its ring inside the list's edges. */
+.row:focus-visible {
+  outline-offset: -2px;
 }
 
 .rowFocused,
@@ -404,6 +410,7 @@
 }
 
 .row:hover .actions,
+.row:focus-visible .actions,
 .row:has(:focus-visible) .actions,
 .actions:has([aria-expanded='true']) {
   opacity: 1;
