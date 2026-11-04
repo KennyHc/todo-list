@@ -10,6 +10,8 @@ declare global {
       deleteAccount: () => Promise<void>;
       /** Sets the due date of the open task with this exact title (e.g. a past date). */
       setDueDate: (title: string, dueDate: string | null) => Promise<void>;
+      /** Sets the note of the open task with this exact title. */
+      setNotes: (title: string, notes: string) => Promise<void>;
     };
   }
 }
@@ -36,6 +38,13 @@ export function installE2eHook(auth: Auth): void {
       const found = Object.values(tasks).find((t) => t.title === title && !t.done);
       if (!found) throw new Error(`no open task titled "${title}"`);
       update(found.id, { dueDate });
+    },
+    async setNotes(title, notes) {
+      const { useTaskStore } = await import('../store/tasks');
+      const { tasks, update } = useTaskStore.getState();
+      const found = Object.values(tasks).find((t) => t.title === title && !t.done);
+      if (!found) throw new Error(`no open task titled "${title}"`);
+      update(found.id, { notes });
     },
   };
 }
