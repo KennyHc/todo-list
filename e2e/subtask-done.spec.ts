@@ -35,6 +35,9 @@ async function select(page: Page, title: string) {
   await expect(target).toHaveAttribute('data-focused', 'true');
 }
 
+const selected = (page: Page, title: string) =>
+  expect(row(page, title).locator('[data-row]').first()).toHaveAttribute('data-focused', 'true');
+
 const isOpen = (page: Page, title: string) =>
   expect(check(page, title)).toHaveAttribute('aria-checked', 'false');
 
@@ -51,6 +54,12 @@ test.describe('desktop', () => {
       await check(page, 'One').click();
       await expect(row(page, 'One')).toHaveCount(0);
       await isOpen(page, 'Parent');
+      // The selection left the parent for the row that took the checked one's place.
+      await selected(page, 'Two');
+      await expect(row(page, 'Parent').locator('[data-row]').first()).not.toHaveAttribute(
+        'data-focused',
+        'true',
+      );
       // The key acts on the row that took the checked one's place, never on the parent.
       await page.keyboard.press(key);
       await expect(row(page, 'Two')).toHaveCount(0);
@@ -73,6 +82,34 @@ test.describe('desktop', () => {
       await isOpen(page, 'Three');
     });
   }
+
+  test('Pack for trip: real mouse clicks on the svg, x never completes the parent', async ({
+    page,
+  }, info) => {
+    await signIn(page, uniqueSub(info));
+    await addTask(page, 'Pack for trip');
+    await expect(titleBtn(page, 'Pack for trip')).toBeVisible();
+    for (const child of ['Passport', 'Charger', 'Snacks']) {
+      await addSubtask(page, 'Pack for trip', child);
+    }
+    // A mouse press on the check mark itself (svg), which focuses the span inside the button.
+    const clickMark = async (title: string) => {
+      const box = (await check(page, title).locator('svg').boundingBox())!;
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    };
+    await select(page, 'Pack for trip');
+    await clickMark('Passport');
+    await expect(row(page, 'Passport')).toHaveCount(0);
+    await selected(page, 'Charger');
+    await select(page, 'Pack for trip');
+    await clickMark('Charger');
+    await expect(row(page, 'Charger')).toHaveCount(0);
+    await selected(page, 'Snacks');
+    await page.keyboard.press('x');
+    // x completed Snacks, the last open subtask, so the parent completes by the intended rule.
+    await expect(row(page, 'Pack for trip')).toHaveCount(0);
+    await expect(page.getByText(/Completed 3 tasks/)).toHaveCount(0);
+  });
 
   test('Week: the checked subtask stays, and x then reopens it', async ({ page }, info) => {
     await signIn(page, uniqueSub(info));
