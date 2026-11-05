@@ -6,11 +6,11 @@
   max-width: 100%;
   padding: 2px 4px 2px 7px;
   border: 1px solid var(--border-strong);
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--surface-2);
   color: var(--text-2);
-  font-size: 11.5px;
-  font-weight: 500;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
   line-height: 16px;
   white-space: nowrap;
   transition:

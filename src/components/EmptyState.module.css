@@ -23,14 +23,14 @@
   margin-bottom: var(--space-3);
   border-radius: 50%;
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .title {
   margin: 0;
-  font-size: 15px;
-  font-weight: 550;
-  letter-spacing: -0.005em;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-snug);
   transition: color var(--t-theme);
 }
 
@@ -38,6 +38,6 @@
   max-width: 280px;
   margin: var(--space-1) 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
 }

@@ -3,8 +3,8 @@
   margin: 0 0 14px;
   overflow: hidden;
   color: var(--text);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
   line-height: 20px;
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
@@ -25,9 +25,9 @@
 .heading {
   margin: 0 0 6px;
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-caps);
   line-height: 16px;
   text-transform: uppercase;
 }
@@ -35,7 +35,7 @@
 .note {
   margin: 0;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   line-height: 18px;
 }
 
@@ -62,7 +62,7 @@
   border-radius: var(--r-sm);
   background: none;
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   text-align: left;
   cursor: pointer;
   transition:
@@ -107,13 +107,13 @@
     height: 48px;
     margin: 0 -8px;
     padding: 0 8px;
-    font-size: 15px;
+    font-size: var(--fs-lg);
   }
 }
 
 .hint {
   margin: 6px 4px 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   line-height: 16px;
 }

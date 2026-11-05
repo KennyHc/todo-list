@@ -13,12 +13,12 @@
   gap: 6px;
   padding: 2px 8px 2px 4px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
   cursor: pointer;
   transition:
     color var(--t-fast),
@@ -46,8 +46,8 @@
   height: 16px;
   border-radius: 50%;
   background: var(--surface-2);
-  font-size: 10.5px;
-  font-weight: 600;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
   line-height: 1;
 }
 
@@ -59,7 +59,7 @@
 .hint {
   margin: 10px 0 0;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   line-height: 18px;
 }
 

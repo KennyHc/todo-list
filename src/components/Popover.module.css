@@ -7,10 +7,10 @@
   padding: 10px;
   background: var(--elevated);
   border: 1px solid var(--border-strong);
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
   box-shadow: var(--shadow-pop);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .panel:focus-visible {
@@ -22,7 +22,7 @@
   position: fixed;
   inset: 0;
   z-index: 59;
-  background: rgba(8, 11, 18, 0.38);
+  background: var(--scrim);
 }
 
 .sheet {
@@ -34,10 +34,10 @@
   background: var(--elevated);
   border: 1px solid var(--border-strong);
   border-bottom: 0;
-  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
   box-shadow: var(--shadow-pop);
   color: var(--text);
-  font-size: 14px;
+  font-size: var(--fs-md);
 }
 
 .sheet:focus-visible {
@@ -65,7 +65,7 @@
 .grabber {
   width: 36px;
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--border-strong);
 }
 

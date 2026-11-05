@@ -16,8 +16,8 @@
   background: transparent;
   color: var(--accent-ink);
   font: inherit;
-  font-size: 13px;
-  font-weight: 550;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
   cursor: pointer;
   transition: var(--t-press);
 }
@@ -34,7 +34,7 @@
 .paste {
   min-height: 96px;
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   line-height: 18px;
 }
 
@@ -52,12 +52,12 @@
 .modeOption {
   padding: 4px 12px;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: transparent;
   color: var(--text-2);
   font: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
   cursor: pointer;
   transition:
     background-color var(--t-fast),
@@ -82,7 +82,7 @@
   border-radius: var(--r-sm);
   background: var(--danger-soft);
   color: var(--danger);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   line-height: 18px;
 }
 
@@ -118,7 +118,7 @@
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   text-decoration: underline;
   text-decoration-color: var(--border-strong);
   text-underline-offset: 3px;
@@ -139,7 +139,7 @@
 
 .fileError {
   color: var(--danger);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
 }
 
 .result {
@@ -157,7 +157,7 @@
 
 .hintText {
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
 }
 
 .backup {
@@ -169,8 +169,8 @@
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   background: var(--surface-2);
-  font-size: 13.5px;
-  font-weight: 550;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
 }
 
 .backup svg {

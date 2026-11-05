@@ -30,7 +30,7 @@
   width: 18px;
   height: 18px;
   border: 1.5px solid var(--border-strong);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   align-items: center;
   justify-content: center;
   transition: border-color var(--t-fast);
@@ -79,7 +79,7 @@
   margin: -9px 0 0 -9px;
   border: 1.5px solid var(--accent);
   background: var(--accent);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   opacity: 0;
   pointer-events: none;
 }

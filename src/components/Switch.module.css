@@ -5,7 +5,7 @@
   height: 18px;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--border-strong);
   cursor: pointer;
   transition:

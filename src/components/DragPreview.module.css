@@ -41,9 +41,9 @@
   flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
-  font-size: 14.5px;
-  font-weight: 450;
-  letter-spacing: -0.005em;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-regular);
+  letter-spacing: var(--track-snug);
   line-height: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -53,10 +53,10 @@
   flex: none;
   padding: 2px 8px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--accent-soft);
   color: var(--accent-ink);
-  font-size: 11.5px;
-  font-weight: 550;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
   line-height: 16px;
 }

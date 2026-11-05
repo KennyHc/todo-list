@@ -7,8 +7,8 @@
 .line {
   margin: 0 0 var(--space-2);
   color: var(--text);
-  font-size: 13.5px;
-  font-weight: 550;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
   line-height: 20px;
   transition: color var(--t-theme);
 }
@@ -19,14 +19,14 @@
 
 .planned {
   color: var(--muted);
-  font-weight: 450;
+  font-weight: var(--fw-regular);
   font-variant-numeric: tabular-nums;
 }
 
 .meter {
   position: relative;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--border);
   overflow: hidden;
@@ -79,7 +79,7 @@
 .overLine {
   margin: var(--space-2) 0 0;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 20px;
 }
 
@@ -87,11 +87,11 @@
   position: relative;
   padding: 0 2px;
   border: 0;
-  border-radius: 3px;
+  border-radius: var(--r-xs);
   background: none;
   color: var(--accent-ink);
   font: inherit;
-  font-weight: 550;
+  font-weight: var(--fw-semibold);
   cursor: pointer;
 }
 
@@ -151,27 +151,27 @@
 
 .emptyTitle {
   margin: 0;
-  font-size: 15px;
-  font-weight: 550;
-  letter-spacing: -0.005em;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-snug);
 }
 
 .emptyHint {
   max-width: 280px;
   margin: var(--space-1) 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
 }
 
 .emptyHint kbd {
   padding: 1px 5px;
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   background: var(--surface-2);
   color: var(--text-2);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 .emptyAction {
@@ -183,8 +183,8 @@
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 13px;
-  font-weight: 550;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
   cursor: pointer;
   transition:
     background-color var(--t-fast),
@@ -211,16 +211,16 @@
   margin: 0 0 var(--space-1);
   padding: 0 var(--space-4);
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-caps);
   line-height: 16px;
   text-transform: uppercase;
 }
 
 .suggestLeft {
-  font-weight: 500;
-  letter-spacing: 0.02em;
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--track-wide);
   text-transform: none;
   font-variant-numeric: tabular-nums;
 }
@@ -286,7 +286,7 @@
 .suggestTitle {
   overflow: hidden;
   color: var(--text-2);
-  font-size: 14px;
+  font-size: var(--fs-md);
   line-height: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -295,7 +295,7 @@
 .suggestMeta {
   overflow: hidden;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -304,8 +304,8 @@
 .sum {
   flex: none;
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
   font-variant-numeric: tabular-nums;
 }
 
@@ -394,13 +394,13 @@
   }
 
   .suggestTitle {
-    font-size: 15px;
+    font-size: var(--fs-lg);
   }
 }
 
 @media (pointer: coarse) {
   .emptyAction {
     min-height: var(--tap);
-    font-size: 14px;
+    font-size: var(--fs-md);
   }
 }

@@ -6,7 +6,7 @@
   /* Align with the title: row padding 8 + checkbox 18 + an 8px gap. */
   padding: 0 8px 6px 34px;
   color: var(--text-2);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   line-height: 20px;
   transition: color var(--t-theme);
 }
@@ -32,11 +32,11 @@
   position: relative;
   padding: 0 2px;
   border: 0;
-  border-radius: 3px;
+  border-radius: var(--r-xs);
   background: none;
   color: var(--accent-ink);
   font: inherit;
-  font-weight: 550;
+  font-weight: var(--fw-semibold);
   cursor: pointer;
   transition: var(--t-press);
 }
@@ -63,7 +63,7 @@
     /* Align with the title: the gutter, the 20px checkbox and a 12px gap. */
     padding: 0 var(--gutter-r) 10px calc(var(--gutter-l) + 32px);
     color: var(--muted);
-    font-size: 13px;
+    font-size: var(--fs-sm);
   }
 
   /* One short line on a phone. */

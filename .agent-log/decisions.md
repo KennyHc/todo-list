@@ -21,3 +21,6 @@ that made it.
 - Completing a task never completes its parent: completion cascades down to its subtasks only,
   for checks and structural edits alike (`reopenFrom` only ever reopens). Reopening a subtask,
   or adding one, under a done parent reopens that parent and its done ancestors (user-confirmed). (#74)
+- Styles use the theme.css scales for font-size (`--fs-*`), weight (`--fw-*`), tracking
+  (`--track-*`) and radius (`--r-*`); no raw values except 50%, 0 and 2px bars. Segmented controls
+  mark the chosen option with a raised `--thumb`, not the accent. (#81)

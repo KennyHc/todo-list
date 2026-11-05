@@ -6,11 +6,11 @@
   height: 44px;
   padding: 0 var(--space-5);
   border: 1px solid #dadce0;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: #ffffff;
   color: #1f1f1f;
-  font-size: 15px;
-  font-weight: 550;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
   line-height: 1;
   cursor: pointer;
   transition:

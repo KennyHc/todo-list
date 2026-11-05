@@ -13,7 +13,7 @@
   background: var(--surface-2);
   color: var(--text-2);
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   line-height: 18px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -27,7 +27,7 @@
 .meta {
   margin: 8px 0 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
 }
 

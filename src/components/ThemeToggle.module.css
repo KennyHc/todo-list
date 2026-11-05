@@ -20,7 +20,7 @@
   height: 26px;
   padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: calc(var(--r-md) - 2px);
   background: none;
   color: var(--muted);
   cursor: pointer;
@@ -40,8 +40,8 @@
 .thumb {
   position: absolute;
   inset: 0;
-  border-radius: 8px;
-  background: var(--surface);
+  border-radius: calc(var(--r-md) - 2px);
+  background: var(--thumb);
   box-shadow: var(--shadow-thumb);
 }
 

@@ -19,9 +19,9 @@
   padding: var(--space-4) var(--space-2) var(--space-2);
   background: var(--surface);
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-caps);
   line-height: 16px;
   text-transform: uppercase;
   list-style: none;
@@ -38,7 +38,7 @@
 .header[data-count]::after {
   content: '\00b7  ' attr(data-count);
   margin-left: 2px;
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   opacity: 0.8;
 }
 
@@ -85,8 +85,8 @@
   border-radius: var(--r-sm);
   background: none;
   color: var(--accent-ink);
-  font-size: 13.5px;
-  font-weight: 500;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
   cursor: pointer;
   transition: background-color var(--t-fast);
 }
@@ -116,7 +116,7 @@
     background: color-mix(in srgb, var(--bg) 78%, transparent);
     -webkit-backdrop-filter: blur(20px) saturate(1.6);
     backdrop-filter: blur(20px) saturate(1.6);
-    font-size: 12px;
+    font-size: var(--fs-xs);
     line-height: 16px;
   }
 
@@ -144,7 +144,7 @@
   .moreBtn {
     min-height: 44px;
     margin-left: -8px;
-    font-size: 15px;
+    font-size: var(--fs-lg);
   }
 }
 

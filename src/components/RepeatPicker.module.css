@@ -1,4 +1,4 @@
-/* A compact segmented control: one track; the chosen segment takes the accent, like the date picks. */
+/* A compact segmented control: one track; the chosen segment is a raised thumb, like the view switch. */
 .group {
   display: flex;
   gap: 2px;
@@ -14,11 +14,11 @@
   height: 26px;
   padding: 0 4px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   background: none;
   color: var(--text-2);
-  font-size: 11.5px;
-  font-weight: 500;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -33,9 +33,10 @@
 }
 
 .seg[aria-checked='true'] {
-  background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--accent);
-  color: var(--accent-ink);
+  background: var(--thumb);
+  box-shadow: var(--shadow-thumb);
+  color: var(--text);
+  font-weight: var(--fw-semibold);
 }
 
 .seg:focus-visible {
@@ -46,7 +47,7 @@
 @media (max-width: 480px), (hover: none) {
   .seg {
     height: 36px;
-    font-size: 13px;
+    font-size: var(--fs-sm);
   }
 }
 

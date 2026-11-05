@@ -26,7 +26,7 @@
   border-radius: var(--r-sm);
   background: var(--surface-2);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   caret-color: var(--accent);
   transition:
     border-color var(--t-fast),
@@ -61,7 +61,7 @@
   padding: 0 8px;
   border-radius: var(--r-sm);
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   cursor: pointer;
   transition: var(--t-press);
 }
@@ -89,7 +89,7 @@
 
 .optionCount {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 .colorRow {
@@ -101,15 +101,15 @@
 .colorLabel {
   margin: 0 4px 4px;
   color: var(--text-2);
-  font-size: 12px;
-  font-weight: 550;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
   line-height: 16px;
 }
 
 .colorHint {
   margin: 4px 4px 0;
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   line-height: 16px;
 }
 
@@ -122,11 +122,11 @@
   /* 16px keeps iOS from zooming into the field. */
   .input {
     height: var(--tap);
-    font-size: 16px;
+    font-size: var(--fs-xl);
   }
 
   .option {
     height: var(--tap);
-    font-size: 15px;
+    font-size: var(--fs-lg);
   }
 }

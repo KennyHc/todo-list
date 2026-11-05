@@ -191,17 +191,17 @@
   gap: 0 var(--space-2);
   min-height: 20px;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .starts {
   flex: none;
   padding: 0 6px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   box-shadow: inset 0 0 0 1px var(--border);
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 450;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-regular);
   line-height: 16px;
   white-space: nowrap;
 }
@@ -216,7 +216,7 @@
   height: 16px;
   padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   background: none;
   color: var(--muted);
   cursor: pointer;
@@ -240,8 +240,8 @@
 
 .more {
   color: var(--muted);
-  font-size: 13px;
-  font-weight: 450;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-regular);
   line-height: 16px;
 }
 
@@ -250,7 +250,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -266,9 +266,9 @@
   min-width: 0;
   /* Centres the first line on the band (see .row). */
   padding-top: calc(var(--band) / 2 - var(--pad-y) - var(--lh) / 2);
-  font-size: 14.5px;
-  font-weight: 450;
-  letter-spacing: -0.005em;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-regular);
+  letter-spacing: var(--track-snug);
   line-height: var(--lh);
 }
 
@@ -292,7 +292,7 @@
   font: inherit;
   text-align: left;
   cursor: text;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   transition: color var(--t-theme);
 }
 
@@ -368,13 +368,13 @@
   gap: var(--space-2);
   margin-right: 6px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   transition: color var(--t-theme);
 }
 
 .badge {
   color: var(--text-2);
-  font-weight: 550;
+  font-weight: var(--fw-semibold);
 }
 
 .chevron {
@@ -474,7 +474,7 @@
   height: 24px;
   padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   background: none;
   color: var(--muted);
   cursor: grab;
@@ -566,8 +566,8 @@
   }
 
   .title {
-    font-size: 16px;
-    letter-spacing: -0.011em;
+    font-size: var(--fs-xl);
+    letter-spacing: var(--track-snug);
   }
 
   .titleLine {
@@ -624,15 +624,15 @@
 .reason {
   flex: none;
   color: var(--muted);
-  font-size: 13px;
-  font-weight: 450;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-regular);
   line-height: 16px;
   white-space: nowrap;
 }
 
 .reason[data-danger] {
   color: var(--danger-text);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
 }
 
 /* Week view: a plan for this day (its due date is another) reads quieter than a deadline. Once
