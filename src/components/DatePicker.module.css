@@ -13,12 +13,12 @@
 .pick {
   height: 28px;
   padding: 0 4px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border);
   border-radius: var(--r-sm);
   background: var(--surface-2);
   color: var(--text-2);
-  font-size: 12.5px;
-  font-weight: 500;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -29,12 +29,12 @@
 }
 
 .pick:hover {
-  background: var(--border);
+  border-color: var(--border-strong);
   color: var(--text);
 }
 
 .pick[aria-pressed='true'] {
-  border-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   background: var(--accent-soft);
   color: var(--accent-ink);
 }
@@ -43,11 +43,11 @@
   width: 100%;
   height: 30px;
   padding: 0 10px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border);
   border-radius: var(--r-sm);
   background: var(--surface-2);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   transition:
     border-color var(--t-fast),
     box-shadow var(--t-fast);
@@ -55,8 +55,8 @@
 
 .date:focus-visible {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--ring);
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .clear {
@@ -64,10 +64,10 @@
   padding: 2px 4px;
   margin-left: -4px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   background: none;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   cursor: pointer;
   transition:
     color var(--t-fast),
@@ -81,9 +81,9 @@
 .sub {
   margin: 4px 0 -2px;
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-caps);
   line-height: 16px;
   text-transform: uppercase;
 }
@@ -97,17 +97,17 @@
   .pick,
   .date {
     height: var(--tap);
-    font-size: 14px;
+    font-size: var(--fs-md);
   }
 
   /* 16px keeps iOS from zooming into the field. */
   .date {
-    font-size: 16px;
+    font-size: var(--fs-xl);
   }
 
   .clear {
     position: relative;
-    font-size: 13px;
+    font-size: var(--fs-sm);
   }
 
   .clear::after {

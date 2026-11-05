@@ -13,8 +13,8 @@
   color: var(--text-2);
   /* A textarea defaults to the monospace system font. */
   font-family: inherit;
-  font-size: 13px;
-  font-weight: 400;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-regular);
   letter-spacing: 0;
   line-height: 18px;
   overflow-wrap: anywhere;
@@ -23,7 +23,7 @@
 }
 
 .text {
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   cursor: text;
 }
 
@@ -64,7 +64,7 @@
 .hint {
   margin: 0 0 var(--space-1);
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   line-height: 14px;
 }
 
@@ -73,7 +73,7 @@
   .text,
   .editor {
     color: var(--muted);
-    font-size: 15px;
+    font-size: var(--fs-lg);
     line-height: 22px;
   }
 }

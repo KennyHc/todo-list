@@ -1,41 +1,88 @@
 :root {
   color-scheme: light;
 
+  /* Neutrals: a cool, nearly colourless grey ramp. Page < card < raised, one hairline apart. */
   --bg: #f7f8fa;
   --surface: #ffffff;
-  --surface-2: #f3f5f8;
+  --surface-2: #f2f4f7;
   --elevated: #ffffff;
+  /* The raised thumb of a segmented control: always a step above whatever it sits on. */
+  --thumb: #ffffff;
 
-  --border: rgba(15, 23, 42, 0.07);
-  --border-strong: rgba(15, 23, 42, 0.12);
+  --border: rgba(17, 20, 28, 0.075);
+  --border-strong: rgba(17, 20, 28, 0.13);
 
-  --text: #0f172a;
-  --text-2: #475569;
-  /* 4.9:1 or better on the page, cards and surface-2 (AA for small text), still lighter than --text-2. */
-  --muted: #5f6b7d;
+  --text: #12151c;
+  --text-2: #454b57;
+  /* 4.8:1 or better on the page, cards, surface-2 and the soft tints (AA for small text). */
+  --muted: #5c6370;
 
-  --accent: #7c9cf0;
-  --accent-soft: rgba(124, 156, 240, 0.14);
-  --ring: rgba(124, 156, 240, 0.45);
-  /* Text-weight accent for small links: --accent itself is too light on white. 4.8:1 or better
-     on accent-soft too (avatar initial, today's Week header). */
-  --accent-ink: #3d5fc2;
+  /* One restrained ink blue. Fills (checks, selected segments) carry white marks at 4.7:1. */
+  --accent: #4a69e2;
+  --accent-soft: rgba(74, 105, 226, 0.1);
+  --ring: rgba(74, 105, 226, 0.42);
+  /* Text-weight accent for small links: 5.3:1 or better on every surface and on accent-soft
+     (avatar initial, today's Week header). */
+  --accent-ink: #3955c4;
 
-  --check-ink: #0f172a;
+  --check-ink: #ffffff;
 
   --danger: #e5484d;
   --danger-soft: rgba(229, 72, 77, 0.1);
   /* Danger as text (overdue): 4.5:1 or better on every surface and on danger-soft. */
-  --danger-text: #c0333a;
+  --danger-text: #be3138;
+  /* Destructive buttons: white labels on it at 4.7:1. */
+  --danger-fill: #d13a40;
 
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.08);
-  --shadow-lift: 0 2px 4px rgba(15, 23, 42, 0.05), 0 14px 28px -12px rgba(15, 23, 42, 0.16);
-  --shadow-pop: 0 16px 40px -8px rgba(15, 23, 42, 0.22), 0 2px 8px rgba(15, 23, 42, 0.08);
-  --shadow-thumb: 0 1px 2px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(15, 23, 42, 0.04);
+  /*
+   * Elevation, three layers each: a tight contact shadow, a soft ambient one and (dark) a top
+   * highlight. card < lift (hover, drag) < pop (popovers, sheets, dialogs, toasts).
+   */
+  --shadow-card:
+    0 1px 1px rgba(17, 20, 28, 0.03), 0 1px 3px rgba(17, 20, 28, 0.04),
+    0 10px 24px -14px rgba(17, 20, 28, 0.1);
+  --shadow-lift:
+    0 1px 2px rgba(17, 20, 28, 0.05), 0 4px 10px -2px rgba(17, 20, 28, 0.06),
+    0 18px 32px -14px rgba(17, 20, 28, 0.18);
+  --shadow-pop:
+    0 1px 2px rgba(17, 20, 28, 0.06), 0 6px 16px -4px rgba(17, 20, 28, 0.1),
+    0 24px 48px -12px rgba(17, 20, 28, 0.2);
+  --shadow-thumb: 0 1px 2px rgba(17, 20, 28, 0.1), 0 0 0 1px rgba(17, 20, 28, 0.04);
+  /* The dim behind sheets and dialogs. */
+  --scrim: rgba(10, 12, 18, 0.36);
 
+  /* Radii: nested shapes step down one size (a segment inside a track, a row inside a card). */
+  --r-xs: 4px;
   --r-sm: 6px;
   --r-md: 10px;
-  --r-lg: 16px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-full: 999px;
+
+  /* Type scale. Body is --fs-base; meta --fs-sm/--fs-xs; section labels --fs-2xs caps.
+     --fs-xl (16px) is also the floor for text fields on touch, below which iOS zooms. */
+  --fs-2xs: 11px;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-base: 14.5px;
+  --fs-lg: 15px;
+  --fs-xl: 16px;
+  --fs-2xl: 24px;
+  --fs-3xl: 28px;
+
+  /* Inter Variable takes any weight; these four are the only ones the UI uses. */
+  --fw-regular: 450;
+  --fw-medium: 500;
+  --fw-semibold: 580;
+  --fw-bold: 660;
+
+  /* Tracking: display and titles pull in, small caps open up. */
+  --track-display: -0.034em;
+  --track-tight: -0.022em;
+  --track-snug: -0.011em;
+  --track-wide: 0.015em;
+  --track-caps: 0.06em;
 
   /* Motion tokens; the TS twins live in motion.ts. */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -76,10 +123,11 @@
   color-scheme: dark;
 
   --bg: #0b0d12;
-  --surface: #111419;
-  --surface-2: #171b22;
+  --surface: #111318;
+  --surface-2: #171a20;
   /* Popovers, sheets and dialogs sit a clear step above cards (surface), which sit above the page. */
-  --elevated: #1f242d;
+  --elevated: #1d2027;
+  --thumb: #2a2e37;
 
   --border: rgba(255, 255, 255, 0.07);
   --border-strong: rgba(255, 255, 255, 0.12);
@@ -87,13 +135,13 @@
   /* Top of the page glow: a touch lighter than --bg, fading out by 40vh. */
   --bg-top: color-mix(in srgb, var(--bg) 97%, white);
 
-  --text: #e7eaf0;
-  --text-2: #a3acbc;
-  /* 4.8:1 or better on every dark surface, so meta text stays readable. */
-  --muted: #8590a3;
+  --text: #e8eaef;
+  --text-2: #a5abb7;
+  /* 4.6:1 or better on every dark surface and on accent-soft, so meta text stays readable. */
+  --muted: #8b92a0;
 
   --accent: #8faef5;
-  --accent-soft: rgba(143, 174, 245, 0.14);
+  --accent-soft: rgba(143, 174, 245, 0.13);
   --ring: rgba(143, 174, 245, 0.5);
   --accent-ink: #8faef5;
 
@@ -103,17 +151,32 @@
   --danger-soft: rgba(242, 85, 90, 0.14);
   /* A step lighter than --danger so the overdue pill passes on a hovered row too. */
   --danger-text: #f46468;
+  --danger-fill: #d13a40;
 
   --shadow-card:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 1px 2px rgba(0, 0, 0, 0.4),
     0 12px 28px -14px rgba(0, 0, 0, 0.6);
   --shadow-lift:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 4px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 2px 4px rgba(0, 0, 0, 0.4),
     0 16px 32px -12px rgba(0, 0, 0, 0.7);
   --shadow-pop:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 24px 56px -12px rgba(0, 0, 0, 0.85),
-    0 4px 12px rgba(0, 0, 0, 0.5);
+    inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 6px rgba(0, 0, 0, 0.45),
+    0 24px 56px -12px rgba(0, 0, 0, 0.8);
   --shadow-thumb: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 3px rgba(0, 0, 0, 0.5);
+  --scrim: rgba(0, 0, 0, 0.5);
+}
+
+/*
+ * Reduced motion: CSS transitions collapse to a near-instant fade and nothing scales on press.
+ * Framer Motion follows the same setting through <MotionConfig reducedMotion="user">.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 1ms;
+    --dur-base: 1ms;
+    --dur-slow: 1ms;
+    --press-scale: 1;
+  }
 }
 
 * {
@@ -131,7 +194,7 @@ body {
   background-color: var(--bg);
   color: var(--text);
   font-family: var(--font);
-  font-size: 14.5px;
+  font-size: var(--fs-base);
   font-feature-settings: 'cv11', 'ss01', 'ss03';
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
@@ -199,7 +262,7 @@ input {
   background: var(--border-strong);
   border: 3px solid transparent;
   background-clip: content-box;
-  border-radius: 999px;
+  border-radius: var(--r-full);
 }
 
 ::-webkit-scrollbar-track {
@@ -263,9 +326,9 @@ input {
   box-shadow: 0 0 12px 1px color-mix(in srgb, var(--row-color) 60%, transparent);
   pointer-events: none;
   transition:
-    background-color 200ms var(--ease-out),
-    box-shadow 200ms var(--ease-out),
-    opacity 200ms var(--ease-out);
+    background-color var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    opacity var(--dur-base) var(--ease-out);
 }
 
 :root[data-theme='dark'] [data-row-color]::after {

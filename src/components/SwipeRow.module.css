@@ -90,9 +90,9 @@
   border: 0;
   border-radius: 0;
   font: inherit;
-  font-size: 12px;
-  font-weight: 550;
-  letter-spacing: 0.01em;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-wide);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: filter var(--t-fast);
@@ -118,9 +118,9 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  font-weight: 550;
-  letter-spacing: 0.01em;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-wide);
 }
 
 .pop {

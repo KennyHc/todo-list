@@ -3,23 +3,23 @@
   flex: none;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
-  font-weight: 450;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-regular);
   line-height: 16px;
   white-space: nowrap;
 }
 
 .overdue {
   padding: 0 6px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--danger-soft);
   color: var(--danger-text);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
 }
 
 .today {
   color: var(--accent-ink);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
 }
 
 .soon {

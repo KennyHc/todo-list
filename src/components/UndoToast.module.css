@@ -21,11 +21,14 @@
   padding: 10px 10px 10px 14px;
   overflow: hidden;
   border: 1px solid var(--border-strong);
-  border-radius: var(--r-md);
-  background: var(--elevated);
+  border-radius: var(--r-lg);
+  /* Frosted: the list stays faintly visible behind it, and its text stays readable (90% opaque). */
+  background: color-mix(in srgb, var(--elevated) 90%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
   box-shadow: var(--shadow-pop);
   color: var(--text);
-  font-size: 13.5px;
+  font-size: var(--fs-md);
   line-height: 20px;
   pointer-events: auto;
 }
@@ -54,8 +57,8 @@
   padding: 4px 10px;
   border-radius: var(--r-sm);
   color: var(--accent-ink);
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
 }
 
 .undo:hover {

@@ -1,7 +1,7 @@
 .body {
   margin: 12px 0 0;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 20px;
 }
 
@@ -12,8 +12,8 @@
   background: transparent;
   color: var(--accent-ink);
   font: inherit;
-  font-size: 13px;
-  font-weight: 550;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
   text-decoration: underline;
   text-decoration-color: transparent;
   text-underline-offset: 3px;
@@ -49,7 +49,7 @@
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--fs-md);
   transition:
     border-color var(--t-fast),
     box-shadow var(--t-fast);
@@ -87,11 +87,11 @@
   padding: 0 14px;
   border: 1px solid transparent;
   border-radius: var(--r-sm);
-  background: var(--danger);
+  background: var(--danger-fill);
   color: #fff;
   font: inherit;
-  font-size: 13px;
-  font-weight: 550;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -139,7 +139,7 @@
   /* 16px keeps iOS from zooming into the field. */
   .input {
     height: 44px;
-    font-size: 16px;
+    font-size: var(--fs-xl);
   }
 
   .actions {
@@ -153,7 +153,7 @@
 
 @media (hover: none) and (pointer: coarse) {
   .input {
-    font-size: 16px;
+    font-size: var(--fs-xl);
   }
 
   .link {
