@@ -24,3 +24,6 @@ that made it.
 - Styles use the theme.css scales for font-size (`--fs-*`), weight (`--fw-*`), tracking
   (`--track-*`) and radius (`--r-*`); no raw values except 50%, 0 and 2px bars. Segmented controls
   mark the chosen option with a raised `--thumb`, not the accent. (#81)
+- Undo/redo apply only their own action's change (`applyChange`, field-level 3-way merge) on
+  top of the live state; edits made since, local or remote, win where they overlap, and remote
+  content no longer trims the history (supersedes the trimming in #50's line). (#84)
