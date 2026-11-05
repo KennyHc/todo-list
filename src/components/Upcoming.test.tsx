@@ -113,10 +113,10 @@ describe('the Tree view and tasks that start later', () => {
     add('Waiting', { startDate: MONDAY });
     render(<App />);
     expect(screen.queryByText('Waiting')).toBeNull();
-    // Monday morning: re-render with the new date (a store update, as any edit would be).
+    // Monday morning: the app comes back to the front and notices the new day (#86).
     vi.setSystemTime(new Date(2026, 9, 26, 8, 0));
     act(() => {
-      get().add({ title: 'Anything' });
+      window.dispatchEvent(new Event('focus'));
     });
     expect(await screen.findByText('Waiting')).toBeInTheDocument();
     expect(footer()).toBeNull();

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { todayISO } from '../lib/views';
 import { taskStorage } from './storage';
 import { useTaskStore } from './tasks';
 
@@ -55,6 +56,12 @@ type UIState = {
   rescheduleRequestId: string | null;
   /** Latest "reveal" pulse; `n` changes on every pulse so the same row can flash again. */
   revealFlash: { id: string; n: number } | null;
+  /**
+   * The local calendar date (YYYY-MM-DD) the UI renders against. Kept current by useToday(), so
+   * labels, overdue styling and the Week/Today views move at midnight. Not persisted.
+   */
+  today: string;
+  setToday: (today: string) => void;
   setView: (view: View) => void;
   setTagFilter: (tag: string | null) => void;
   setCompletedCollapsed: (collapsed: boolean) => void;
@@ -100,6 +107,8 @@ export const useUIStore = create<UIState>()(
       deleteRequestId: null,
       rescheduleRequestId: null,
       revealFlash: null,
+      today: todayISO(),
+      setToday: (today) => set((s) => (s.today === today ? s : { today })),
       setView: (view) => set({ view }),
       setTagFilter: (tagFilter) => set({ tagFilter }),
       setCompletedCollapsed: (completedCollapsed) => set({ completedCollapsed }),

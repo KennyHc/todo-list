@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Calendar, CircleHelp, Hourglass, Plus, Repeat as RepeatIcon, Tag, X } from 'lucide-react';
+import { useImeEnter } from '../hooks/useImeEnter';
 import { useIsTouch } from '../hooks/useIsTouch';
 import { useKeyboardInset } from '../hooks/useKeyboardInset';
 import { useIsPhone } from '../hooks/useMediaQuery';
@@ -250,7 +251,10 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
     setPanel(null);
   };
 
+  const ime = useImeEnter(() => (listOpen ? accept(suggestions[activeIndex].tag) : submit()));
+
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (ime.intercept(e)) return;
     if (listOpen) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
@@ -325,7 +329,9 @@ export function TaskInput({ autoFocus = false }: { autoFocus?: boolean }) {
               setActive(0);
             }}
             onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
+            enterKeyHint="enter"
             onKeyDown={onKeyDown}
+            {...ime.handlers}
           />
           {!focused && value === '' ? (
             <kbd className={`${styles.kbd} ${styles.kbdHint}`} aria-hidden="true">

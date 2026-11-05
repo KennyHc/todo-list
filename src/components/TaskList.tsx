@@ -37,7 +37,6 @@ import {
   type Projection,
 } from '../lib/dnd';
 import { getDescendants } from '../lib/tree';
-import { todayISO } from '../lib/views';
 import { useDragStore } from '../store/drag';
 import { useTaskStore } from '../store/tasks';
 import { useUIStore } from '../store/ui';
@@ -47,6 +46,7 @@ import { useSessionStore } from '../store/session';
 import { SortableTaskItem } from './TaskItem';
 import { UpcomingFooter } from './UpcomingFooter';
 import styles from './TaskList.module.css';
+import { useToday } from '../hooks/useToday';
 
 const EXPAND_DELAY = 600;
 const RELEASE_LAYOUT_MS = 320;
@@ -79,9 +79,8 @@ export function TaskList() {
   const reduced = useReducedMotion();
   const activeId = useDragStore((s) => s.activeId);
   const showUpcoming = useUIStore((s) => s.showUpcoming);
-  const liveIds = useTaskStore(
-    useShallow((s) => flattenTree(s, { tag, today: todayISO(), showUpcoming })),
-  );
+  const today = useToday();
+  const liveIds = useTaskStore(useShallow((s) => flattenTree(s, { tag, today, showUpcoming })));
   const key = useTaskStore((s) => structureKey(s));
   // Moves apply at once; nothing reorders mid-drag. A just-completed row (already filed in
   // History, so absent from `liveIds`) stays until its strike has played, then pops out.

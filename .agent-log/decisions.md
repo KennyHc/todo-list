@@ -27,3 +27,5 @@ that made it.
 - Undo/redo apply only their own action's change (`applyChange`, field-level 3-way merge) on
   top of the live state; edits made since, local or remote, win where they overlap, and remote
   content no longer trims the history (supersedes the trimming in #50's line). (#84)
+- "Today" in render code comes from `useToday()` (`ui.today`, rolls over at midnight and on
+  focus/visibility); `todayISO()` is for write paths and event handlers only. (#86)

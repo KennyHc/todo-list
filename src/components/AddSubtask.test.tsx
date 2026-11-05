@@ -131,29 +131,29 @@ describe('Add subtask from the task menu', () => {
       expect(proxy).toHaveAttribute('tabindex', '-1');
       const input = screen.getByLabelText('Task title');
       expect(input).toHaveFocus();
-      expect(input).toHaveAttribute('enterkeyhint', 'done');
+      expect(input).toHaveAttribute('enterkeyhint', 'next');
       await waitFor(() =>
         expect(screen.queryByRole('dialog', { name: 'Task options' })).not.toBeInTheDocument(),
       );
     });
 
-    it('Enter saves and closes the keyboard without creating a sibling', () => {
+    it('Enter saves and opens a sibling, keeping the keyboard up (like desktop)', () => {
       mockMedia({ touch: true });
       render(<App />);
       const parent = seed();
       fireEvent.click(within(openMenu('Plan trip')).getByRole('button', { name: 'Add subtask' }));
       const input = screen.getByLabelText('Task title') as HTMLInputElement;
       typeInto(input, 'Book the flights to Rome');
-      const blur = vi.spyOn(input, 'blur');
       fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
 
       const s = useTaskStore.getState();
-      expect(s.tasks[parent].childIds).toHaveLength(2);
-      expect(s.tasks[s.tasks[parent].childIds[1]].title).toBe('Book the flights to Rome');
-      expect(Object.keys(s.tasks)).toHaveLength(3);
-      expect(s.editingId).toBeNull();
-      expect(blur).toHaveBeenCalled();
-      expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+      const [, saved, next] = s.tasks[parent].childIds;
+      expect(s.tasks[saved].title).toBe('Book the flights to Rome');
+      expect(s.tasks[next].title).toBe('');
+      expect(s.editingId).toBe(next);
+      const editor = screen.getByLabelText('Task title');
+      expect(editor).toHaveValue('');
+      expect(editor).toHaveFocus();
     });
 
     it('Enter on an empty title removes the row instead of leaving a blank one', () => {

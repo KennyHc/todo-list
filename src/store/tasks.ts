@@ -874,8 +874,8 @@ export const useAllTags = (): { tag: string; count: number }[] => {
 };
 
 /** Ids of the open overdue tasks (see overdueIds), compared shallowly so rows don't re-render. */
-export const useOverdueIds = (tag: string | null): string[] =>
-  useTaskStore(useShallow((s) => overdueIds(treeOf(s), todayISO(), tag)));
+export const useOverdueIds = (tag: string | null, today: string): string[] =>
+  useTaskStore(useShallow((s) => overdueIds(treeOf(s), today, tag)));
 
 export const useDeadlineList = (tag: string | null): string[] =>
   useTaskStore(useShallow((s) => deadlineList(treeOf(s), { tag })));
