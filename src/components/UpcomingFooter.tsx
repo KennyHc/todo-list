@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { todayISO, upcomingCount } from '../lib/views';
+import { upcomingCount } from '../lib/views';
 import { useTaskStore } from '../store/tasks';
 import { useUIStore } from '../store/ui';
 import styles from './UpcomingFooter.module.css';
 import { dur, ease } from '../styles/motion';
+import { useToday } from '../hooks/useToday';
 
 /**
  * The Tree's quiet last line, only while tasks are hidden by a start date: "3 starting later ·
@@ -13,7 +14,8 @@ import { dur, ease } from '../styles/motion';
 export function UpcomingFooter() {
   const tag = useUIStore((s) => s.tagFilter);
   const show = useUIStore((s) => s.showUpcoming);
-  const count = useTaskStore((s) => upcomingCount(s, todayISO(), tag));
+  const today = useToday();
+  const count = useTaskStore((s) => upcomingCount(s, today, tag));
 
   // With nothing left to reveal, the toggle goes back to off, so the next one starts hidden.
   useEffect(() => {

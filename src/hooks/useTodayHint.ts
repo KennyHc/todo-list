@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { completedTodayCount } from '../lib/today';
-import { todayISO } from '../lib/views';
 import { useSessionStore } from '../store/session';
 import { useTaskStore } from '../store/tasks';
 import { setTodayView, useUIStore } from '../store/ui';
 import { useSyncStore } from '../sync/status';
+import { useToday } from './useToday';
 
 /** Completions in a day that make it a "busy day". */
 export const BUSY_DAY = 5;
@@ -24,7 +24,8 @@ export function useTodayHint(): void {
   const synced = useSyncStore((s) => s.syncStatus !== 'loading');
   const todayView = useTaskStore((s) => s.settings.todayView);
   const offered = useTaskStore((s) => s.settings.hints.todayOffered === true);
-  const completed = useTaskStore((s) => completedTodayCount(s.history, todayISO()));
+  const today = useToday();
+  const completed = useTaskStore((s) => completedTodayCount(s.history, today));
   // The Undo toast sits in the same spot; the hint waits for it to go.
   const quiet = useTaskStore((s) => s.undo === null);
 

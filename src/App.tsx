@@ -35,6 +35,8 @@ import { useTaskStore, useTotals } from './store/tasks';
 import styles from './App.module.css';
 import { useIntro } from './hooks/useIntro';
 import { dur, ease } from './styles/motion';
+import { useToday } from './hooks/useToday';
+import { parseISO } from './lib/dates';
 
 const dateFormat = new Intl.DateTimeFormat(undefined, {
   weekday: 'long',
@@ -104,6 +106,7 @@ function Controls() {
 }
 
 function App() {
+  const today = useToday();
   const isEmpty = useTaskStore((s) => s.rootIds.length === 0);
   const hasHistory = useTaskStore((s) => s.history.length > 0);
   const view = useView();
@@ -137,7 +140,7 @@ function App() {
         <header className={styles.header} data-intro="1">
           <div className={styles.heading}>
             <h1 className={styles.title}>Tasks</h1>
-            <p className={styles.date}>{dateFormat.format(new Date())}</p>
+            <p className={styles.date}>{dateFormat.format(parseISO(today))}</p>
           </div>
           {!phone && <Controls />}
         </header>

@@ -15,7 +15,7 @@ import {
 } from '../lib/today';
 import { todayReason } from '../lib/todayReason';
 import { effectiveDifficulty } from '../lib/tree';
-import { taskPath, todayISO } from '../lib/views';
+import { taskPath } from '../lib/views';
 import { dismissSuggestion, useSessionStore } from '../store/session';
 import { useTask, useTaskStore } from '../store/tasks';
 import { useUIStore } from '../store/ui';
@@ -24,6 +24,7 @@ import { DifficultyGlyph } from './DifficultyGlyph';
 import { TaskItem } from './TaskItem';
 import styles from './TodayList.module.css';
 import { dur, ease, spring } from '../styles/motion';
+import { useToday } from '../hooks/useToday';
 
 const MAX_SUGGESTIONS = 3;
 /** How long "move something" keeps the over-capacity rows tinted. */
@@ -170,7 +171,7 @@ export function TodayList() {
   const tag = useUIStore((s) => s.tagFilter);
   const capacity = useTaskStore((s) => s.settings.dailyCapacity);
   const dismissed = useSessionStore((s) => s.dismissedSuggestions);
-  const today = todayISO();
+  const today = useToday();
   const [highlighting, setHighlighting] = useState(false);
   const suggestRef = useRef<HTMLElement>(null);
 

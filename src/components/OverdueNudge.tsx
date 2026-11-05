@@ -3,13 +3,14 @@ import { AlertCircle } from 'lucide-react';
 import { useOverdueIds, useTaskStore } from '../store/tasks';
 import styles from './OverdueNudge.module.css';
 import { spring } from '../styles/motion';
+import { useToday } from '../hooks/useToday';
 
 /**
  * One quiet line above the Tree and By deadline lists, only while something open is overdue:
  * "3 overdue · Move to today". The button moves them all in one undoable step.
  */
 export function OverdueNudge({ tag }: { tag: string | null }) {
-  const count = useOverdueIds(tag).length;
+  const count = useOverdueIds(tag, useToday()).length;
   // Reduced motion: the line appears at full height. While it grows, its wrapper clips the
   // button, so a tap (or the hit-area check) can miss it (#65).
   const reduced = useReducedMotion();
