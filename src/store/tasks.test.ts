@@ -357,18 +357,17 @@ describe('undo history', () => {
     expect(get().tasks).toEqual({});
   });
 
-  it('drops steps older than remote content, keeping only the toast entry', () => {
+  it('keeps older steps when remote content arrives, and they undo only their own change', () => {
     const a = get().add({ title: 'A' });
     get().setTagColor('work', '#c0333a');
-    const entry = get().undo;
     get().hydrate({ tasks: { ...get().tasks, [a]: { ...get().tasks[a], title: 'Remote' } } });
-    expect(get().past).toEqual([entry]);
-    expect(get().future).toEqual([]);
+    expect(get().past).toHaveLength(2);
     get().undoLast();
     expect(get().tagColors).toEqual({});
-    // The add of A predates the remote edit, so it is out of reach.
+    expect(get().tasks[a].title).toBe('Remote');
+    // The add of A: A was edited elsewhere since, so it stays (see undoMerge).
     get().undoLast();
-    expect(get().tasks[a]).toBeDefined();
+    expect(get().tasks[a]?.title).toBe('Remote');
   });
 
   it('keeps the history when only settings arrive', () => {
@@ -485,6 +484,144 @@ describe('hydrate', () => {
     get().hydrate({ tasks: { ...get().tasks, [id]: { ...get().tasks[id], title: 'A2' } } });
     expect(get().lastToggle).toBeNull();
     expect(get().undo).not.toBeNull();
+  });
+});
+
+describe('undo after remote changes (#84)', () => {
+  // What sync does with another device's edits: new objects for the changed tasks only.
+  const remoteRename = (id: string, title: string) =>
+    get().hydrate({ tasks: { ...get().tasks, [id]: { ...get().tasks[id], title } } });
+  const remoteAdd = (title: string) => {
+    const id = `remote-${title}`;
+    const task = mkTask(id, { title, createdAt: 99 });
+    get().hydrate({ tasks: { ...get().tasks, [id]: task }, rootIds: [...get().rootIds, id] });
+    return id;
+  };
+
+  it('undoing a completion leaves another task edited and one added elsewhere', () => {
+    const mum = get().add({ title: 'Call mum' });
+    const trip = get().add({ title: 'Plan trip' });
+    get().toggle(mum);
+    const added = remoteAdd('Added in tab B');
+    remoteRename(trip, 'Plan trip (renamed in B)');
+    get().undoToast();
+    expect(get().tasks[mum].done).toBe(false);
+    expect(get().tasks[added]?.title).toBe('Added in tab B');
+    expect(get().tasks[trip].title).toBe('Plan trip (renamed in B)');
+    expect(get().rootIds).toEqual([mum, trip, added]);
+    expect(get().history).toEqual([]);
+    // Redo completes it again, and still leaves the others alone.
+    get().redoLast();
+    expect(get().tasks[mum].done).toBe(true);
+    expect(get().tasks[added]).toBeDefined();
+    expect(get().tasks[trip].title).toBe('Plan trip (renamed in B)');
+  });
+
+  it('on the same task, fields changed elsewhere win and the rest is undone', () => {
+    const mum = get().add({ title: 'Call mum' });
+    get().reschedule(mum, '2026-11-10');
+    get().toggle(mum);
+    // Another device renames it and moves its due date.
+    get().hydrate({
+      tasks: {
+        ...get().tasks,
+        [mum]: { ...get().tasks[mum], title: 'Call mum!', dueDate: '2026-11-12' },
+      },
+    });
+    get().undoToast();
+    expect(get().tasks[mum]).toMatchObject({
+      done: false,
+      title: 'Call mum!',
+      dueDate: '2026-11-12',
+    });
+    // Undoing the reschedule: the due date changed elsewhere since, so it stays.
+    get().undoLast();
+    expect(get().tasks[mum].dueDate).toBe('2026-11-12');
+  });
+
+  it('undoes a cascade completion without touching a remote edit to a subtask', () => {
+    const p = get().add({ title: 'P' });
+    const c1 = get().add({ title: 'C1', parentId: p });
+    const c2 = get().add({ title: 'C2', parentId: p });
+    get().toggle(p);
+    expect(get().history).toHaveLength(3);
+    remoteRename(c1, 'C1 renamed');
+    const added = remoteAdd('Elsewhere');
+    get().undoToast();
+    expect([p, c1, c2].map((id) => get().tasks[id].done)).toEqual([false, false, false]);
+    expect(get().tasks[c1].title).toBe('C1 renamed');
+    expect(get().tasks[added]).toBeDefined();
+    expect(get().history).toEqual([]);
+  });
+
+  it('undoes a delete in place, keeping a root task added elsewhere since', () => {
+    const a = get().add({ title: 'A' });
+    const p = get().add({ title: 'P' });
+    const c = get().add({ title: 'C', parentId: p });
+    const z = get().add({ title: 'Z' });
+    get().remove(p);
+    const added = remoteAdd('Remote');
+    get().undoToast();
+    expect(get().tasks[p].childIds).toEqual([c]);
+    expect(get().tasks[c].parentId).toBe(p);
+    expect(get().rootIds).toEqual([a, p, z, added]);
+  });
+
+  it('undoes a History restore, keeping another completion that arrived since', () => {
+    const a = get().add({ title: 'A' });
+    const b = get().add({ title: 'B' });
+    get().toggle(a);
+    const entry = get().history[0];
+    get().restoreFromHistory(entry.id);
+    expect(get().tasks[a].done).toBe(false);
+    // B is completed on another device: its task and its History entry arrive.
+    const remoteEntry = { ...entry, id: 'remote-entry', taskId: b, title: 'B', completedAt: 5 };
+    get().hydrate({
+      tasks: { ...get().tasks, [b]: { ...get().tasks[b], done: true, completedAt: 5 } },
+      history: [...get().history, remoteEntry],
+    });
+    get().undoToast();
+    expect(get().tasks[a].done).toBe(true);
+    expect(get().tasks[b].done).toBe(true);
+    expect(
+      get()
+        .history.map((e) => e.id)
+        .sort(),
+    ).toEqual([entry.id, 'remote-entry'].sort());
+  });
+
+  it('does not delete a task added here once another device edited it', () => {
+    const a = get().add({ title: 'A' });
+    remoteRename(a, 'A edited elsewhere');
+    get().undoLast();
+    expect(get().tasks[a]?.title).toBe('A edited elsewhere');
+    // Expanding or collapsing it here does not count as an edit.
+    const b = get().add({ title: 'B' });
+    get().add({ title: 'B1', parentId: b });
+    get().undoLast();
+    get().update(b, { collapsed: true });
+    get().undoLast();
+    expect(get().tasks[b]).toBeUndefined();
+  });
+
+  it('a restored backup undoes without deleting what was added since', () => {
+    const a = get().add({ title: 'A' });
+    get().replaceAll(
+      {
+        tasks: { x: mkTask('x') },
+        rootIds: ['x'],
+        history: [],
+        tagColors: {},
+        settings: get().settings,
+      },
+      'Restored backup',
+    );
+    const added = remoteAdd('After restore');
+    get().undoToast();
+    expect(get().tasks[a]).toBeDefined();
+    expect(get().tasks.x).toBeUndefined();
+    expect(get().tasks[added]).toBeDefined();
+    expect(get().rootIds).toEqual([a, added]);
   });
 });
 

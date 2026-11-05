@@ -44,16 +44,24 @@ import { useSessionStore } from './session';
 import { allTags, deadlineList, todayISO, visibleTreeIds } from '../lib/views';
 import type { WeekMove } from '../lib/week';
 import type { ColorSource } from '../lib/colorResolve';
+import { applyChange, type UndoSnapshot } from '../lib/undoMerge';
 import { DEFAULT_SETTINGS, type Settings, type Task, type TaskTree } from '../types';
 
-export type UndoSnapshot = {
-  tasks: TaskTree['tasks'];
-  rootIds: string[];
-  history: HistoryEntry[];
-  tagColors: Record<string, string>;
-};
+export type { UndoSnapshot };
 
-export type UndoEntry = { id: string; label: string; snapshot: UndoSnapshot; at: number };
+/**
+ * One undoable action: the content just before and just after it. Undo applies the change
+ * `after` -> `before` on top of the live state, redo `before` -> `after` (see applyChange), so
+ * only what the action touched moves and later edits, local or remote, stay.
+ */
+export type UndoEntry = {
+  id: string;
+  label: string;
+  before: UndoSnapshot;
+  /** Filled in by `commit` once the action's new state is known. */
+  after: UndoSnapshot | null;
+  at: number;
+};
 
 type TaskState = TaskTree & {
   /** Completion log, oldest first. Persisted; independent of task deletion. */
@@ -70,7 +78,7 @@ type TaskState = TaskTree & {
   undo: UndoEntry | null;
   /**
    * Undo history, oldest first, at most UNDO_DEPTH entries; `undo` (when set) is the last one.
-   * Not persisted, and emptied by a reset (sign-out, account switch) or remote content.
+   * Not persisted, and emptied by a reset (sign-out, account switch). Remote content keeps it.
    */
   past: UndoEntry[];
   /** Undone entries for redo, the next one last. Any new undoable action empties it. */
@@ -133,8 +141,8 @@ type TaskActions = {
   revealTask: (id: string) => void;
   /**
    * Applies remote state (cloud sync). Sets only the given fields; never touches `undo`.
-   * `lastToggle` is cleared if the toggled task was changed by the update. Older undo history
-   * is dropped (its snapshots predate the remote change), keeping only the toast's entry.
+   * `lastToggle` is cleared if the toggled task was changed by the update. The undo history is
+   * kept: undo and redo only apply their own change, so they leave remote edits alone.
    */
   hydrate: (partial: Partial<PersistedTasks>) => void;
   /**
@@ -248,16 +256,23 @@ const snapshotOf = (s: TaskState): UndoSnapshot => ({
 
 /**
  * Records an undoable action and shows it as the toast. Snapshots are the old references:
- * structural sharing makes this free, so nothing is cloned.
+ * structural sharing makes this free, so nothing is cloned. Wrap the update in `commit`, which
+ * fills in the entry's `after`.
  */
 const undoEntry = (s: TaskState, label: string) => {
-  const entry: UndoEntry = { id: nanoid(), label, snapshot: snapshotOf(s), at: Date.now() };
+  const entry: UndoEntry = {
+    id: nanoid(),
+    label,
+    before: snapshotOf(s),
+    after: null,
+    at: Date.now(),
+  };
   return { undo: entry, past: [...s.past, entry].slice(-UNDO_DEPTH), future: [] };
 };
 
 /**
- * Records an action in the undo history without a toast (add, edit, indent). Snapshots restore
- * everything, so an edit left out of the history would be lost by undoing an older action.
+ * Records an action in the undo history without a toast (add, edit, indent), so ⌘Z can take it
+ * back step by step.
  */
 const quietEntry = (s: TaskState, label: string) => {
   const { past, future } = undoEntry(s, label);
@@ -267,7 +282,19 @@ const quietEntry = (s: TaskState, label: string) => {
 /** Whether the latest history step is the quiet add of `id` (its snapshot predates the row). */
 const isOwnAdd = (s: TaskState, id: string): boolean => {
   const top = s.past.at(-1);
-  return top !== undefined && top.id !== s.undo?.id && !top.snapshot.tasks[id];
+  return top !== undefined && top.id !== s.undo?.id && !top.before.tasks[id];
+};
+
+/** `next` (an update recording an entry) with that entry's `after` filled in. */
+const commit = (s: TaskState, next: Partial<TaskState>): Partial<TaskState> => {
+  const top = next.past?.at(-1);
+  if (!top || top.after !== null) return next;
+  const filled: UndoEntry = { ...top, after: snapshotOf({ ...s, ...next }) };
+  return {
+    ...next,
+    past: [...next.past!.slice(0, -1), filled],
+    ...(next.undo?.id === top.id ? { undo: filled } : {}),
+  };
 };
 
 const pickUndoFields = (s: TaskState) => ({
@@ -277,14 +304,19 @@ const pickUndoFields = (s: TaskState) => ({
   lastToggle: s.lastToggle,
 });
 
-/** One step back: restores the latest entry's snapshot and keeps the current state for redo. */
+/**
+ * One step back: takes back what the latest entry changed (and only that), and records what the
+ * undo did as the redo entry.
+ */
 const stepBack = (s: TaskState): Partial<TaskState> | null => {
   const entry = s.past.at(-1);
-  if (!entry) return null;
+  if (!entry || !entry.after) return null;
+  const current = snapshotOf(s);
+  const result = applyChange(current, entry.after, entry.before);
   return {
-    ...entry.snapshot,
+    ...result,
     past: s.past.slice(0, -1),
-    future: [...s.future, { ...entry, snapshot: snapshotOf(s) }],
+    future: [...s.future, { ...entry, before: result, after: current }],
     lastToggle: null,
     undo: s.undo?.id === entry.id ? null : s.undo,
   };
@@ -321,13 +353,15 @@ export const createTaskStore = () =>
     add: (input) => {
       const state = get();
       const { tree, id } = addTask(treeOf(state), input);
-      set({
-        tasks: tree.tasks,
-        rootIds: tree.rootIds,
-        history: historyAfter(state, tree),
-        lastToggle: null,
-        ...quietEntry(state, `Added \u201c${input.title}\u201d`),
-      });
+      set(
+        commit(state, {
+          tasks: tree.tasks,
+          rootIds: tree.rootIds,
+          history: historyAfter(state, tree),
+          lastToggle: null,
+          ...quietEntry(state, `Added \u201c${input.title}\u201d`),
+        }),
+      );
       return id;
     },
     update: (id, patch) => {
@@ -338,7 +372,20 @@ export const createTaskStore = () =>
       // subtask getting its title) belong to its add: neither is an undo step of its own.
       const quiet = Object.keys(patch).every((key) => key === 'collapsed') || isOwnAdd(state, id);
       const title = state.tasks[id]?.title ?? '';
-      set({ ...after, ...(quiet ? {} : quietEntry(state, `Edited \u201c${title}\u201d`)) });
+      if (!quiet) {
+        set(commit(state, { ...after, ...quietEntry(state, `Edited \u201c${title}\u201d`) }));
+        return;
+      }
+      // Folded into the add: its `after` moves along, or undoing the add would see the row as
+      // edited since and keep it.
+      const top = state.past.at(-1);
+      const fold = isOwnAdd(state, id) && top?.after;
+      set({
+        ...after,
+        ...(fold
+          ? { past: [...state.past.slice(0, -1), { ...top, after: { ...top.after!, ...after } }] }
+          : {}),
+      });
     },
     plan: (id, plannedFor) => {
       const state = get();
@@ -350,7 +397,7 @@ export const createTaskStore = () =>
         plannedFor === null
           ? `Removed \u201c${task.title}\u201d from today`
           : `Planned \u201c${task.title}\u201d for today`;
-      set({ ...after, ...undoEntry(state, label) });
+      set(commit(state, { ...after, ...undoEntry(state, label) }));
     },
     setSetting: (patch) => {
       const settings = applySettingsPatch(get().settings, patch);
@@ -366,7 +413,7 @@ export const createTaskStore = () =>
         after.tasks[id].notes === undefined
           ? `Removed note from \u201c${task.title}\u201d`
           : `${task.notes === undefined ? 'Added note to' : 'Edited note on'} \u201c${task.title}\u201d`;
-      set({ ...after, ...undoEntry(state, label) });
+      set(commit(state, { ...after, ...undoEntry(state, label) }));
     },
     hideUntil: (id, startDate) => {
       const state = get();
@@ -374,7 +421,7 @@ export const createTaskStore = () =>
       if (!task) return;
       const after = updateTask(treeOf(state), id, { startDate });
       if (after.tasks === state.tasks) return;
-      set({ ...after, ...undoEntry(state, hideUntilLabel(task.title, startDate)) });
+      set(commit(state, { ...after, ...undoEntry(state, hideUntilLabel(task.title, startDate)) }));
     },
     reschedule: (id, dueDate) => {
       const state = get();
@@ -382,7 +429,7 @@ export const createTaskStore = () =>
       if (!task) return;
       const after = updateTask(treeOf(state), id, { dueDate });
       if (after.tasks === state.tasks) return;
-      set({ ...after, ...undoEntry(state, rescheduleLabel(task.title, dueDate)) });
+      set(commit(state, { ...after, ...undoEntry(state, rescheduleLabel(task.title, dueDate)) }));
     },
     moveToDay: (id, { field, date }) => {
       const state = get();
@@ -390,7 +437,7 @@ export const createTaskStore = () =>
       if (!task) return;
       const after = updateTask(treeOf(state), id, { [field]: date });
       if (after.tasks === state.tasks) return;
-      set({ ...after, ...undoEntry(state, rescheduleLabel(task.title, date)) });
+      set(commit(state, { ...after, ...undoEntry(state, rescheduleLabel(task.title, date)) }));
     },
     moveOverdueToToday: (tag = null) => {
       const state = get();
@@ -399,7 +446,7 @@ export const createTaskStore = () =>
       if (ids.length === 0) return 0;
       let after = treeOf(state);
       for (const id of ids) after = updateTask(after, id, { dueDate: today });
-      set({ ...after, ...undoEntry(state, overdueMoveLabel(ids.length)) });
+      set(commit(state, { ...after, ...undoEntry(state, overdueMoveLabel(ids.length)) }));
       return ids.length;
     },
     remove: (id) => {
@@ -413,16 +460,18 @@ export const createTaskStore = () =>
       // it is not a deletion worth an Undo toast, so the previous undo entry stays as it was, and
       // the history forgets the draft's own quiet "Added" step (its snapshot predates the row).
       const abandonedDraft = task.title.trim() === '' && count === 0;
-      set({
-        ...after,
-        history: historyAfter(state, after),
-        lastToggle: null,
-        ...(abandonedDraft
-          ? isOwnAdd(state, id)
-            ? { past: state.past.slice(0, -1) }
-            : {}
-          : undoEntry(state, label)),
-      });
+      set(
+        commit(state, {
+          ...after,
+          history: historyAfter(state, after),
+          lastToggle: null,
+          ...(abandonedDraft
+            ? isOwnAdd(state, id)
+              ? { past: state.past.slice(0, -1) }
+              : {}
+            : undoEntry(state, label)),
+        }),
+      );
     },
     toggle: (id) => {
       const state = get();
@@ -484,39 +533,51 @@ export const createTaskStore = () =>
           : `${toggled.tasks[id]?.done ? 'Completed' : 'Reopened'} \u201c${title}\u201d${
               next === null ? '' : ` \u00b7 ${nextLabel(next, todayISO(new Date(now)))}`
             }${madeOneOff ? ' \u00b7 no longer repeats' : ''}`;
-      set({
-        tasks: after.tasks,
-        rootIds: after.rootIds,
-        history,
-        lastToggle: { id, at: now },
-        ...undoEntry(state, label),
-      });
+      set(
+        commit(state, {
+          tasks: after.tasks,
+          rootIds: after.rootIds,
+          history,
+          lastToggle: { id, at: now },
+          ...undoEntry(state, label),
+        }),
+      );
     },
     clearCompleted: () => {
       const state = get();
       const after = clearCompleted(treeOf(state));
       const removed = Object.keys(state.tasks).length - Object.keys(after.tasks).length;
       if (removed === 0) return;
-      set({ ...after, lastToggle: null, ...undoEntry(state, `Cleared ${removed} completed`) });
+      set(
+        commit(state, {
+          ...after,
+          lastToggle: null,
+          ...undoEntry(state, `Cleared ${removed} completed`),
+        }),
+      );
     },
     clearHistory: () => {
       const state = get();
       if (state.history.length === 0) return;
-      set({
-        history: [],
-        ...undoEntry(
-          state,
-          `Cleared history (${plural(state.history.length, 'entry', 'entries')})`,
-        ),
-      });
+      set(
+        commit(state, {
+          history: [],
+          ...undoEntry(
+            state,
+            `Cleared history (${plural(state.history.length, 'entry', 'entries')})`,
+          ),
+        }),
+      );
     },
     removeHistoryEntry: (id) => {
       const state = get();
       if (!state.history.some((entry) => entry.id === id)) return;
-      set({
-        history: state.history.filter((entry) => entry.id !== id),
-        ...undoEntry(state, 'Removed from history'),
-      });
+      set(
+        commit(state, {
+          history: state.history.filter((entry) => entry.id !== id),
+          ...undoEntry(state, 'Removed from history'),
+        }),
+      );
     },
     deleteCompleted: (entryId) => {
       const state = get();
@@ -530,13 +591,15 @@ export const createTaskStore = () =>
         removeTask ? [entry.taskId, ...getDescendants(treeOf(state), entry.taskId)] : [],
       );
       const history = state.history.filter((e) => e.id !== entryId && !gone.has(e.taskId));
-      set({
-        tasks: tree.tasks,
-        rootIds: tree.rootIds,
-        history,
-        lastToggle: null,
-        ...undoEntry(state, `Deleted \u201c${entry.title}\u201d`),
-      });
+      set(
+        commit(state, {
+          tasks: tree.tasks,
+          rootIds: tree.rootIds,
+          history,
+          lastToggle: null,
+          ...undoEntry(state, `Deleted \u201c${entry.title}\u201d`),
+        }),
+      );
     },
     deleteAllCompleted: () => {
       const state = get();
@@ -544,13 +607,15 @@ export const createTaskStore = () =>
       const removed = Object.keys(state.tasks).length - Object.keys(after.tasks).length;
       if (removed === 0 && state.history.length === 0) return;
       const count = state.history.length > 0 ? state.history.length : removed;
-      set({
-        tasks: after.tasks,
-        rootIds: after.rootIds,
-        history: [],
-        lastToggle: null,
-        ...undoEntry(state, `Deleted all completed (${count})`),
-      });
+      set(
+        commit(state, {
+          tasks: after.tasks,
+          rootIds: after.rootIds,
+          history: [],
+          lastToggle: null,
+          ...undoEntry(state, `Deleted all completed (${count})`),
+        }),
+      );
     },
     restoreFromHistory: (entryId) => {
       const state = get();
@@ -568,23 +633,27 @@ export const createTaskStore = () =>
       const state = get();
       const after = indentTask(treeOf(state), id);
       if (after.tasks === state.tasks) return;
-      set({
-        ...after,
-        history: historyAfter(state, after),
-        lastToggle: null,
-        ...quietEntry(state, 'Indented'),
-      });
+      set(
+        commit(state, {
+          ...after,
+          history: historyAfter(state, after),
+          lastToggle: null,
+          ...quietEntry(state, 'Indented'),
+        }),
+      );
     },
     outdent: (id) => {
       const state = get();
       const after = outdentTask(treeOf(state), id);
       if (after.tasks === state.tasks) return;
-      set({
-        ...after,
-        history: historyAfter(state, after),
-        lastToggle: null,
-        ...quietEntry(state, 'Outdented'),
-      });
+      set(
+        commit(state, {
+          ...after,
+          history: historyAfter(state, after),
+          lastToggle: null,
+          ...quietEntry(state, 'Outdented'),
+        }),
+      );
     },
     move: (id, target) => {
       const state = get();
@@ -593,13 +662,15 @@ export const createTaskStore = () =>
       const before = treeOf(state);
       const after = moveTask(before, id, target);
       if (after === before) return;
-      set({
-        tasks: after.tasks,
-        rootIds: after.rootIds,
-        history: historyAfter(state, after),
-        lastToggle: null,
-        ...undoEntry(state, `Moved \u201c${task.title}\u201d`),
-      });
+      set(
+        commit(state, {
+          tasks: after.tasks,
+          rootIds: after.rootIds,
+          history: historyAfter(state, after),
+          lastToggle: null,
+          ...undoEntry(state, `Moved \u201c${task.title}\u201d`),
+        }),
+      );
     },
     setEditingId: (editingId) => set({ editingId }),
     setTagColor: (rawTag, color) => {
@@ -613,7 +684,7 @@ export const createTaskStore = () =>
       const tagColors = { ...state.tagColors };
       if (value === null) delete tagColors[tag];
       else tagColors[tag] = value;
-      set({ tagColors, ...undoEntry(state, `Changed #${tag} colour`) });
+      set(commit(state, { tagColors, ...undoEntry(state, `Changed #${tag} colour`) }));
     },
     revealTask: (id) => {
       const state = get();
@@ -630,54 +701,51 @@ export const createTaskStore = () =>
           toggled !== undefined &&
           partial.tasks !== undefined &&
           partial.tasks[toggled] !== state.tasks[toggled];
-        // Older snapshots predate the remote change, so undoing them would overwrite it. The
-        // toast's entry stays, as it always has; any other step back is dropped.
-        const content =
-          partial.tasks !== undefined ||
-          partial.rootIds !== undefined ||
-          partial.history !== undefined ||
-          partial.tagColors !== undefined;
-        const kept = state.past.filter((e) => e.id === state.undo?.id);
-        return {
-          ...partial,
-          ...(changed ? { lastToggle: null } : {}),
-          ...(content ? { past: kept, future: [] } : {}),
-        };
+        // Undo and redo apply their own change on top of whatever arrives here (applyChange), so
+        // the history survives remote content.
+        return { ...partial, ...(changed ? { lastToggle: null } : {}) };
       }),
     replaceAll: (raw, label) => {
+      const state = get();
       const data = withHistoryRepaired(raw);
-      set({
-        tasks: data.tasks,
-        rootIds: data.rootIds,
-        history: data.history,
-        tagColors: data.tagColors,
-        settings: data.settings,
-        lastToggle: null,
-        ...undoEntry(get(), label),
-      });
+      set(
+        commit(state, {
+          tasks: data.tasks,
+          rootIds: data.rootIds,
+          history: data.history,
+          tagColors: data.tagColors,
+          settings: data.settings,
+          lastToggle: null,
+          ...undoEntry(state, label),
+        }),
+      );
     },
     appendTasks: (tasks, label) => {
       const state = get();
       const { tree, ids, count } = appendAiTasks(treeOf(state), tasks);
       if (count === 0) return [];
-      set({
-        tasks: tree.tasks,
-        rootIds: tree.rootIds,
-        lastToggle: null,
-        ...undoEntry(state, label),
-      });
+      set(
+        commit(state, {
+          tasks: tree.tasks,
+          rootIds: tree.rootIds,
+          lastToggle: null,
+          ...undoEntry(state, label),
+        }),
+      );
       return ids;
     },
     replaceWithTasks: (tasks, label) => {
       const state = get();
       const { tree, ids, count } = appendAiTasks(emptyTree(), tasks);
       if (count === 0) return [];
-      set({
-        tasks: tree.tasks,
-        rootIds: tree.rootIds,
-        lastToggle: null,
-        ...undoEntry(state, label),
-      });
+      set(
+        commit(state, {
+          tasks: tree.tasks,
+          rootIds: tree.rootIds,
+          lastToggle: null,
+          ...undoEntry(state, label),
+        }),
+      );
       return ids;
     },
     undoLast: () => {
@@ -690,18 +758,22 @@ export const createTaskStore = () =>
       // Steps back through any quiet edits made since, then the toast's own action.
       let state: TaskState = get();
       while (state.past.some((e) => e.id === target.id)) {
-        state = { ...state, ...stepBack(state) };
+        const back = stepBack(state);
+        if (!back) break;
+        state = { ...state, ...back };
       }
       set({ ...pickUndoFields(state), undo: null });
     },
     redoLast: () => {
       const state = get();
       const entry = state.future.at(-1);
-      if (!entry) return;
+      if (!entry || !entry.after) return;
+      const current = snapshotOf(state);
+      const result = applyChange(current, entry.before, entry.after);
       set({
-        ...entry.snapshot,
+        ...result,
         future: state.future.slice(0, -1),
-        past: [...state.past, { ...entry, snapshot: snapshotOf(state) }].slice(-UNDO_DEPTH),
+        past: [...state.past, { ...entry, before: current, after: result }].slice(-UNDO_DEPTH),
         lastToggle: null,
       });
     },
