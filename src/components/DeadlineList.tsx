@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { useCompletionHold } from '../hooks/useCompletionHold';
 import { useSettledOrder } from '../hooks/useSettledOrder';
 import { BUCKET_LABELS, deadlineBucket, type DeadlineBucket } from '../lib/dates';
-import { completedShown, deadlineList, todayISO } from '../lib/views';
+import { completedShown, deadlineList } from '../lib/views';
 import { useTaskStore, type TaskStore } from '../store/tasks';
 import { useShallow } from 'zustand/react/shallow';
 import { useUIStore } from '../store/ui';
@@ -12,6 +12,7 @@ import { useSessionStore } from '../store/session';
 import { TaskItem } from './TaskItem';
 import styles from './DeadlineList.module.css';
 import { dur, ease } from '../styles/motion';
+import { useToday } from '../hooks/useToday';
 
 const HEADER = 'section:';
 const isHeader = (key: string) => key.startsWith(HEADER);
@@ -23,8 +24,7 @@ const SHOW_ALL = 'more:completed';
  * Open task ids in deadline order, with a section header key ('section:overdue') before each
  * group. Done tasks are the Completed section's business (see `completedIds`).
  */
-function sectionKeys(state: TaskStore, tag: string | null): string[] {
-  const today = todayISO();
+function sectionKeys(state: TaskStore, tag: string | null, today: string): string[] {
   const keys: string[] = [];
   let last: DeadlineBucket | null = null;
   for (const id of deadlineList(state, { tag })) {
@@ -105,12 +105,17 @@ export function DeadlineList() {
   const collapsed = useUIStore((s) => s.completedCollapsed);
   const showAll = useUIStore((s) => s.completedShowAll);
   const celebrate = useSessionStore((s) => s.completedSomething);
+  const today = useToday();
   // Headers and ids settle as one list. A just-completed task is held where it was (struck
   // through, with its section header if it was the last one there) until the strike has
   // played; then it is released and, being the same row, glides down into Completed.
-  const settled = useSettledOrder(useTaskStore(useShallow((s) => sectionKeys(s, tag))), 700, {
-    isAnchor: isHeader,
-  });
+  const settled = useSettledOrder(
+    useTaskStore(useShallow((s) => sectionKeys(s, tag, today))),
+    700,
+    {
+      isAnchor: isHeader,
+    },
+  );
   const open = useCompletionHold(settled, { holdWith: headerBefore });
   const completedAll = useTaskStore(useShallow((s) => completedIds(s, tag)));
 

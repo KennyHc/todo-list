@@ -1,9 +1,10 @@
 import { Repeat as RepeatIcon } from 'lucide-react';
 import { dueLabel, weekdayName } from '../lib/dates';
 import { repeatPhrase } from '../lib/recur';
-import { dueStatus, todayISO } from '../lib/views';
+import { dueStatus } from '../lib/views';
 import type { Repeat } from '../types';
 import styles from './DuePill.module.css';
+import { useToday } from '../hooks/useToday';
 
 type Props = {
   dueDate: string;
@@ -19,7 +20,7 @@ type Props = {
 
 /** A due date as quiet text; overdue gets a tint. A repeating task carries the repeat icon. */
 export function DuePill({ dueDate, done, repeat = null, display = 'full' }: Props) {
-  const today = todayISO();
+  const today = useToday();
   const status = done ? 'done' : dueStatus(dueDate, today);
   const label = dueLabel(dueDate, today);
   const shown = display === 'weekday' ? weekdayName(dueDate) : label;

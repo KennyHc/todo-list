@@ -30,13 +30,7 @@ import { ignoreTextEntry } from '../lib/textEntry';
 import { primeKeyboard } from '../lib/focusProxy';
 import { rowControls, TEXT_ENTRY, toggleKeepingFocus } from '../hooks/useHotkeys';
 import { getDescendants, hiddenUntilStart } from '../lib/tree';
-import {
-  isContextOnly,
-  neighborAfterRemoval,
-  taskPath,
-  todayISO,
-  visibleOrder,
-} from '../lib/views';
+import { isContextOnly, neighborAfterRemoval, taskPath, visibleOrder } from '../lib/views';
 import {
   useColorSource,
   useEffectiveColor,
@@ -66,6 +60,7 @@ import { SwipeRow } from './SwipeRow';
 import styles from './TaskItem.module.css';
 import { TitleEditor } from './TitleEditor';
 import { dur, ease, spring } from '../styles/motion';
+import { useToday } from '../hooks/useToday';
 
 type Props = {
   id: string;
@@ -238,11 +233,10 @@ function TaskItemInner({
     (s) => !flat && tagFilter !== null && isContextOnly(s, id, tagFilter),
   );
   const showUpcoming = useUIStore((s) => s.showUpcoming);
+  const today = useToday();
   // Only in the Tree, with "Show" pressed on its footer: a task that starts later (or sits under
   // one) is dimmed, and its own row says when it starts.
-  const upcoming = useTaskStore(
-    (s) => showUpcoming && !flat && hiddenUntilStart(s, id, todayISO()),
-  );
+  const upcoming = useTaskStore((s) => showUpcoming && !flat && hiddenUntilStart(s, id, today));
   const path = useTaskStore(useShallow((s) => (flat ? taskPath(s, id) : NO_PATH)));
   /** The note under the title: shut, shown read-only (links as chips) or being edited. */
   const [noteMode, setNoteMode] = useState<NoteMode>('closed');
@@ -424,7 +418,6 @@ function TaskItemInner({
   const { text: linkless, links } = splitTitleLinks(task.title);
   const shownTitle = linkless === '' ? task.title : linkless;
   const chipLinks = linkless === '' ? [] : [...new Set(links)].slice(0, MAX_LINKS_SHOWN);
-  const today = todayISO();
   const startsLater = upcoming && task.startDate !== null && task.startDate > today;
   const hasNote = task.notes !== undefined;
   const noteOpen = noteMode === 'edit' || (noteMode === 'read' && hasNote);

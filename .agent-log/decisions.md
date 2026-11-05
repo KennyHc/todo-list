@@ -24,3 +24,5 @@ that made it.
 - Styles use the theme.css scales for font-size (`--fs-*`), weight (`--fw-*`), tracking
   (`--track-*`) and radius (`--r-*`); no raw values except 50%, 0 and 2px bars. Segmented controls
   mark the chosen option with a raised `--thumb`, not the accent. (#81)
+- "Today" in render code comes from `useToday()` (`ui.today`, rolls over at midnight and on
+  focus/visibility); `todayISO()` is for write paths and event handlers only. (#86)

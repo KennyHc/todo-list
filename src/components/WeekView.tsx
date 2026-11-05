@@ -35,6 +35,7 @@ import { dur, ease } from '../styles/motion';
 import { DragPreview } from './DragPreview';
 import { TaskItem } from './TaskItem';
 import styles from './WeekView.module.css';
+import { useToday } from '../hooks/useToday';
 
 /** What a dragged Week row carries: the task, which of its rows it is, and the day it is on. */
 type RowData = { id: string; kind: WeekKind; date: string };
@@ -46,7 +47,7 @@ const weekdayShort = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
 const weekdayLong = new Intl.DateTimeFormat(undefined, { weekday: 'long' });
 const monthDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
 
-function WeekBar({ start, current }: { start: string; current: string }) {
+function WeekBar({ start, current, today }: { start: string; current: string; today: string }) {
   const setAnchor = useUIStore((s) => s.setWeekAnchor);
   // The current week is "follow today" (null), so the view stays right past midnight.
   const go = (next: string) => setAnchor(next === current ? null : next);
@@ -54,7 +55,7 @@ function WeekBar({ start, current }: { start: string; current: string }) {
   return (
     <div className={styles.bar}>
       <h2 className={styles.range} aria-live="polite">
-        {weekRange(start, todayISO())}
+        {weekRange(start, today)}
       </h2>
       <div className={styles.nav} role="group" aria-label="Week">
         {/* Only off the current week; first, so the arrows don't move when it comes and goes. */}
@@ -215,7 +216,7 @@ export function WeekView() {
   const anchor = useUIStore((s) => s.weekAnchor);
   const tasks = useTaskStore((s) => s.tasks);
   const rootIds = useTaskStore((s) => s.rootIds);
-  const today = todayISO();
+  const today = useToday();
   const current = weekStart(today);
   const start = anchor ?? current;
   const days = useMemo(
@@ -286,7 +287,7 @@ export function WeekView() {
 
   return (
     <div className={styles.week}>
-      <WeekBar start={start} current={current} />
+      <WeekBar start={start} current={current} today={today} />
       <DndContext
         sensors={sensors}
         collisionDetection={pointerWithin}
