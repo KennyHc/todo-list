@@ -1,6 +1,6 @@
 import { MoreHorizontal } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { useIsTouch } from '../hooks/useIsTouch';
+import { useImeEnter } from '../hooks/useImeEnter';
 import { useIsPhone } from '../hooks/useMediaQuery';
 import { weekdayDate } from '../lib/dates';
 import { parseQuickAdd, SUPPORTS_REPEAT, tokenKey, type QuickToken } from '../lib/quickAdd';
@@ -26,7 +26,6 @@ type Props = {
 export function TitleEditor({ id, initial, parentId, onMenu }: Props) {
   const [draft, setDraft] = useState(initial);
   const ref = useRef<HTMLInputElement>(null);
-  const touch = useIsTouch();
   const phone = useIsPhone();
   /** Set once a key action has handled saving, so the blur that follows is ignored. */
   const handled = useRef(false);
@@ -81,18 +80,23 @@ export function TitleEditor({ id, initial, parentId, onMenu }: Props) {
   };
   const finish = () => store.getState().setEditingId(null);
 
+  // Enter (and a phone's ✓ / return key) saves and opens a new sibling below, on every device.
+  // The new row's editor takes focus as it mounts, so the on-screen keyboard stays up.
+  const enter = () => {
+    const { add, setEditingId } = store.getState();
+    handled.current = true;
+    if (!save()) finish();
+    else setEditingId(add({ title: '', parentId, afterId: id }));
+  };
+  const ime = useImeEnter(enter);
+
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.nativeEvent.isComposing) return;
-    const { add, indent, outdent, remove, setEditingId } = store.getState();
+    if (ime.intercept(e)) return;
+    const { indent, outdent, remove } = store.getState();
     const title = draft.trim();
     if (e.key === 'Enter') {
       e.preventDefault();
-      handled.current = true;
-      // Phones: Enter means "done". Save and stop: no new sibling.
-      if (!save() || touch) finish();
-      else setEditingId(add({ title: '', parentId, afterId: id }));
-      // Closes the on-screen keyboard.
-      if (touch) ref.current?.blur();
+      enter();
     } else if (e.key === 'Escape') {
       e.preventDefault();
       handled.current = true;
@@ -115,10 +119,11 @@ export function TitleEditor({ id, initial, parentId, onMenu }: Props) {
       className={styles.titleInput}
       value={draft}
       aria-label="Task title"
-      enterKeyHint={touch ? 'done' : 'next'}
+      enterKeyHint="next"
       autoComplete="off"
       onChange={(e) => setDraft(e.target.value)}
       onKeyDown={onKeyDown}
+      {...ime.handlers}
       onBlur={() => {
         if (handled.current) return;
         handled.current = true;

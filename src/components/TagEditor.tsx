@@ -1,5 +1,6 @@
 import { useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useImeEnter } from '../hooks/useImeEnter';
 import { normalizeTag, tagColor } from '../lib/tags';
 import { useAllTags, useTagColors, useTaskStore } from '../store/tasks';
 import { ColorPicker } from './ColorPicker';
@@ -44,7 +45,12 @@ export function TagEditor({ tags, onChange, autoFocus, compact, colorEdit }: Pro
     if (tag && !tags.includes(tag)) onChange([...tags, tag]);
   };
 
+  const enter = () =>
+    add(active >= 0 && active < suggestions.length ? suggestions[active].tag : draft);
+  const ime = useImeEnter(enter);
+
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (ime.intercept(e)) return;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       if (suggestions.length === 0) return;
       e.preventDefault();
@@ -56,8 +62,7 @@ export function TagEditor({ tags, onChange, autoFocus, compact, colorEdit }: Pro
       });
     } else if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
-      const pick = active >= 0 && active < suggestions.length ? suggestions[active].tag : draft;
-      add(pick);
+      enter();
     } else if (e.key === 'Tab' && active >= 0 && active < suggestions.length) {
       e.preventDefault();
       add(suggestions[active].tag);
@@ -125,7 +130,9 @@ export function TagEditor({ tags, onChange, autoFocus, compact, colorEdit }: Pro
           setDraft(e.target.value);
           setActive(-1);
         }}
+        enterKeyHint="enter"
         onKeyDown={onKeyDown}
+        {...ime.handlers}
       />
       <ul id={listId} role="listbox" aria-label="Existing tags" className={styles.suggestions}>
         {suggestions.map(({ tag, count }, i) => (
